@@ -1,0 +1,30 @@
+# KiCad
+*.lck
+*.kicad_prl
+*-backups/
+.history/
+fp-info-cache
+_autosave-*
+*.bak
+*.000
+\#auto_saved_files#
+
+# KiCad fabrication outputs
+hardware/gerbers/
+hardware/production/
+
+# Fusion 360 / slicer outputs
+*.gcode
+*.3mf.bak
+
+# ESP-IDF / PlatformIO
+build/
+.pio/
+sdkconfig.old
+managed_components/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
