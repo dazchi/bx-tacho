@@ -240,7 +240,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": "v0.1"
+      "sch_revision": "v0.2"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -448,7 +448,7 @@
       "field_name_whitespace": "warning",
       "footprint_filter": "ignore",
       "footprint_link_issues": "warning",
-      "four_way_junction": "warning",
+      "four_way_junction": "ignore",
       "ground_pin_not_ground": "warning",
       "hier_label_mismatch": "error",
       "isolated_pin_label": "warning",
@@ -466,7 +466,7 @@
       "no_connect_dangling": "warning",
       "pin_not_connected": "error",
       "pin_not_driven": "error",
-      "pin_to_pin": "warning",
+      "pin_to_pin": "ignore",
       "power_pin_not_driven": "error",
       "same_local_global_label": "warning",
       "similar_label_and_power": "warning",
@@ -535,7 +535,7 @@
     "annotate_start_num": 0,
     "annotation": {
       "method": 0,
-      "sort_order": 0
+      "sort_order": 1
     },
     "bom_export_filename": "${PROJECTNAME}.csv",
     "bom_fmt_presets": [],
@@ -661,7 +661,7 @@
         "uuid": "2c588408-32da-424d-a43f-d1ecf098f060"
       }
     ],
-    "used_designators": "U1-6,LDO1,KEY1-2,Q1-2,#PWR1-36,#PWR45-52,D1-2,USB1,SW1-3,#FLG1-4,R1-26,C1-11,J1,TP1-14",
+    "used_designators": "LDO1,TP1-14,KEY1-2,USB1,C1-13,SW1-3,U1-6,#FLG1-5,Q1-2,D1-2,#PWR1-41,#PWR45-56,R1-26,J1-3",
     "variants": []
   },
   "sheets": [
