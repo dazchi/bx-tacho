@@ -1,0 +1,126 @@
+(footprint "BatteryPads_1x02_SMD_2x3mm_P4mm"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "Two SMD solder pads for direct wire soldering of a 1S LiPo (26-28 AWG), 2.0x3.0mm pads, 4mm pitch, no holes. Pad 1 = BAT+, pad 2 = BAT-")
+	(tags "solder wire pad battery SMD")
+	(property "Reference" "REF**"
+		(at -2.5 0 90)
+		(layer "F.SilkS")
+		(uuid "c12768e1-c55f-4019-b8aa-633b7d4401ef")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "BatteryPads_1x02_SMD"
+		(at 2 2.8 0)
+		(layer "F.Fab")
+		(uuid "44ab9c3f-b7ec-4df8-856e-a5d6a888cd72")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "81d2d4ec-f882-4790-865b-ba68b5b881fa")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "fbe65be1-305e-4a3a-be19-a6c8eda73913")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr smd exclude_from_bom)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_rect
+		(start -1.7 -2.25)
+		(end 5.7 2.25)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "b0ce3af9-c725-4b06-9788-f2b9a60630de")
+	)
+	(fp_rect
+		(start -1.5 -2)
+		(end 5.5 2)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.Fab")
+		(uuid "c75f45d5-cc17-4b65-b197-cd7fd8536654")
+	)
+	(fp_text user "+"
+		(at 0.922857 -3.1 0)
+		(layer "F.SilkS")
+		(uuid "cff634d9-b7d0-4233-a8df-dd4bd7a29080")
+		(effects
+			(font
+				(size 1.2 1.2)
+				(thickness 0.2)
+			)
+			(justify right)
+		)
+	)
+	(fp_text user "-"
+		(at 3.077143 -3.1 0)
+		(layer "F.SilkS")
+		(uuid "a7a82604-a3fa-4415-9f7c-f161d6c0431f")
+		(effects
+			(font
+				(size 1.2 1.2)
+				(thickness 0.2)
+			)
+			(justify left)
+		)
+	)
+	(fp_text user "${REFERENCE}"
+		(at 2 0 0)
+		(layer "F.Fab")
+		(uuid "f5b4c1b4-9778-4a45-a2e3-a48e89454b30")
+		(effects
+			(font
+				(size 0.6 0.6)
+				(thickness 0.09)
+			)
+		)
+	)
+	(pad "1" smd roundrect
+		(at 0 0)
+		(size 2 3)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.15)
+		(uuid "9126c3d5-90bd-484d-bf27-3519f8c59a12")
+	)
+	(pad "2" smd roundrect
+		(at 4 0)
+		(size 2 3)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.15)
+		(uuid "554c17a0-abea-49a3-af3b-662769dc8d42")
+	)
+	(embedded_fonts no)
+)

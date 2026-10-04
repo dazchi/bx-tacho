@@ -1,0 +1,69 @@
+(version 1)
+# JLCPCB fabrication limits: standard 2-layer board, 1 oz copper.
+# Source: https://jlcpcb.com/capabilities/pcb-capabilities (read 2026-10-04).
+# Rules marked (assumed) are not stated on that page; they are common
+# conservative values. Check JLCPCB's page again before ordering.
+# These are fab MINIMUMS. Draw with larger defaults (see Board Setup) so the
+# check only fires on genuine mistakes.
+
+# Copper
+(rule "JLC copper clearance"
+	(constraint clearance (min 0.1mm)))
+
+(rule "JLC track width"
+	(condition "A.Type == 'Track'")
+	(constraint track_width (min 0.1mm)))
+
+# Vias
+(rule "JLC via hole"
+	(condition "A.Type == 'Via'")
+	(constraint hole_size (min 0.15mm)))
+
+(rule "JLC via diameter"
+	(condition "A.Type == 'Via'")
+	(constraint via_diameter (min 0.25mm)))
+
+(rule "JLC via annular ring"
+	(condition "A.Type == 'Via'")
+	(constraint annular_width (min 0.05mm)))
+
+# Plated through-hole pads
+(rule "JLC PTH hole range"
+	(condition "A.Type == 'Pad' && A.isPlated()")
+	(constraint hole_size (min 0.15mm) (max 6.3mm)))
+
+(rule "JLC PTH annular ring (recommended)"
+	(severity warning)
+	(condition "A.Type == 'Pad' && A.isPlated() && A.Pad_Type == 'Through-hole'")
+	(constraint annular_width (min 0.25mm)))
+
+# Non-plated holes
+(rule "JLC NPTH hole"
+	(condition "A.Type == 'Pad' && A.Pad_Type == 'NPTH, mechanical'")
+	(constraint hole_size (min 0.5mm)))
+
+# Hole spacing
+(rule "JLC hole to hole (default)"
+	(constraint hole_to_hole (min 0.2mm)))
+
+(rule "JLC hole to hole between pads"
+	(condition "A.Type == 'Pad' && B.Type == 'Pad'")
+	(constraint hole_to_hole (min 0.45mm)))
+
+(rule "JLC hole to copper (assumed)"
+	(constraint hole_clearance (min 0.2mm)))
+
+# Board edge (routed outline; V-cut needs 0.4 mm)
+(rule "JLC copper to board edge"
+	(constraint edge_clearance (min 0.2mm)))
+
+# Silkscreen
+(rule "JLC silk to pad/mask"
+	(layer "?.Silkscreen")
+	(constraint silk_clearance (min 0.15mm)))
+
+(rule "JLC silk text size"
+	(severity warning)
+	(layer "?.Silkscreen")
+	(constraint text_height (min 1.0mm))
+	(constraint text_thickness (min 0.15mm)))
