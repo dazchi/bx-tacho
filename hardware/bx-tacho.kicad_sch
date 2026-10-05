@@ -215,129 +215,6 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Connector:TestPoint"
-			(pin_numbers
-				(hide yes)
-			)
-			(pin_names
-				(offset 0.762)
-				(hide yes)
-			)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(in_pos_files yes)
-			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "TP"
-				(at 0 6.858 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "TestPoint"
-				(at 0 5.08 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 5.08 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Datasheet" ""
-				(at 5.08 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Description" "test point"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_keywords" "test point tp"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "ki_fp_filters" "Pin* Test*"
-				(at 0 0 0)
-				(show_name no)
-				(do_not_autoplace no)
-				(hide yes)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(symbol "TestPoint_0_1"
-				(circle
-					(center 0 3.302)
-					(radius 0.762)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-			)
-			(symbol "TestPoint_1_1"
-				(pin passive line
-					(at 0 0 90)
-					(length 2.54)
-					(name "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-			(embedded_fonts no)
-		)
 		(symbol "Connector_Generic:Conn_01x02"
 			(pin_names
 				(offset 1.016)
@@ -5022,16 +4899,6 @@
 	)
 	(wire
 		(pts
-			(xy 140.97 138.43) (xy 140.97 139.7)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "085d798f-e090-4f0d-a91f-09abdd8d2366")
-	)
-	(wire
-		(pts
 			(xy 33.02 161.29) (xy 36.83 161.29)
 		)
 		(stroke
@@ -5052,6 +4919,16 @@
 	)
 	(wire
 		(pts
+			(xy 64.77 83.82) (xy 64.77 97.79)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0ccbadf0-89e9-4539-a879-67eb76a34585")
+	)
+	(wire
+		(pts
 			(xy 143.51 97.79) (xy 147.32 97.79)
 		)
 		(stroke
@@ -5062,7 +4939,7 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 142.24) (xy 170.18 142.24)
+			(xy 132.08 168.91) (xy 146.05 168.91)
 		)
 		(stroke
 			(width 0)
@@ -5122,16 +4999,6 @@
 	)
 	(wire
 		(pts
-			(xy 93.98 168.91) (xy 102.87 168.91)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1483ad82-18dd-497d-965b-e24ecbd6f275")
-	)
-	(wire
-		(pts
 			(xy 172.72 82.55) (xy 172.72 90.17)
 		)
 		(stroke
@@ -5172,16 +5039,6 @@
 	)
 	(wire
 		(pts
-			(xy 132.08 142.24) (xy 142.24 142.24)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1961ce16-2d73-41a5-bad3-ef699c90e9c6")
-	)
-	(wire
-		(pts
 			(xy 166.37 38.1) (xy 195.58 38.1)
 		)
 		(stroke
@@ -5209,6 +5066,16 @@
 			(type default)
 		)
 		(uuid "1b1c807a-096b-4a63-aa5f-17ac5e51ab0c")
+	)
+	(wire
+		(pts
+			(xy 50.8 83.82) (xy 64.77 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1c01ca85-2c04-433d-bd85-081fa337a0d4")
 	)
 	(wire
 		(pts
@@ -5370,16 +5237,6 @@
 		)
 		(uuid "2b038e98-8548-4e82-83f2-5a90033935d0")
 	)
-	(wire
-		(pts
-			(xy 132.08 144.78) (xy 142.24 144.78)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2c52fc66-f4b8-44c9-8ee0-6bc8ab35e508")
-	)
 	(polyline
 		(pts
 			(xy 95.25 147.32) (xy 95.25 130.81)
@@ -5502,16 +5359,6 @@
 	)
 	(wire
 		(pts
-			(xy 102.87 168.91) (xy 102.87 170.18)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "380b7a16-75ad-467b-8be3-63b2c7289308")
-	)
-	(wire
-		(pts
 			(xy 53.34 25.4) (xy 53.34 31.75)
 		)
 		(stroke
@@ -5519,16 +5366,6 @@
 			(type default)
 		)
 		(uuid "39a221a3-7247-4562-ba3b-a5a87b4355e2")
-	)
-	(wire
-		(pts
-			(xy 64.77 87.63) (xy 64.77 97.79)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "3b388137-9107-460f-b527-57e6790f22fd")
 	)
 	(wire
 		(pts
@@ -5572,23 +5409,13 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 139.7) (xy 170.18 139.7)
+			(xy 132.08 166.37) (xy 146.05 166.37)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "412d033f-02b2-469b-9540-efe6bd5d5dba")
-	)
-	(wire
-		(pts
-			(xy 134.62 147.32) (xy 134.62 149.86)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4298cb1c-35b8-49ad-9a1e-d3604db6740c")
 	)
 	(wire
 		(pts
@@ -5622,7 +5449,7 @@
 	)
 	(wire
 		(pts
-			(xy 107.95 140.97) (xy 116.84 140.97)
+			(xy 111.76 167.64) (xy 120.65 167.64)
 		)
 		(stroke
 			(width 0)
@@ -5652,16 +5479,6 @@
 	)
 	(wire
 		(pts
-			(xy 140.97 139.7) (xy 132.08 139.7)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4d163c92-8fb5-453e-957a-bc3535a5a4ea")
-	)
-	(wire
-		(pts
 			(xy 176.53 60.96) (xy 176.53 62.23)
 		)
 		(stroke
@@ -5669,16 +5486,6 @@
 			(type default)
 		)
 		(uuid "4d1ce6ba-6d87-42cd-9167-29ee6b8aa1d4")
-	)
-	(wire
-		(pts
-			(xy 115.57 167.64) (xy 132.08 167.64)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4dba5038-fee8-44c1-983e-ef6350423851")
 	)
 	(wire
 		(pts
@@ -5822,16 +5629,6 @@
 	)
 	(wire
 		(pts
-			(xy 102.87 158.75) (xy 102.87 160.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5c345697-584b-43c7-9384-76bbf6b4a15a")
-	)
-	(wire
-		(pts
 			(xy 62.23 25.4) (xy 53.34 25.4)
 		)
 		(stroke
@@ -5862,7 +5659,7 @@
 	)
 	(wire
 		(pts
-			(xy 156.21 144.78) (xy 170.18 144.78)
+			(xy 132.08 171.45) (xy 146.05 171.45)
 		)
 		(stroke
 			(width 0)
@@ -6050,16 +5847,6 @@
 		)
 		(uuid "6c760f9c-6b91-43e5-a303-5ff184a1d46d")
 	)
-	(wire
-		(pts
-			(xy 93.98 160.02) (xy 102.87 160.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "6cae8600-31bd-426c-858a-10dcfd1c2453")
-	)
 	(polyline
 		(pts
 			(xy 203.2 78.74) (xy 203.2 128.27)
@@ -6099,26 +5886,6 @@
 			(type default)
 		)
 		(uuid "73039626-62c2-4491-8410-3f1e12a94b42")
-	)
-	(wire
-		(pts
-			(xy 81.28 160.02) (xy 74.93 160.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7306e461-d487-437b-a8dd-4901a872f0e5")
-	)
-	(wire
-		(pts
-			(xy 115.57 158.75) (xy 132.08 158.75)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7340bcfd-e7bd-4657-a966-3cbf368a7c50")
 	)
 	(wire
 		(pts
@@ -6252,7 +6019,7 @@
 	)
 	(wire
 		(pts
-			(xy 107.95 143.51) (xy 116.84 143.51)
+			(xy 111.76 170.18) (xy 120.65 170.18)
 		)
 		(stroke
 			(width 0)
@@ -6322,7 +6089,7 @@
 	)
 	(wire
 		(pts
-			(xy 170.18 149.86) (xy 170.18 147.32)
+			(xy 146.05 176.53) (xy 146.05 173.99)
 		)
 		(stroke
 			(width 0)
@@ -6379,16 +6146,6 @@
 			(type dash)
 		)
 		(uuid "8a89721b-dfae-49f1-9792-2bbc094c0526")
-	)
-	(wire
-		(pts
-			(xy 153.67 185.42) (xy 153.67 186.69)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8ad31a1e-b3a2-41f6-9a39-38cd88c33726")
 	)
 	(wire
 		(pts
@@ -6499,16 +6256,6 @@
 			(type default)
 		)
 		(uuid "98574fc2-5d52-4689-b5c7-c9dc9e06996e")
-	)
-	(wire
-		(pts
-			(xy 140.97 176.53) (xy 154.94 176.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9b6263ea-ca62-4f64-bec3-94a7973f77e4")
 	)
 	(wire
 		(pts
@@ -6632,16 +6379,6 @@
 	)
 	(wire
 		(pts
-			(xy 115.57 185.42) (xy 132.08 185.42)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "aa29acdc-14d4-4bfe-a775-127cf1ec6d14")
-	)
-	(wire
-		(pts
 			(xy 64.77 114.3) (xy 64.77 124.46)
 		)
 		(stroke
@@ -6692,16 +6429,6 @@
 	)
 	(wire
 		(pts
-			(xy 74.93 177.8) (xy 83.82 177.8)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ad131e2c-2cc2-446c-baa9-ecaa338ce7ed")
-	)
-	(wire
-		(pts
 			(xy 165.1 100.33) (xy 162.56 100.33)
 		)
 		(stroke
@@ -6709,16 +6436,6 @@
 			(type default)
 		)
 		(uuid "ad18f5c9-e29b-47de-9bd3-adfff5cea6f2")
-	)
-	(wire
-		(pts
-			(xy 81.28 157.48) (xy 81.28 160.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ad58e0a7-122d-450a-b8df-52d97c2ca5a8")
 	)
 	(wire
 		(pts
@@ -6769,16 +6486,6 @@
 			(type default)
 		)
 		(uuid "afc2b7c1-9f62-4ffc-95d3-89232a7bea2c")
-	)
-	(wire
-		(pts
-			(xy 74.93 186.69) (xy 83.82 186.69)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b061fd4a-f4af-42c6-b777-008d7d2b1591")
 	)
 	(polyline
 		(pts
@@ -6912,7 +6619,7 @@
 	)
 	(wire
 		(pts
-			(xy 170.18 147.32) (xy 156.21 147.32)
+			(xy 146.05 173.99) (xy 132.08 173.99)
 		)
 		(stroke
 			(width 0)
@@ -7002,16 +6709,6 @@
 	)
 	(wire
 		(pts
-			(xy 132.08 147.32) (xy 134.62 147.32)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c118a047-21aa-4307-a36a-8605e7bf182a")
-	)
-	(wire
-		(pts
 			(xy 166.37 50.8) (xy 176.53 50.8)
 		)
 		(stroke
@@ -7072,16 +6769,6 @@
 	)
 	(wire
 		(pts
-			(xy 115.57 176.53) (xy 132.08 176.53)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c718bf0c-8b82-4800-8d1e-48342eb28d54")
-	)
-	(wire
-		(pts
 			(xy 41.91 39.37) (xy 59.69 39.37)
 		)
 		(stroke
@@ -7119,16 +6806,6 @@
 			(type default)
 		)
 		(uuid "ca101f63-a698-42bb-936b-8013f7349672")
-	)
-	(wire
-		(pts
-			(xy 140.97 185.42) (xy 153.67 185.42)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "cc4ca5dc-612a-47fd-9cac-3478fbaaabfa")
 	)
 	(wire
 		(pts
@@ -7329,16 +7006,6 @@
 			(type default)
 		)
 		(uuid "e245e6bd-1871-4576-8636-97ea873c8610")
-	)
-	(wire
-		(pts
-			(xy 74.93 168.91) (xy 83.82 168.91)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e33e5cfb-f388-4a71-9201-993ea4ede51f")
 	)
 	(wire
 		(pts
@@ -7562,16 +7229,6 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 186.69) (xy 83.82 187.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f5d76413-e8b0-445e-9a3c-c41f3a256807")
-	)
-	(wire
-		(pts
 			(xy 21.59 119.38) (xy 25.4 119.38)
 		)
 		(stroke
@@ -7690,16 +7347,6 @@
 		)
 		(uuid "045a4f8e-0833-4559-b221-2121274c6c65")
 	)
-	(label "RPM_IR_TRIG"
-		(at 132.08 176.53 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "11cb9b7b-8fea-441a-8f85-b85ef779c4f3")
-	)
 	(label "VUSB_DET"
 		(at 218.44 104.14 0)
 		(effects
@@ -7720,16 +7367,6 @@
 		)
 		(uuid "1dd1e4ab-741a-44fa-877a-e41f99f5df11")
 	)
-	(label "LOAD_SENSE"
-		(at 154.94 176.53 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "255a8a26-ed88-4d61-981d-b1c94af45c1d")
-	)
 	(label "USB_DN"
 		(at 218.44 129.54 0)
 		(effects
@@ -7740,25 +7377,15 @@
 		)
 		(uuid "2eea250f-3000-4f74-9dde-afddbe43d63a")
 	)
-	(label "RPM_SENSE"
-		(at 132.08 158.75 180)
+	(label "RPM_CMP_PWR"
+		(at 50.8 83.82 0)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
-			(justify right bottom)
+			(justify left bottom)
 		)
-		(uuid "30c1cbd6-70e6-4b14-9f9e-b4f8a665a63c")
-	)
-	(label "VBAT+"
-		(at 83.82 168.91 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "424cdb7d-028d-4feb-a97a-914f1f08c459")
+		(uuid "36d05478-72f3-4676-b116-af8c579d0f2f")
 	)
 	(label "RPM_IR_TRIG"
 		(at 218.44 114.3 0)
@@ -7789,16 +7416,6 @@
 			(justify right bottom)
 		)
 		(uuid "4fa462a5-ec9d-4c8c-8f60-1e80602c79e8")
-	)
-	(label "RPM_IR_THR_PWM"
-		(at 132.08 185.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "5211460e-b420-418b-90a0-df7482b1a496")
 	)
 	(label "CHRG_DET"
 		(at 128.27 49.53 0)
@@ -7860,18 +7477,8 @@
 		)
 		(uuid "7ff41f80-a8c2-407b-8461-99be79c86775")
 	)
-	(label "UART_TX"
-		(at 142.24 144.78 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "8113629d-c8b4-4394-85be-05c8a089c423")
-	)
 	(label "RPM_SENSE"
-		(at 170.18 139.7 180)
+		(at 146.05 166.37 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -7891,7 +7498,7 @@
 		(uuid "8542f478-3ac5-4318-b3ba-6543d7037c6b")
 	)
 	(label "RPM_IR_TRIG"
-		(at 170.18 142.24 180)
+		(at 146.05 168.91 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -7911,7 +7518,7 @@
 		(uuid "8c23fb93-c245-4329-9634-b45dfde4e3ba")
 	)
 	(label "VBAT-"
-		(at 116.84 143.51 180)
+		(at 120.65 170.18 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -7970,7 +7577,7 @@
 		)
 		(uuid "97d78d30-cd14-4259-93da-3a12d3813f66")
 	)
-	(label "LOAD_IR_LED"
+	(label "RPM_IR_LED"
 		(at 280.67 104.14 180)
 		(effects
 			(font
@@ -7978,7 +7585,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "9afd440e-677d-4416-8e6b-a32529c0f868")
+		(uuid "a4e48d19-6192-4c3f-b88f-37fba5c830c6")
 	)
 	(label "OLED_SCL"
 		(at 218.44 124.46 0)
@@ -8051,7 +7658,7 @@
 		(uuid "babd2c68-54d0-4695-9d4d-52f83dabc0b5")
 	)
 	(label "LOAD_SENSE"
-		(at 170.18 144.78 180)
+		(at 146.05 171.45 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -8100,16 +7707,6 @@
 		)
 		(uuid "d019214b-36a0-4c61-9915-69aba8ad1e40")
 	)
-	(label "VSYS"
-		(at 83.82 177.8 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d94cd95f-169a-431e-b6d7-e9a947c3011f")
-	)
 	(label "RPM_IR_TRIG"
 		(at 201.93 100.33 180)
 		(effects
@@ -8140,17 +7737,7 @@
 		)
 		(uuid "e4f7d4db-1e5f-4f0d-bf93-78bae7ee9380")
 	)
-	(label "UART_RX"
-		(at 142.24 142.24 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "e8baebd2-d558-42e0-b623-3d298db84934")
-	)
-	(label "RPM_IR_LED"
+	(label "LOAD_IR_LED"
 		(at 218.44 119.38 0)
 		(effects
 			(font
@@ -8158,17 +7745,7 @@
 			)
 			(justify left bottom)
 		)
-		(uuid "ebd61dca-0d89-4e78-99aa-e73361ac0798")
-	)
-	(label "RPM_REF"
-		(at 132.08 167.64 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "f9b80a76-e9f2-4fb6-9b73-07a261448edc")
+		(uuid "eaa55eec-db65-45c3-a8dd-b94c8319cdb8")
 	)
 	(label "VSYS"
 		(at 251.46 25.4 180)
@@ -8191,7 +7768,7 @@
 		(uuid "fb5d3022-dd12-4dd3-a23c-3bf8ecc08f1e")
 	)
 	(label "VBAT+"
-		(at 116.84 140.97 180)
+		(at 120.65 167.64 180)
 		(effects
 			(font
 				(size 1.27 1.27)
@@ -8212,7 +7789,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "02ce2680-d1db-45cf-b162-c0601598375b")
-		(property "Reference" "R25"
+		(property "Reference" "R22"
 			(at 49.276 165.1 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8276,7 +7853,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R25")
+					(reference "R22")
 					(unit 1)
 				)
 			)
@@ -8294,7 +7871,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "04b77bc5-8bc7-4b22-92d1-383aeda9e9a4")
-		(property "Reference" "#PWR06"
+		(property "Reference" "#PWR07"
 			(at 21.59 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -8354,7 +7931,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR06")
+					(reference "#PWR07")
 					(unit 1)
 				)
 			)
@@ -8372,7 +7949,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "07a18a2c-14c0-4b54-b632-f7ace338e784")
-		(property "Reference" "SW3"
+		(property "Reference" "SW1"
 			(at 195.58 59.69 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8476,7 +8053,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "SW3")
+					(reference "SW1")
 					(unit 1)
 				)
 			)
@@ -8494,7 +8071,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "09ed934d-628c-4508-bcef-e4f90431309a")
-		(property "Reference" "R24"
+		(property "Reference" "R21"
 			(at 39.116 165.1 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8558,7 +8135,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R24")
+					(reference "R21")
 					(unit 1)
 				)
 			)
@@ -8575,7 +8152,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "0b2a73ed-5ac2-43af-a231-f7500ed3f16d")
-		(property "Reference" "R5"
+		(property "Reference" "R4"
 			(at 213.614 46.99 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8639,7 +8216,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R5")
+					(reference "R4")
 					(unit 1)
 				)
 			)
@@ -8657,7 +8234,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "10784392-e355-4dc5-b9ac-8a5485d5356f")
-		(property "Reference" "SW1"
+		(property "Reference" "SW2"
 			(at 223.52 147.32 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8752,7 +8329,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "SW1")
+					(reference "SW2")
 					(unit 1)
 				)
 			)
@@ -8770,7 +8347,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "109879fc-8f29-4374-b413-97663a07fec1")
-		(property "Reference" "R13"
+		(property "Reference" "R15"
 			(at 74.676 96.52 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8834,7 +8411,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R13")
+					(reference "R15")
 					(unit 1)
 				)
 			)
@@ -8852,7 +8429,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "176ab29b-32c6-4b5b-a2ae-8e9908620566")
-		(property "Reference" "#PWR014"
+		(property "Reference" "#PWR013"
 			(at 111.76 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -8912,7 +8489,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR014")
+					(reference "#PWR013")
 					(unit 1)
 				)
 			)
@@ -8930,7 +8507,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "19be2de0-d309-4afe-9bea-5ff1f0d1f668")
-		(property "Reference" "#PWR026"
+		(property "Reference" "#PWR033"
 			(at 85.09 133.35 0)
 			(hide yes)
 			(show_name no)
@@ -8990,7 +8567,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR026")
+					(reference "#PWR033")
 					(unit 1)
 				)
 			)
@@ -9008,7 +8585,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "1a608322-7385-4b4f-9f45-41a56ff81335")
-		(property "Reference" "#PWR010"
+		(property "Reference" "#PWR09"
 			(at 59.69 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -9068,84 +8645,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR010")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 115.57 158.75 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "1de6a8ef-34b6-4846-a331-75786631da38")
-		(property "Reference" "TP8"
-			(at 112.268 153.67 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 112.268 156.21 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 115.57 153.67 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 115.57 153.67 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 115.57 158.75 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "e1e0df87-5c10-440a-8a0d-f75d9d4340e8")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP8")
+					(reference "#PWR09")
 					(unit 1)
 				)
 			)
@@ -9162,7 +8662,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "26d2ccb1-f3fc-4997-8a98-ea32146469df")
-		(property "Reference" "R6"
+		(property "Reference" "R7"
 			(at 132.08 57.404 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9224,84 +8724,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R6")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+3.3V")
-		(at 102.87 158.75 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "2c0886cc-ed7f-4292-811e-e205cb7b68c8")
-		(property "Reference" "#PWR052"
-			(at 102.87 162.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 102.616 154.178 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 102.87 158.75 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 102.87 158.75 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 102.87 158.75 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "e2df1544-b4bb-4bf6-9093-9b18cb0f76ed")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR052")
+					(reference "R7")
 					(unit 1)
 				)
 			)
@@ -9387,7 +8810,7 @@
 	)
 	(symbol
 		(lib_id "Connector_Generic:Conn_01x02")
-		(at 102.87 140.97 0)
+		(at 106.68 167.64 0)
 		(mirror y)
 		(unit 1)
 		(body_style 1)
@@ -9399,7 +8822,7 @@
 		(fields_autoplaced yes)
 		(uuid "2d4ecf16-3684-493c-b26c-5fbddcd85c3e")
 		(property "Reference" "J1"
-			(at 102.87 134.62 0)
+			(at 106.68 161.29 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9409,7 +8832,7 @@
 			)
 		)
 		(property "Value" "Conn_01x02"
-			(at 102.87 137.16 0)
+			(at 106.68 163.83 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -9419,7 +8842,7 @@
 			)
 		)
 		(property "Footprint" "lib:BatteryPads_1x02_SMD_2x3mm_P4mm"
-			(at 102.87 140.97 0)
+			(at 106.68 167.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9430,7 +8853,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 102.87 140.97 0)
+			(at 106.68 167.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9441,7 +8864,7 @@
 			)
 		)
 		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 102.87 140.97 0)
+			(at 106.68 167.64 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9467,93 +8890,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector_Generic:Conn_01x04")
-		(at 127 142.24 0)
-		(mirror y)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "3051af2d-2bf4-4f4e-bbd8-03b7968693de")
-		(property "Reference" "J2"
-			(at 127 133.35 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "Conn_01x04"
-			(at 127 135.89 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
-			(at 127 142.24 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 127 142.24 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 127 142.24 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "3"
-			(uuid "8655153f-fe75-423a-9b0f-b637f7800127")
-		)
-		(pin "1"
-			(uuid "65c377d6-0fb4-4947-bd14-d859f9d898e0")
-		)
-		(pin "4"
-			(uuid "f2ab3f3b-a3df-4f17-abe5-e51588750051")
-		)
-		(pin "2"
-			(uuid "b0f0310d-a6c3-450d-af12-2353e19706a2")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "J2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GNDREF")
 		(at 30.48 179.07 0)
 		(unit 1)
@@ -9565,7 +8901,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "33b3a752-3053-4528-9aed-369e387b11b7")
-		(property "Reference" "#PWR029"
+		(property "Reference" "#PWR041"
 			(at 30.48 185.42 0)
 			(hide yes)
 			(show_name no)
@@ -9625,7 +8961,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR029")
+					(reference "#PWR041")
 					(unit 1)
 				)
 			)
@@ -9643,7 +8979,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "36a7ba06-74fc-4ad2-ad99-4bb8b31be495")
-		(property "Reference" "#PWR019"
+		(property "Reference" "#PWR035"
 			(at 250.19 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -9703,7 +9039,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR019")
+					(reference "#PWR035")
 					(unit 1)
 				)
 			)
@@ -9720,7 +9056,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "372354ff-eb01-43ec-990f-34db812fd9c7")
-		(property "Reference" "#PWR050"
+		(property "Reference" "#PWR029"
 			(at 267.97 116.84 0)
 			(hide yes)
 			(show_name no)
@@ -9780,7 +9116,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR050")
+					(reference "#PWR029")
 					(unit 1)
 				)
 			)
@@ -9798,7 +9134,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "37ef4c46-4d94-4326-ab11-c689b8392cb1")
-		(property "Reference" "#PWR032"
+		(property "Reference" "#PWR037"
 			(at 232.41 162.56 0)
 			(hide yes)
 			(show_name no)
@@ -9858,7 +9194,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR032")
+					(reference "#PWR037")
 					(unit 1)
 				)
 			)
@@ -9876,7 +9212,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "3d78cc75-5126-4b0e-8c4b-d8b6642bc5aa")
-		(property "Reference" "#PWR011"
+		(property "Reference" "#PWR012"
 			(at 100.33 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -9936,7 +9272,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR011")
+					(reference "#PWR012")
 					(unit 1)
 				)
 			)
@@ -9954,7 +9290,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "3de6277d-b74d-42d8-b84b-0e5c39311fc3")
-		(property "Reference" "#FLG05"
+		(property "Reference" "#FLG04"
 			(at 198.12 89.535 0)
 			(hide yes)
 			(show_name no)
@@ -10014,84 +9350,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#FLG05")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 74.93 186.69 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "3edf167a-c681-4d75-9a02-b9d0bf4e26ce")
-		(property "Reference" "TP4"
-			(at 71.628 181.61 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 71.628 184.15 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 74.93 181.61 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 74.93 181.61 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 74.93 186.69 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "75bf62c3-9d3c-4113-acd2-8570bc238a6b")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP4")
+					(reference "#FLG04")
 					(unit 1)
 				)
 			)
@@ -10109,7 +9368,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "409b59a7-aebe-473f-a874-5c63ba893c9b")
-		(property "Reference" "#PWR028"
+		(property "Reference" "#PWR020"
 			(at 176.53 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -10169,7 +9428,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR028")
+					(reference "#PWR020")
 					(unit 1)
 				)
 			)
@@ -10187,7 +9446,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "44ed41aa-b53e-42c7-9887-fad1f8477adb")
-		(property "Reference" "R14"
+		(property "Reference" "R20"
 			(at 74.676 121.92 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10251,7 +9510,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R14")
+					(reference "R20")
 					(unit 1)
 				)
 			)
@@ -10268,7 +9527,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "47c61793-a45f-49ee-8d3a-f95ac1a90d78")
-		(property "Reference" "U1"
+		(property "Reference" "U3"
 			(at 252.73 88.392 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10383,7 +9642,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "U1")
+					(reference "U3")
 					(unit 1)
 				)
 			)
@@ -10391,7 +9650,7 @@
 	)
 	(symbol
 		(lib_id "power:GNDREF")
-		(at 170.18 149.86 0)
+		(at 146.05 176.53 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -10401,8 +9660,8 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "48243841-b42e-479c-9c01-f03319c06a26")
-		(property "Reference" "#PWR041"
-			(at 170.18 156.21 0)
+		(property "Reference" "#PWR040"
+			(at 146.05 182.88 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10413,7 +9672,8 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 170.18 154.94 0)
+			(at 146.05 181.61 0)
+			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -10423,7 +9683,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 170.18 149.86 0)
+			(at 146.05 176.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10434,7 +9694,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 170.18 149.86 0)
+			(at 146.05 176.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10445,7 +9705,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GNDREF\" , reference supply ground"
-			(at 170.18 149.86 0)
+			(at 146.05 176.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10461,7 +9721,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR041")
+					(reference "#PWR040")
 					(unit 1)
 				)
 			)
@@ -10479,7 +9739,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "4d483e1f-c4a8-408f-b720-cee7a2eaf315")
-		(property "Reference" "#PWR031"
+		(property "Reference" "#PWR036"
 			(at 279.4 151.13 0)
 			(hide yes)
 			(show_name no)
@@ -10539,7 +9799,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR031")
+					(reference "#PWR036")
 					(unit 1)
 				)
 			)
@@ -10556,7 +9816,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "519dbd25-2328-4d79-9b78-6a265c730e58")
-		(property "Reference" "R9"
+		(property "Reference" "R3"
 			(at 171.831 42.545 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10620,7 +9880,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R9")
+					(reference "R3")
 					(unit 1)
 				)
 			)
@@ -10702,161 +9962,6 @@
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
 					(reference "C3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 140.97 176.53 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "5dea357f-513a-45e0-ab40-22b365bb45f7")
-		(property "Reference" "TP12"
-			(at 137.668 171.45 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 137.668 173.99 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 140.97 171.45 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 140.97 171.45 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 140.97 176.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "403fed4e-7e87-4bbf-b27f-18d0ebe32264")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP12")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:VCC")
-		(at 140.97 138.43 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "5f24c447-419b-44fe-83ef-9316764c8712")
-		(property "Reference" "#PWR05"
-			(at 140.97 142.24 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "VUSB"
-			(at 140.97 133.35 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 140.97 138.43 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 140.97 138.43 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 140.97 138.43 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "13d54c4e-69a2-48fb-81a2-f3d8be2163d0")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -10955,7 +10060,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "644dfaac-82c6-4a65-a0b8-371d7400f01a")
-		(property "Reference" "R12"
+		(property "Reference" "R19"
 			(at 29.21 116.586 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11017,7 +10122,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R12")
+					(reference "R19")
 					(unit 1)
 				)
 			)
@@ -11035,7 +10140,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "64d1fd2c-5557-465f-a5d5-b5fb66e7b5ff")
-		(property "Reference" "#PWR017"
+		(property "Reference" "#PWR016"
 			(at 215.9 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -11095,7 +10200,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR017")
+					(reference "#PWR016")
 					(unit 1)
 				)
 			)
@@ -11199,7 +10304,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "76fd6c0a-7951-42db-82e4-9d4fba35c5be")
-		(property "Reference" "#PWR015"
+		(property "Reference" "#PWR018"
 			(at 245.11 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -11259,7 +10364,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR015")
+					(reference "#PWR018")
 					(unit 1)
 				)
 			)
@@ -11277,7 +10382,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "78129c4c-22fd-4ec2-af7e-a5d544e8fafa")
-		(property "Reference" "SW2"
+		(property "Reference" "SW3"
 			(at 267.97 147.32 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11372,162 +10477,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "SW2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 115.57 167.64 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "7a433f43-c3f0-4dbd-ab29-d521dfbb7b1b")
-		(property "Reference" "TP9"
-			(at 112.268 162.56 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 112.268 165.1 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 115.57 162.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 115.57 162.56 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 115.57 167.64 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "7e915140-8f86-417e-9aad-593c7d901efb")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP9")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GNDREF")
-		(at 153.67 186.69 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "7a4c4c49-0bf8-4b81-a51c-db905dc0a0f4")
-		(property "Reference" "#PWR036"
-			(at 153.67 193.04 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 153.67 191.77 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 153.67 186.69 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 153.67 186.69 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GNDREF\" , reference supply ground"
-			(at 153.67 186.69 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "adadf33f-7919-426e-ba73-d16b1192a5a5")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR036")
+					(reference "SW3")
 					(unit 1)
 				)
 			)
@@ -11545,7 +10495,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "7c43d101-342e-41f7-bf97-09769dc629e0")
-		(property "Reference" "#PWR039"
+		(property "Reference" "#PWR025"
 			(at 120.65 119.38 0)
 			(hide yes)
 			(show_name no)
@@ -11605,7 +10555,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR039")
+					(reference "#PWR025")
 					(unit 1)
 				)
 			)
@@ -11622,7 +10572,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "7f1d1042-f5c1-468f-95b6-d7404585c989")
-		(property "Reference" "#PWR051"
+		(property "Reference" "#PWR021"
 			(at 213.36 90.17 0)
 			(hide yes)
 			(show_name no)
@@ -11682,7 +10632,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR051")
+					(reference "#PWR021")
 					(unit 1)
 				)
 			)
@@ -11699,7 +10649,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "7ff6ec36-d60a-43ad-b3b3-d41c256e2b3a")
-		(property "Reference" "#PWR046"
+		(property "Reference" "#PWR06"
 			(at 118.11 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -11759,84 +10709,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR046")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+3.3V")
-		(at 64.77 87.63 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(uuid "80be1e77-f8a3-4678-86b8-5b642cdf57f0")
-		(property "Reference" "#PWR054"
-			(at 64.77 91.44 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "+3.3V"
-			(at 64.516 83.058 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 64.77 87.63 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 64.77 87.63 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
-			(at 64.77 87.63 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "f7b0815d-10ef-4a78-a95e-b64846aabc89")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR054")
+					(reference "#PWR06")
 					(unit 1)
 				)
 			)
@@ -11854,7 +10727,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "829082d5-fd0d-48e3-b9e5-f02df0bfda83")
-		(property "Reference" "#PWR021"
+		(property "Reference" "#PWR031"
 			(at 22.86 133.35 0)
 			(hide yes)
 			(show_name no)
@@ -11914,7 +10787,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR021")
+					(reference "#PWR031")
 					(unit 1)
 				)
 			)
@@ -11932,7 +10805,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8629fac2-cfd1-4ba5-b343-440919fdf9c2")
-		(property "Reference" "R21"
+		(property "Reference" "R14"
 			(at 185.166 92.71 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11996,84 +10869,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R21")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 140.97 185.42 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "8855aab3-d057-4879-abc9-dedbd60f2d1d")
-		(property "Reference" "TP13"
-			(at 137.668 180.34 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 137.668 182.88 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 140.97 180.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 140.97 180.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 140.97 185.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "4187a5c5-8c43-4a56-adc6-59f1a80b09ad")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP13")
+					(reference "R14")
 					(unit 1)
 				)
 			)
@@ -12091,7 +10887,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "88d01910-c75a-4939-9ff9-1597b4f65d04")
-		(property "Reference" "#PWR012"
+		(property "Reference" "#PWR014"
 			(at 149.86 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -12151,7 +10947,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR012")
+					(reference "#PWR014")
 					(unit 1)
 				)
 			)
@@ -12168,7 +10964,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "893c6ad8-3c9b-4d59-93d7-5e2b61cc69a0")
-		(property "Reference" "R19"
+		(property "Reference" "R17"
 			(at 113.792 105.664 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12232,85 +11028,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R19")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GNDREF")
-		(at 102.87 170.18 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "8c4aca8d-ecab-4efe-b369-548bedda7ef2")
-		(property "Reference" "#PWR035"
-			(at 102.87 176.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 102.87 175.26 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 102.87 170.18 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 102.87 170.18 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GNDREF\" , reference supply ground"
-			(at 102.87 170.18 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "75bed584-750f-4502-aabf-4eebd0ef705d")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR035")
+					(reference "R17")
 					(unit 1)
 				)
 			)
@@ -12328,7 +11046,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "8d192a52-dd65-4821-ae29-bd4bf6e79e02")
-		(property "Reference" "#PWR030"
+		(property "Reference" "#PWR034"
 			(at 213.36 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -12388,7 +11106,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR030")
+					(reference "#PWR034")
 					(unit 1)
 				)
 			)
@@ -12518,7 +11236,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8e42c1fc-7c2d-443c-85e1-ff70dd28acbc")
-		(property "Reference" "R11"
+		(property "Reference" "R13"
 			(at 27.94 89.916 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12580,7 +11298,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R11")
+					(reference "R13")
 					(unit 1)
 				)
 			)
@@ -12597,7 +11315,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "8f11e007-890c-483c-8f29-a8a50bf938ea")
-		(property "Reference" "U2"
+		(property "Reference" "U1"
 			(at 132.08 31.496 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12701,7 +11419,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "U2")
+					(reference "U1")
 					(unit 1)
 				)
 			)
@@ -12719,7 +11437,7 @@
 		(in_pos_files yes)
 		(dnp yes)
 		(uuid "90b8bc0b-f5cb-4516-8ad6-3c177d7d9a9e")
-		(property "Reference" "R16"
+		(property "Reference" "R18"
 			(at 122.936 106.68 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12783,7 +11501,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R16")
+					(reference "R18")
 					(unit 1)
 				)
 			)
@@ -12800,7 +11518,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "915b33ab-cf66-4267-8af5-a1a3c98624af")
-		(property "Reference" "U5"
+		(property "Reference" "U2"
 			(at 160.782 105.664 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12882,85 +11600,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "U5")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GNDREF")
-		(at 134.62 149.86 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "921f9f64-d1d1-4a76-82ae-cc70fbdd892c")
-		(property "Reference" "#PWR040"
-			(at 134.62 156.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 134.62 154.94 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 134.62 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 134.62 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GNDREF\" , reference supply ground"
-			(at 134.62 149.86 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "a273bc18-931c-43ee-96ce-8ad3dbbf8782")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR040")
+					(reference "U2")
 					(unit 1)
 				)
 			)
@@ -12978,7 +11618,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "9223eeec-c5ea-4410-8571-f3915d05ed0d")
-		(property "Reference" "#PWR01"
+		(property "Reference" "#PWR02"
 			(at 53.34 27.94 0)
 			(hide yes)
 			(show_name no)
@@ -13038,7 +11678,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR01")
+					(reference "#PWR02")
 					(unit 1)
 				)
 			)
@@ -13056,7 +11696,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "924d7b0d-9395-4107-8e0f-2cc11bc2013c")
-		(property "Reference" "#PWR07"
+		(property "Reference" "#PWR08"
 			(at 44.45 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -13116,7 +11756,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR07")
+					(reference "#PWR08")
 					(unit 1)
 				)
 			)
@@ -13133,7 +11773,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "960fcd28-0aae-48d3-b49a-d1519829d639")
-		(property "Reference" "#PWR045"
+		(property "Reference" "#PWR05"
 			(at 275.59 31.75 0)
 			(hide yes)
 			(show_name no)
@@ -13193,7 +11833,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR045")
+					(reference "#PWR05")
 					(unit 1)
 				)
 			)
@@ -13211,7 +11851,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "97317e05-67dc-4696-bf2c-9c4202832e6d")
-		(property "Reference" "#PWR027"
+		(property "Reference" "#PWR015"
 			(at 166.37 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -13271,7 +11911,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR027")
+					(reference "#PWR015")
 					(unit 1)
 				)
 			)
@@ -13289,7 +11929,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "97eaa7c8-0109-46f0-8764-fc828881f5f9")
-		(property "Reference" "#PWR038"
+		(property "Reference" "#PWR028"
 			(at 172.72 119.38 0)
 			(hide yes)
 			(show_name no)
@@ -13349,7 +11989,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR038")
+					(reference "#PWR028")
 					(unit 1)
 				)
 			)
@@ -13366,7 +12006,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "9af106ff-98bb-468e-9ea6-cc0a422a1b24")
-		(property "Reference" "R8"
+		(property "Reference" "R5"
 			(at 81.407 47.879 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13430,7 +12070,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R8")
+					(reference "R5")
 					(unit 1)
 				)
 			)
@@ -13447,7 +12087,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "9bb67a14-7fd8-44aa-a435-3cf3b113621a")
-		(property "Reference" "C9"
+		(property "Reference" "C6"
 			(at 210.566 100.076 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13511,7 +12151,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "C9")
+					(reference "C6")
 					(unit 1)
 				)
 			)
@@ -13528,7 +12168,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "9faa673d-48df-438a-a3c6-f6af55ac1303")
-		(property "Reference" "R10"
+		(property "Reference" "R9"
 			(at 171.577 54.229 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13592,7 +12232,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R10")
+					(reference "R9")
 					(unit 1)
 				)
 			)
@@ -13610,7 +12250,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a263cb41-62a8-4b85-9cd1-441b3d7f52b4")
-		(property "Reference" "#PWR013"
+		(property "Reference" "#PWR017"
 			(at 234.95 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -13670,7 +12310,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR013")
+					(reference "#PWR017")
 					(unit 1)
 				)
 			)
@@ -13688,7 +12328,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a38c8c0e-f040-4f3d-b1f4-2fc3d70d4e0d")
-		(property "Reference" "#FLG04"
+		(property "Reference" "#FLG03"
 			(at 25.4 69.215 0)
 			(hide yes)
 			(show_name no)
@@ -13748,7 +12388,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#FLG04")
+					(reference "#FLG03")
 					(unit 1)
 				)
 			)
@@ -13766,7 +12406,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "a57f2c98-a76a-4164-acad-a338faeda3d6")
-		(property "Reference" "C12"
+		(property "Reference" "C8"
 			(at 176.53 106.6799 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13830,84 +12470,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "C12")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 93.98 168.91 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "aa11858e-dd36-40c2-9b44-71caa4264cdd")
-		(property "Reference" "TP7"
-			(at 90.678 163.83 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 90.678 166.37 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 93.98 163.83 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 93.98 163.83 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 93.98 168.91 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c3e52e1f-bdd6-4fd3-b4ec-50f8f727cf58")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP7")
+					(reference "C8")
 					(unit 1)
 				)
 			)
@@ -14015,7 +12578,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "adcdae69-4cbf-4118-8ade-c9475f13b21d")
-		(property "Reference" "#PWR09"
+		(property "Reference" "#PWR010"
 			(at 69.85 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -14075,7 +12638,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR09")
+					(reference "#PWR010")
 					(unit 1)
 				)
 			)
@@ -14093,7 +12656,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ae44f2af-9621-4b2c-bc97-c8d0b531ce8a")
-		(property "Reference" "R1"
+		(property "Reference" "R8"
 			(at 62.23 54.6099 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14157,7 +12720,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R1")
+					(reference "R8")
 					(unit 1)
 				)
 			)
@@ -14283,83 +12846,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 74.93 177.8 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "b55038be-fe0a-452f-92f8-1530ca47be78")
-		(property "Reference" "TP3"
-			(at 71.628 172.72 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 71.628 175.26 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 74.93 172.72 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 74.93 172.72 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 74.93 177.8 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "a3494af2-71e9-4e2c-9687-34259b3d7ced")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "lib:ITR8307_S17_TR8")
 		(at 48.26 95.25 0)
 		(unit 1)
@@ -14479,84 +12965,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:VCC")
-		(at 81.28 157.48 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "c337841f-92b7-411a-a2ce-7cd263c4d79d")
-		(property "Reference" "#PWR04"
-			(at 81.28 161.29 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "VUSB"
-			(at 81.28 152.4 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 81.28 157.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 81.28 157.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"VCC\""
-			(at 81.28 157.48 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "b1b4f8e1-f388-43f4-8291-757807f0a267")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR04")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R_US")
 		(at 153.67 86.36 270)
 		(unit 1)
@@ -14567,7 +12975,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "c8ebeee9-0438-4c4c-a3c9-ad38fba15c5d")
-		(property "Reference" "R17"
+		(property "Reference" "R11"
 			(at 155.448 81.534 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14631,84 +13039,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R17")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 74.93 168.91 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "cd22bc86-e0bd-41cd-9766-d5b799711ca6")
-		(property "Reference" "TP2"
-			(at 71.628 163.83 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 71.628 166.37 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 74.93 163.83 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 74.93 163.83 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 74.93 168.91 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "d1d1117b-ae8c-4290-a47c-0ae486f37e2c")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP2")
+					(reference "R11")
 					(unit 1)
 				)
 			)
@@ -14807,7 +13138,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d06ecfa8-4687-40e6-bf33-0bbbeb756356")
-		(property "Reference" "#PWR02"
+		(property "Reference" "#PWR04"
 			(at 116.84 31.75 0)
 			(hide yes)
 			(show_name no)
@@ -14867,7 +13198,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR02")
+					(reference "#PWR04")
 					(unit 1)
 				)
 			)
@@ -14885,7 +13216,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d391dd88-06f9-42fb-8fb3-8e97c57b60aa")
-		(property "Reference" "#PWR037"
+		(property "Reference" "#PWR027"
 			(at 152.4 119.38 0)
 			(hide yes)
 			(show_name no)
@@ -14945,7 +13276,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR037")
+					(reference "#PWR027")
 					(unit 1)
 				)
 			)
@@ -15191,7 +13522,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d5f91e27-9fe4-4e29-80c7-72f8452f8954")
-		(property "Reference" "#PWR033"
+		(property "Reference" "#PWR038"
 			(at 276.86 162.56 0)
 			(hide yes)
 			(show_name no)
@@ -15251,7 +13582,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR033")
+					(reference "#PWR038")
 					(unit 1)
 				)
 			)
@@ -15338,84 +13669,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GNDREF")
-		(at 83.82 187.96 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "d6d850e7-f82f-4da9-8702-665e2a3502f5")
-		(property "Reference" "#PWR034"
-			(at 83.82 194.31 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 83.82 193.04 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 83.82 187.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 83.82 187.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GNDREF\" , reference supply ground"
-			(at 83.82 187.96 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "080779cc-57ac-40d7-9476-ac6af946ba16")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR034")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:+3.3V")
 		(at 250.19 86.36 0)
 		(unit 1)
@@ -15426,7 +13679,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "d891e664-b23b-48a2-891b-8a886a097fb3")
-		(property "Reference" "#PWR047"
+		(property "Reference" "#PWR022"
 			(at 250.19 90.17 0)
 			(hide yes)
 			(show_name no)
@@ -15486,7 +13739,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR047")
+					(reference "#PWR022")
 					(unit 1)
 				)
 			)
@@ -15503,7 +13756,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "da8a9e55-f4f0-43a4-bc79-f88f694ac441")
-		(property "Reference" "#PWR049"
+		(property "Reference" "#PWR039"
 			(at 33.02 163.83 0)
 			(hide yes)
 			(show_name no)
@@ -15563,7 +13816,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR049")
+					(reference "#PWR039")
 					(unit 1)
 				)
 			)
@@ -15581,7 +13834,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "dbf9d6d3-942e-41fc-9a0b-0cf4531f0a9d")
-		(property "Reference" "#PWR016"
+		(property "Reference" "#PWR019"
 			(at 275.59 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -15641,84 +13894,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR016")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 74.93 160.02 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "dd9c4218-a294-42b4-80c2-1fa09253f4da")
-		(property "Reference" "TP1"
-			(at 71.628 154.94 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 71.628 157.48 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 74.93 154.94 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 74.93 154.94 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 74.93 160.02 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "88d0accb-eb25-45d9-b10e-dc5ebc079211")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP1")
+					(reference "#PWR019")
 					(unit 1)
 				)
 			)
@@ -15736,7 +13912,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "de81e57c-e329-4d67-b077-39861dc61cf9")
-		(property "Reference" "R26"
+		(property "Reference" "R12"
 			(at 215.646 90.17 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15800,84 +13976,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R26")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 93.98 160.02 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "df1f846b-6aa0-46b0-9732-bada518a5fd6")
-		(property "Reference" "TP5"
-			(at 90.678 154.94 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 90.678 157.48 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 93.98 154.94 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 93.98 154.94 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 93.98 160.02 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "5b4aeefd-ef0c-46f5-a3dc-06959597b4c2")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP5")
+					(reference "R12")
 					(unit 1)
 				)
 			)
@@ -15895,7 +13994,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e17eaa73-1eb3-42d7-b626-78e53b812ef5")
-		(property "Reference" "R2"
+		(property "Reference" "R1"
 			(at 60.96 27.94 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15957,7 +14056,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R2")
+					(reference "R1")
 					(unit 1)
 				)
 			)
@@ -16178,7 +14277,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e4f27262-dec4-431b-8780-7b8eb22f4df2")
-		(property "Reference" "#PWR020"
+		(property "Reference" "#PWR023"
 			(at 21.59 106.68 0)
 			(hide yes)
 			(show_name no)
@@ -16238,7 +14337,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR020")
+					(reference "#PWR023")
 					(unit 1)
 				)
 			)
@@ -16255,7 +14354,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e52f3a56-0a32-47df-82dc-1101bc9f36c8")
-		(property "Reference" "#PWR053"
+		(property "Reference" "#PWR030"
 			(at 64.77 118.11 0)
 			(hide yes)
 			(show_name no)
@@ -16315,7 +14414,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR053")
+					(reference "#PWR030")
 					(unit 1)
 				)
 			)
@@ -16333,7 +14432,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e70965cf-52c5-4417-b2f6-059311c9d379")
-		(property "Reference" "#PWR025"
+		(property "Reference" "#PWR026"
 			(at 134.62 119.38 0)
 			(hide yes)
 			(show_name no)
@@ -16393,7 +14492,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR025")
+					(reference "#PWR026")
 					(unit 1)
 				)
 			)
@@ -16531,7 +14630,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "e8ab7273-772f-4e73-a0f2-94de45479ff9")
-		(property "Reference" "R3"
+		(property "Reference" "R6"
 			(at 98.044 48.26 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16595,7 +14694,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R3")
+					(reference "R6")
 					(unit 1)
 				)
 			)
@@ -16613,7 +14712,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "eca0ea70-49c3-424c-84d3-d585fe33ecdd")
-		(property "Reference" "#PWR023"
+		(property "Reference" "#PWR024"
 			(at 72.39 109.22 0)
 			(hide yes)
 			(show_name no)
@@ -16673,7 +14772,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR023")
+					(reference "#PWR024")
 					(unit 1)
 				)
 			)
@@ -16691,7 +14790,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "ee37721b-c18d-46a0-99cf-5fbd11e4a12b")
-		(property "Reference" "#PWR018"
+		(property "Reference" "#PWR011"
 			(at 76.2 67.31 0)
 			(hide yes)
 			(show_name no)
@@ -16751,7 +14850,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR018")
+					(reference "#PWR011")
 					(unit 1)
 				)
 			)
@@ -16929,7 +15028,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f292ff1a-e3cd-4674-aba1-87a862bfb6d8")
-		(property "Reference" "C8"
+		(property "Reference" "C10"
 			(at 88.9 121.9199 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16993,84 +15092,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "C8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 115.57 176.53 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "f312362f-087f-4794-903e-f8e9c44cb758")
-		(property "Reference" "TP10"
-			(at 112.268 171.45 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 112.268 173.99 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 115.57 171.45 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 115.57 171.45 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 115.57 176.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c06ceb55-0bbf-4277-99ed-471f8707845d")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP10")
+					(reference "C10")
 					(unit 1)
 				)
 			)
@@ -17088,7 +15110,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f45b4662-2fcb-43df-9d82-6156ad04e3f7")
-		(property "Reference" "#PWR024"
+		(property "Reference" "#PWR032"
 			(at 72.39 133.35 0)
 			(hide yes)
 			(show_name no)
@@ -17148,7 +15170,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR024")
+					(reference "#PWR032")
 					(unit 1)
 				)
 			)
@@ -17156,7 +15178,7 @@
 	)
 	(symbol
 		(lib_id "Connector_Generic:Conn_01x04")
-		(at 151.13 142.24 0)
+		(at 127 168.91 0)
 		(mirror y)
 		(unit 1)
 		(body_style 1)
@@ -17167,8 +15189,8 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f673379b-40c6-460d-bf9a-cb128f5fce05")
-		(property "Reference" "J3"
-			(at 151.13 133.35 0)
+		(property "Reference" "J2"
+			(at 127 160.02 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17178,7 +15200,7 @@
 			)
 		)
 		(property "Value" "Conn_01x04"
-			(at 151.13 135.89 0)
+			(at 127 162.56 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17188,7 +15210,7 @@
 			)
 		)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
-			(at 151.13 142.24 0)
+			(at 127 168.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17199,7 +15221,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 151.13 142.24 0)
+			(at 127 168.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17210,7 +15232,7 @@
 			)
 		)
 		(property "Description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 151.13 142.24 0)
+			(at 127 168.91 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17235,7 +15257,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "J3")
+					(reference "J2")
 					(unit 1)
 				)
 			)
@@ -17252,7 +15274,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f6b2c0c4-c310-45d3-ae97-787e8e4225c8")
-		(property "Reference" "R15"
+		(property "Reference" "R16"
 			(at 99.568 92.964 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17316,7 +15338,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R15")
+					(reference "R16")
 					(unit 1)
 				)
 			)
@@ -17333,7 +15355,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "f8fc2ad4-c79f-4fd3-874a-2c4694a2c1a4")
-		(property "Reference" "R7"
+		(property "Reference" "R2"
 			(at 81.026 34.29 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17397,7 +15419,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R7")
+					(reference "R2")
 					(unit 1)
 				)
 			)
@@ -17415,7 +15437,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "fa27f21c-5b12-41c7-9333-1e065d6aa7fd")
-		(property "Reference" "C10"
+		(property "Reference" "C9"
 			(at 273.05 114.3 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17477,7 +15499,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "C10")
+					(reference "C9")
 					(unit 1)
 				)
 			)
@@ -17494,7 +15516,7 @@
 		(in_pos_files yes)
 		(dnp no)
 		(uuid "fa9c85fa-b917-45d9-98da-f14418de9ae6")
-		(property "Reference" "R4"
+		(property "Reference" "R10"
 			(at 125.73 65.024 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17556,84 +15578,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "R4")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 115.57 185.42 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "fbb61f99-11b5-434c-8643-d52101d24003")
-		(property "Reference" "TP11"
-			(at 112.268 180.34 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 112.268 182.88 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 115.57 180.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 115.57 180.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "test point"
-			(at 115.57 185.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "fa1176d4-1e6a-48cf-8fc7-951d2fda8236")
-		)
-		(instances
-			(project "bx-tacho"
-				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "TP11")
+					(reference "R10")
 					(unit 1)
 				)
 			)
@@ -17651,7 +15596,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "fda11efe-592f-46cd-b7e7-7065382f5d16")
-		(property "Reference" "#PWR08"
+		(property "Reference" "#PWR01"
 			(at 46.99 27.94 0)
 			(hide yes)
 			(show_name no)
@@ -17711,7 +15656,7 @@
 		(instances
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
-					(reference "#PWR08")
+					(reference "#PWR01")
 					(unit 1)
 				)
 			)

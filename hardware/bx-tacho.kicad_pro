@@ -60,17 +60,112 @@
           "hatch_smoothing_level": 0,
           "hatch_smoothing_value": 0.1,
           "hatch_thickness": 1.0,
-          "min_clearance": 0.5,
+          "min_clearance": 0.0,
           "min_island_area": 10.0,
-          "min_thickness": 0.25,
+          "min_thickness": 0.2,
           "pad_connection": 1,
           "remove_islands": 0,
-          "thermal_relief_gap": 0.5,
-          "thermal_relief_spoke_width": 0.5
+          "thermal_relief_gap": 0.3,
+          "thermal_relief_spoke_width": 0.3
         }
       },
-      "diff_pair_dimensions": [],
-      "drc_exclusions": [],
+      "diff_pair_dimensions": [
+        {
+          "gap": 0.0,
+          "via_gap": 0.0,
+          "width": 0.0
+        }
+      ],
+      "drc_exclusions": [
+        [
+          "npth_inside_courtyard|148350000|68100000|5c5b8735-039d-43b5-bb10-f3659e9e8cd5|8f3a441e-9e15-4244-b2c5-c4668749b26b",
+          ""
+        ],
+        [
+          "npth_inside_courtyard|171650000|68100000|a7dce2e5-e2c5-4316-9061-163fe734d612|8f3a441e-9e15-4244-b2c5-c4668749b26b",
+          ""
+        ],
+        [
+          "silk_edge_clearance|132000000|77980000|6ccce5a5-aa14-4f00-b54c-f8b1ec7a5b72|6fdeef3e-ce9b-4794-93ac-4a30ee21b437",
+          ""
+        ],
+        [
+          "silk_edge_clearance|132000000|79980000|6ccce5a5-aa14-4f00-b54c-f8b1ec7a5b72|6cd422a3-f826-4f26-bf67-d00332bc8cf0",
+          ""
+        ],
+        [
+          "silk_edge_clearance|146399999|71975635|a592560b-d4be-401a-a189-e22201c9c8d5|06d8af5c-07ed-4f27-979f-8d60a3989fea",
+          ""
+        ],
+        [
+          "silk_edge_clearance|150550000|72500000|fdee9a08-43f6-45a3-be00-5074623fdbf8|69c87bdf-d5e8-489f-bfbe-0afacd630300",
+          ""
+        ],
+        [
+          "silk_edge_clearance|169110000|72500000|fdee9a08-43f6-45a3-be00-5074623fdbf8|4c91d17f-603b-4a47-89ea-f8d7ac32a9c4",
+          ""
+        ],
+        [
+          "silk_edge_clearance|173600000|71975635|e0b653f0-fb0f-4b5c-a5ff-fdfe566228d9|bc09628d-1633-454b-bd1a-94784cc47655",
+          ""
+        ],
+        [
+          "silk_edge_clearance|173600000|93900000|e3a6582d-8a66-41d2-85a5-79742f108b44|94db66c8-c076-4cae-90a0-bb66f67532f7",
+          ""
+        ],
+        [
+          "silk_edge_clearance|188000000|75430000|6d60190a-861d-49ef-834c-c8fa62bef995|d05d9a02-3dc7-4b96-a59b-f1a6c674d052",
+          ""
+        ],
+        [
+          "silk_edge_clearance|188000000|84500000|6d60190a-861d-49ef-834c-c8fa62bef995|0b502b21-1793-44c2-8e15-ee79d21cdf23",
+          ""
+        ],
+        [
+          "silk_overlap|141654819|76270000|6631192c-5511-4737-ad90-1c96cda8f75e|b77b46bf-5055-4b0f-a6a9-7af3514bca0c",
+          ""
+        ],
+        [
+          "silk_overlap|141654819|79330000|20e6057d-57b1-4766-bc87-fb0272a76a1b|b77b46bf-5055-4b0f-a6a9-7af3514bca0c",
+          ""
+        ],
+        [
+          "silk_overlap|144861905|80580000|4b26fdd2-547b-438f-be34-3558fe67d5fd|4e7b2a08-93a9-4e99-8188-cd59a0b37347",
+          ""
+        ],
+        [
+          "silk_overlap|145030000|80854819|4e7b2a08-93a9-4e99-8188-cd59a0b37347|dd10ad5e-787d-4216-b023-777bfa748993",
+          ""
+        ],
+        [
+          "silk_overlap|152285714|91054819|8249d6c3-8bf2-49a6-b50c-acb5aacddd41|b5dfde0e-70e7-4fe3-a004-4bf9c9c13c9d",
+          ""
+        ],
+        [
+          "silk_overlap|154285714|90854819|6f81ee0c-61e6-498b-9cc6-d725bdb25e84|8249d6c3-8bf2-49a6-b50c-acb5aacddd41",
+          ""
+        ],
+        [
+          "silk_overlap|169110000|66140000|4c91d17f-603b-4a47-89ea-f8d7ac32a9c4|b30ee7d5-e244-4533-9f7b-708387c60d12",
+          ""
+        ],
+        [
+          "silk_overlap|173285714|74926247|31f265a3-a608-4fdb-8b0a-0d63c55275c8|bc09628d-1633-454b-bd1a-94784cc47655",
+          ""
+        ],
+        [
+          "silk_overlap|173285714|78226247|173be33c-821c-4d15-933d-6274a634a0c2|bc09628d-1633-454b-bd1a-94784cc47655",
+          ""
+        ],
+        [
+          "starved_thermal|181602500|76800000|73fcebb3-e9c7-4678-bd8b-c6a1d81e1d0c|ba0f90ec-81f3-4d06-8b2c-088c0018083e|F.Cu",
+          ""
+        ],
+        [
+          "starved_thermal|181602500|83200000|73fcebb3-e9c7-4678-bd8b-c6a1d81e1d0c|adf47931-b7ec-4c83-9234-0331d1553dd9|F.Cu",
+          ""
+        ]
+      ],
       "meta": {
         "version": 2
       },
@@ -80,7 +175,7 @@
         "connection_width": "warning",
         "copper_edge_clearance": "error",
         "copper_sliver": "warning",
-        "courtyards_overlap": "error",
+        "courtyards_overlap": "ignore",
         "creepage": "error",
         "diff_pair_gap_out_of_range": "error",
         "diff_pair_uncoupled_length_too_long": "error",
@@ -112,7 +207,7 @@
         "nonmirrored_text_on_back_layer": "warning",
         "npth_inside_courtyard": "error",
         "padstack": "warning",
-        "pth_inside_courtyard": "error",
+        "pth_inside_courtyard": "ignore",
         "shorting_items": "error",
         "silk_edge_clearance": "warning",
         "silk_over_copper": "warning",
@@ -171,7 +266,7 @@
       "teardrop_parameters": [
         {
           "td_allow_use_two_tracks": true,
-          "td_curve_segcount": 0,
+          "td_curve_segcount": 1,
           "td_height_ratio": 1.0,
           "td_length_ratio": 0.5,
           "td_maxheight": 2.0,
@@ -182,7 +277,7 @@
         },
         {
           "td_allow_use_two_tracks": true,
-          "td_curve_segcount": 0,
+          "td_curve_segcount": 1,
           "td_height_ratio": 1.0,
           "td_length_ratio": 0.5,
           "td_maxheight": 2.0,
@@ -193,7 +288,7 @@
         },
         {
           "td_allow_use_two_tracks": true,
-          "td_curve_segcount": 0,
+          "td_curve_segcount": 1,
           "td_height_ratio": 1.0,
           "td_length_ratio": 0.5,
           "td_maxheight": 2.0,
@@ -203,7 +298,9 @@
           "td_width_to_size_filter_ratio": 0.9
         }
       ],
-      "track_widths": [],
+      "track_widths": [
+        0.0
+      ],
       "tuning_pattern_settings": {
         "diff_pair_defaults": {
           "corner_radius_percentage": 80,
@@ -230,7 +327,12 @@
           "spacing": 0.6
         }
       },
-      "via_dimensions": [],
+      "via_dimensions": [
+        {
+          "diameter": 0.0,
+          "drill": 0.0
+        }
+      ],
       "zones_allow_external_fillets": false
     },
     "ipc2581": {
@@ -511,6 +613,17 @@
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
+      },
+      {
+        "clearance": 0.7635,
+        "diff_pair_gap": 0.16,
+        "diff_pair_width": 0.2545,
+        "name": "90ohm_diff",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 0,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2545,
+        "tuning_profile": ""
       }
     ],
     "meta": {
@@ -518,13 +631,22 @@
     },
     "net_colors": null,
     "netclass_assignments": null,
-    "netclass_patterns": []
+    "netclass_patterns": [
+      {
+        "netclass": "90ohm_diff",
+        "pattern": "/USB_DP"
+      },
+      {
+        "netclass": "90ohm_diff",
+        "pattern": "/USB_DN"
+      }
+    ]
   },
   "pcbnew": {
     "last_paths": {
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "gerber/",
       "specctra_dsn": "",
       "step": "",
       "vrml": ""
@@ -697,7 +819,7 @@
         "uuid": "2c588408-32da-424d-a43f-d1ecf098f060"
       }
     ],
-    "used_designators": "LDO1,TP1-14,KEY1-2,USB1,C1-13,SW1-3,U1-6,#FLG1-5,Q1-2,D1-2,#PWR1-56,R1-26,J1-3",
+    "used_designators": "RPM1,LDO1,TP1-14,USB1,KEY1-2,C1-13,SW1-3,U1-6,#FLG1-5,R1-26,Q1-2,D1-2,#PWR1-56,J1-3,LOAD1",
     "variants": []
   },
   "sheets": [
