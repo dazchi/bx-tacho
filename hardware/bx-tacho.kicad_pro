@@ -138,10 +138,6 @@
           ""
         ],
         [
-          "silk_overlap|152285714|91054819|8249d6c3-8bf2-49a6-b50c-acb5aacddd41|b5dfde0e-70e7-4fe3-a004-4bf9c9c13c9d",
-          ""
-        ],
-        [
           "silk_overlap|154285714|90854819|6f81ee0c-61e6-498b-9cc6-d725bdb25e84|8249d6c3-8bf2-49a6-b50c-acb5aacddd41",
           ""
         ],
@@ -151,10 +147,6 @@
         ],
         [
           "silk_overlap|173285714|74926247|31f265a3-a608-4fdb-8b0a-0d63c55275c8|bc09628d-1633-454b-bd1a-94784cc47655",
-          ""
-        ],
-        [
-          "silk_overlap|173285714|78226247|173be33c-821c-4d15-933d-6274a634a0c2|bc09628d-1633-454b-bd1a-94784cc47655",
           ""
         ],
         [
@@ -342,7 +334,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": "v0.2"
+      "sch_revision": "v1.0"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -648,7 +640,7 @@
       "netlist": "",
       "plot": "gerber/",
       "specctra_dsn": "",
-      "step": "",
+      "step": "C:/Users/crazy/Downloads/bx-tacho.step",
       "vrml": ""
     },
     "page_layout_descr_file": ""

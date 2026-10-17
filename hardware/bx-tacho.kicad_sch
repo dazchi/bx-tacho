@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "BX Tacho")
-		(date "2026-10-04")
-		(rev "v0.2")
+		(date "2026-10-17")
+		(rev "v1.0")
 	)
 	(lib_symbols
 		(symbol "Comparator:LMV331"
@@ -4684,6 +4684,12 @@
 		(uuid "70c1a387-0edb-4130-ba9b-6c497aea5a1d")
 	)
 	(junction
+		(at 82.55 92.71)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "73d23a06-4612-4bc7-b75e-8f1e552ab595")
+	)
+	(junction
 		(at 143.51 97.79)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5016,6 +5022,16 @@
 			(type default)
 		)
 		(uuid "1740fe6d-f62e-4b41-8053-dc9864738e3b")
+	)
+	(wire
+		(pts
+			(xy 82.55 92.71) (xy 82.55 93.98)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "175df4bd-3f7a-42c4-bd55-f3ad5809cf24")
 	)
 	(wire
 		(pts
@@ -5399,7 +5415,7 @@
 	)
 	(wire
 		(pts
-			(xy 87.63 92.71) (xy 87.63 97.79)
+			(xy 93.98 92.71) (xy 93.98 97.79)
 		)
 		(stroke
 			(width 0)
@@ -5639,7 +5655,7 @@
 	)
 	(wire
 		(pts
-			(xy 87.63 97.79) (xy 93.98 97.79)
+			(xy 93.98 97.79) (xy 107.95 97.79)
 		)
 		(stroke
 			(width 0)
@@ -5816,6 +5832,16 @@
 			(type default)
 		)
 		(uuid "6acd69a8-a64f-4ba2-8419-6c38ada5c104")
+	)
+	(wire
+		(pts
+			(xy 82.55 92.71) (xy 93.98 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6b00eebb-ec30-47c4-a188-9327d0f85391")
 	)
 	(wire
 		(pts
@@ -6099,7 +6125,7 @@
 	)
 	(wire
 		(pts
-			(xy 101.6 97.79) (xy 143.51 97.79)
+			(xy 115.57 97.79) (xy 143.51 97.79)
 		)
 		(stroke
 			(width 0)
@@ -6977,6 +7003,16 @@
 		)
 		(uuid "ded23083-149a-4764-874a-b0788fb01b71")
 	)
+	(wire
+		(pts
+			(xy 82.55 101.6) (xy 82.55 102.87)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "deedeab0-2aa5-4e6a-a298-18e079a92231")
+	)
 	(polyline
 		(pts
 			(xy 13.97 144.78) (xy 13.97 78.74)
@@ -7239,7 +7275,7 @@
 	)
 	(wire
 		(pts
-			(xy 72.39 92.71) (xy 87.63 92.71)
+			(xy 72.39 92.71) (xy 82.55 92.71)
 		)
 		(stroke
 			(width 0)
@@ -8358,7 +8394,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "10k"
+		(property "Value" "22k"
 			(at 74.676 99.06 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9195,6 +9231,88 @@
 			(project "bx-tacho"
 				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
 					(reference "#PWR037")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 82.55 97.79 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "38ce5a63-8742-4eab-aa22-07b8303fecb5")
+		(property "Reference" "C12"
+			(at 86.36 96.5199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "2.2nF"
+			(at 86.36 99.0599 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+			(at 83.5152 101.6 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 82.55 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 82.55 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1ee714d1-d8c2-4a57-8be3-ed536a0c85e7")
+		)
+		(pin "2"
+			(uuid "57460476-428c-4a2d-9960-1527ec46eed2")
+		)
+		(instances
+			(project "bx-tacho"
+				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
+					(reference "C12")
 					(unit 1)
 				)
 			)
@@ -11246,7 +11364,7 @@
 				)
 			)
 		)
-		(property "Value" "220"
+		(property "Value" "100"
 			(at 27.94 87.376 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12965,6 +13083,84 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GNDREF")
+		(at 82.55 102.87 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c17c6d32-8624-49cf-974d-a7cda40c4ab7")
+		(property "Reference" "#PWR042"
+			(at 82.55 109.22 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 82.55 107.95 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 82.55 102.87 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 82.55 102.87 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GNDREF\" , reference supply ground"
+			(at 82.55 102.87 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8ded2c48-73c3-43e1-9171-679b68a4622d")
+		)
+		(instances
+			(project "bx-tacho"
+				(path "/2c588408-32da-424d-a43f-d1ecf098f060"
+					(reference "#PWR042")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_US")
 		(at 153.67 86.36 270)
 		(unit 1)
@@ -12986,7 +13182,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "1M"
+		(property "Value" "4.7M"
 			(at 155.448 83.82 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15265,7 +15461,7 @@
 	)
 	(symbol
 		(lib_id "Device:R_US")
-		(at 97.79 97.79 270)
+		(at 111.76 97.79 270)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -15275,7 +15471,7 @@
 		(dnp no)
 		(uuid "f6b2c0c4-c310-45d3-ae97-787e8e4225c8")
 		(property "Reference" "R16"
-			(at 99.568 92.964 90)
+			(at 113.538 92.964 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15286,7 +15482,7 @@
 			)
 		)
 		(property "Value" "10k"
-			(at 99.568 95.25 90)
+			(at 113.538 95.25 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -15297,7 +15493,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
-			(at 97.536 98.806 90)
+			(at 111.506 98.806 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15308,7 +15504,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 97.79 97.79 0)
+			(at 111.76 97.79 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15319,7 +15515,7 @@
 			)
 		)
 		(property "Description" "Resistor, US symbol"
-			(at 97.79 97.79 0)
+			(at 111.76 97.79 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
