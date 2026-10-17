@@ -1,0 +1,24 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "sense_adc.c"
+        "battery.c"
+        "rpm.c"
+        "load.c"
+        "launch.c"
+        "display.c"
+        "font5x7.c"
+        "settings.c"
+        "cli.c"
+    INCLUDE_DIRS "."
+    PRIV_REQUIRES
+        esp_driver_gpio
+        esp_driver_ledc
+        esp_driver_i2c
+        esp_adc
+        esp_lcd
+        esp_timer
+        esp_pm
+        nvs_flash
+        console
+)

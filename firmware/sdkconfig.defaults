@@ -1,0 +1,20 @@
+# BX Tacho firmware defaults (ESP32-C3-WROOM-02, 4 MB flash)
+CONFIG_IDF_TARGET="esp32c3"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# Console and flashing over the native USB Serial/JTAG (IO18/IO19).
+# UART0 TX (IO21) is RPM_IR_LED, so keep the console off UART0.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160=y
+
+# 1 kHz tick: the load sensor is sampled every 1 ms while a top is loaded
+CONFIG_FREERTOS_HZ=1000
+
+# Automatic light sleep between polls (HANDOVER.md 6.5)
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+
+# VUSB_DET is driven by the R2/R5 divider; internal pulls would load it
+# during deep sleep.
+CONFIG_ESP_SLEEP_GPIO_ENABLE_INTERNAL_RESISTORS=n

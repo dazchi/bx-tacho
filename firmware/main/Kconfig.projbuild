@@ -1,0 +1,52 @@
+menu "BX Tacho"
+
+    config BXT_EDGES_PER_REV
+        int "Rising edges per launcher revolution (default)"
+        range 1 16
+        default 1
+        help
+            Number of black-to-white transitions the RPM sensor sees per
+            revolution of the launcher's internal disc. Count the segments
+            on your launcher. Can be changed at runtime with the console
+            command "cfg edges <n>" (stored in NVS).
+
+    config BXT_MAX_RPM
+        int "Highest plausible RPM"
+        default 30000
+        help
+            Shorter periods than this are treated as glitches and dropped.
+
+    config BXT_OLED_I2C_HZ
+        int "OLED I2C clock (Hz)"
+        default 100000
+        help
+            The v0.2 board has 10k pull-ups (R21/R22), which suit 100 kHz.
+            Fit 4.7k pull-ups before going to 400 kHz.
+
+    config BXT_OLED_ADDR
+        hex "OLED I2C address"
+        default 0x3C
+
+    config BXT_DISPLAY_DIM_S
+        int "Dim the display after N seconds of inactivity"
+        default 30
+
+    config BXT_DISPLAY_OFF_S
+        int "Turn the display off after N seconds of inactivity"
+        default 120
+
+    config BXT_DEEP_SLEEP_S
+        int "Deep sleep after N seconds of inactivity (on battery only)"
+        default 300
+        help
+            Wake-up is by plugging in USB or cycling the power switch.
+
+    config BXT_LOW_BATT_MV
+        int "Low battery warning (mV)"
+        default 3500
+
+    config BXT_CUTOFF_BATT_MV
+        int "Battery cutoff, enter deep sleep (mV)"
+        default 3300
+
+endmenu
