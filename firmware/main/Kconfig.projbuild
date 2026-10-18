@@ -18,10 +18,11 @@ menu "BX Tacho"
 
     config BXT_OLED_I2C_HZ
         int "OLED I2C clock (Hz)"
-        default 100000
+        default 400000
         help
-            The v0.2 board has 10k pull-ups (R21/R22), which suit 100 kHz.
-            Fit 4.7k pull-ups before going to 400 kHz.
+            Needs 4.7k pull-ups on R21/R22 (as reworked on the v0.2
+            prototype). Boards still fitted with 10k pull-ups should use
+            100000.
 
     config BXT_OLED_ADDR
         hex "OLED I2C address"

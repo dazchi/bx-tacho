@@ -35,7 +35,7 @@ esp_err_t display_init(void)
         .scl_io_num = PIN_OLED_SCL,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
-        // R21/R22 are fitted; the internal pull-ups only add a little margin
+        // R21/R22 (4.7k) do the real work; the internal pull-ups only add a little margin
         .flags.enable_internal_pullup = true,
     };
     ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_cfg, &s_bus), TAG, "i2c bus");
