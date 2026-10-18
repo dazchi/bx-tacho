@@ -24,6 +24,8 @@ typedef struct {
     int revolutions;      // complete revolutions counted
     int duration_ms;      // first edge to end of the measurement window
     launch_end_t end;
+    int rejected_max_rpm;   // edges dropped: faster than CONFIG_BXT_MAX_RPM
+    int rejected_relative;  // edges dropped: too soon for the recent interval
 } launch_result_t;
 
 void launch_init(void);

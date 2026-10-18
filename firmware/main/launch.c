@@ -18,6 +18,17 @@ static const char *TAG = "launch";
 
 #define MAX_EDGES         4096
 
+// Chatter filter. Besides the absolute floor (CONFIG_BXT_MAX_RPM), an edge is
+// dropped when it arrives sooner than CONFIG_BXT_CHATTER_RATIO_PCT of the
+// recent edge interval: the disc cannot speed up that much within one
+// interval, but chatter at the opposite transition lands about half an
+// interval after a real edge. Assumes evenly spaced segments.
+#define HIST_LEN            3
+// A gap this much longer than the reference is a missed edge (or the disc
+// slowing sharply); it is not used as a reference so the filter cannot lock
+// onto half speed.
+#define MISSED_EDGE_PCT     170
+
 static launch_state_t s_state = LAUNCH_EMPTY;
 
 static uint32_t s_edges[MAX_EDGES];
@@ -28,6 +39,13 @@ static int s_window_len;
 
 static uint32_t s_last_edge;
 static bool s_have_last_edge;
+
+static uint32_t s_hist[HIST_LEN];   // recent accepted edge intervals (us)
+static int s_hist_len;
+static int s_hist_next;
+static int s_long_streak;           // consecutive gaps rejected as references
+static int s_rejected_max_rpm;      // edges dropped in this launch: faster than CONFIG_BXT_MAX_RPM
+static int s_rejected_relative;     // ...or too soon for the recent interval
 
 static bool s_was_loaded;
 static bool s_release_seen;
@@ -65,11 +83,52 @@ static void set_state(launch_state_t s)
     }
 }
 
+static void filter_reset(void)
+{
+    s_hist_len = 0;
+    s_hist_next = 0;
+    s_long_streak = 0;
+}
+
+// Reference interval for the relative filter, or 0 until enough history.
+// min(last, median) follows a speed-up immediately and ignores one long gap.
+static uint32_t filter_reference(void)
+{
+    if (s_hist_len < HIST_LEN) {
+        return 0;
+    }
+    uint32_t a = s_hist[0], b = s_hist[1], c = s_hist[2];
+    uint32_t lo = a < b ? (a < c ? a : c) : (b < c ? b : c);
+    uint32_t hi = a > b ? (a > c ? a : c) : (b > c ? b : c);
+    uint32_t median = a + b + c - lo - hi;
+    uint32_t last = s_hist[(s_hist_next + HIST_LEN - 1) % HIST_LEN];
+    return last < median ? last : median;
+}
+
+static void filter_record(uint32_t gap, uint32_t ref)
+{
+    if (ref && (uint64_t)gap * 100 > (uint64_t)ref * MISSED_EDGE_PCT) {
+        // Likely a missed edge. Only if it keeps happening has the rhythm
+        // really changed; then start the history again from here.
+        if (++s_long_streak < HIST_LEN) {
+            return;
+        }
+        filter_reset();
+    }
+    s_long_streak = 0;
+    s_hist[s_hist_next] = gap;
+    s_hist_next = (s_hist_next + 1) % HIST_LEN;
+    if (s_hist_len < HIST_LEN) {
+        s_hist_len++;
+    }
+}
+
 void launch_init(void)
 {
     s_state = LAUNCH_EMPTY;
     s_window_len = 0;
     s_have_last_edge = false;
+    filter_reset();
 }
 
 static void start_launch(void)
@@ -80,6 +139,8 @@ static void start_launch(void)
     }
     s_window_len = 0;
     s_release_seen = false;
+    s_rejected_max_rpm = 0;
+    s_rejected_relative = 0;
     set_state(LAUNCH_PULLING);
 }
 
@@ -126,20 +187,37 @@ static bool finish_launch(void)
         .duration_ms = (int)((s_edges[n - 1] - s_edges[0]) / 1000),
         .end = s_release_seen ? LAUNCH_END_RELEASE
              : (last > best[0] * SLOWDOWN_RATIO ? LAUNCH_END_SLOWDOWN : LAUNCH_END_ABRUPT),
+        .rejected_max_rpm = s_rejected_max_rpm,
+        .rejected_relative = s_rejected_relative,
     };
     s_have_result = true;
 
-    ESP_LOGI(TAG, "peak %d rpm, max %d rpm, %d revs, %d ms, end=%d",
-             s_result.peak_rpm, s_result.max_rpm, s_result.revolutions,
-             s_result.duration_ms, s_result.end);
+    ESP_LOGI(TAG, "peak %d rpm, max %d rpm, %d revs, %d ms, end=%d, rejected %d (max-rpm %d, relative %d)",
+             s_result.peak_rpm, s_result.max_rpm, s_result.revolutions, s_result.duration_ms,
+             s_result.end, s_result.rejected_max_rpm + s_result.rejected_relative,
+             s_result.rejected_max_rpm, s_result.rejected_relative);
     return true;
 }
 
 static void handle_edge(uint32_t t, bool can_start, uint32_t min_gap_us)
 {
-    // Faster than physically possible: comparator chatter
-    if (s_have_last_edge && (t - s_last_edge) < min_gap_us) {
-        return;
+    if (s_have_last_edge) {
+        uint32_t gap = t - s_last_edge;
+        if (gap > END_GAP_US) {
+            filter_reset();   // the disc stopped; the old rhythm no longer applies
+        }
+        uint32_t ref = filter_reference();
+        uint32_t rel_limit = (uint32_t)((uint64_t)ref * CONFIG_BXT_CHATTER_RATIO_PCT / 100);
+        // Faster than physically possible, or too soon after the last edge: chatter
+        if (gap < min_gap_us) {
+            s_rejected_max_rpm++;
+            return;
+        }
+        if (gap < rel_limit) {
+            s_rejected_relative++;
+            return;
+        }
+        filter_record(gap, ref);
     }
     s_last_edge = t;
     s_have_last_edge = true;
@@ -193,6 +271,7 @@ bool launch_update(bool loaded, bool armed_always)
         rpm_power(want_power);
         s_window_len = 0;
         s_have_last_edge = false;
+        filter_reset();
     }
 
     uint32_t min_gap_us = 60000000UL / ((uint32_t)CONFIG_BXT_MAX_RPM * cfg->edges_per_rev);

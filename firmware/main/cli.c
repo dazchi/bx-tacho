@@ -54,8 +54,11 @@ static int cmd_status(int argc, char **argv)
         printf("load        : not calibrated (RPM stays armed). See 'cal load'.\n");
     }
     if (s.have_result) {
-        printf("last launch : peak %d rpm, max %d rpm, %d revs, %d ms\n", s.result.peak_rpm,
-               s.result.max_rpm, s.result.revolutions, s.result.duration_ms);
+        printf("last launch : peak %d rpm, max %d rpm, %d revs, %d ms\n",
+               s.result.peak_rpm, s.result.max_rpm, s.result.revolutions, s.result.duration_ms);
+        printf("rejected    : %d edges (max-rpm %d, relative %d)\n",
+               s.result.rejected_max_rpm + s.result.rejected_relative,
+               s.result.rejected_max_rpm, s.result.rejected_relative);
     }
     printf("idle        : %lu ms\n", (unsigned long)s.idle_ms);
     return 0;

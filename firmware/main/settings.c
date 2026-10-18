@@ -26,7 +26,9 @@ void settings_reset(void)
     s_settings = (settings_t) {
         .rpm_thr_mv = RPM_THR_DEFAULT_MV,
         .edges_per_rev = CONFIG_BXT_EDGES_PER_REV,
-        .load_cal_valid = false,
+        .load_cal_valid = true,
+        .load_empty = 100,
+        .load_loaded = 400,
     };
 }
 

@@ -16,6 +16,19 @@ menu "BX Tacho"
         help
             Shorter periods than this are treated as glitches and dropped.
 
+    config BXT_CHATTER_RATIO_PCT
+        int "Chatter filter: minimum edge interval (% of recent interval)"
+        range 0 90
+        default 60
+        help
+            An edge that arrives sooner than this percentage of the recent
+            edge-to-edge interval is dropped as comparator chatter. Chatter
+            at the opposite transition lands about 50 % into an interval,
+            while the disc cannot speed up by more than a few percent per
+            interval. Assumes evenly spaced segments; lower it for discs
+            with uneven segments. 0 disables this check (the
+            BXT_MAX_RPM floor still applies).
+
     config BXT_OLED_I2C_HZ
         int "OLED I2C clock (Hz)"
         default 400000
