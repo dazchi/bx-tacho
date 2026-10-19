@@ -15,6 +15,8 @@ void display_clear(void);
 // Draw text with the 5x7 font magnified by `scale` (glyph cell = 6*scale wide).
 void display_text(int x, int y, const char *s, int scale);
 void display_hline(int x0, int x1, int y);
+// 1-bit bitmap, row-major, MSB = leftmost pixel, rows padded to whole bytes (see icons.h)
+void display_bitmap(int x, int y, int w, int h, const uint8_t *bits);
 // Width in pixels of `s` drawn at `scale`
 int display_text_width(const char *s, int scale);
 

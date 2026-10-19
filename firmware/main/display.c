@@ -96,6 +96,18 @@ void display_hline(int x0, int x1, int y)
     }
 }
 
+void display_bitmap(int x, int y, int w, int h, const uint8_t *bits)
+{
+    int stride = (w + 7) / 8;
+    for (int row = 0; row < h; row++) {
+        for (int col = 0; col < w; col++) {
+            if (bits[row * stride + col / 8] & (0x80 >> (col % 8))) {
+                set_pixel(x + col, y + row);
+            }
+        }
+    }
+}
+
 int display_text_width(const char *s, int scale)
 {
     int n = (int)strlen(s);

@@ -11,6 +11,7 @@
 #include "esp_timer.h"
 #include "eventlog.h"
 #include "freertos/FreeRTOS.h"
+#include "icons.h"
 #include "freertos/task.h"
 #include "load.h"
 #include "rpm.h"
@@ -28,6 +29,10 @@ static const char *TAG = "main";
 #define CONTRAST_NORMAL    0xCF
 #define CONTRAST_DIM       0x10
 
+// Low-battery shutdown: dead-battery icon, then a shorter countdown
+#define LOW_BATT_ICON_S       2
+#define LOW_BATT_COUNTDOWN_S  3
+
 static portMUX_TYPE s_snap_lock = portMUX_INITIALIZER_UNLOCKED;
 static app_snapshot_t s_snap;
 static volatile app_mode_t s_mode = APP_MODE_RUN;
@@ -37,6 +42,7 @@ static esp_pm_lock_handle_t s_usb_pm_lock;
 
 // Deep-sleep hand-off. The UI task owns the display: it draws the countdown
 // and switches the display off, so two tasks never drive the I2C bus at once.
+static volatile bool s_show_batt_icon;            // low-battery icon on the display
 static volatile int s_countdown;                  // >0: seconds left, shown on the display
 static volatile app_sleep_reason_t s_countdown_reason;
 static volatile bool s_sleep_pending;             // countdown or shutdown in progress
@@ -104,14 +110,24 @@ bool app_enter_deep_sleep(app_sleep_reason_t reason)
 
     // The idle timeout skips the countdown: the display is already off by then
     if (reason != APP_SLEEP_IDLE) {
+        // On low battery, plugging in USB at any point means it can charge instead
+        bool low_batt = reason == APP_SLEEP_LOW_BATT;
         s_countdown_reason = reason;
-        for (int i = APP_SLEEP_COUNTDOWN_S; i > 0; i--) {
+        if (low_batt) {
+            s_show_batt_icon = true;
+            for (int i = 0; i < LOW_BATT_ICON_S && !battery_usb_present(); i++) {
+                vTaskDelay(pdMS_TO_TICKS(1000));
+            }
+            s_show_batt_icon = false;
+        }
+        int seconds = low_batt ? LOW_BATT_COUNTDOWN_S : APP_SLEEP_COUNTDOWN_S;
+        for (int i = seconds; i > 0 && !(low_batt && battery_usb_present()); i--) {
             s_countdown = i;
             ESP_LOGI(TAG, "deep sleep in %d s%s", i, battery_usb_present() ? " - unplug USB now" : "");
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
         if (battery_usb_present()) {
-            ESP_LOGW(TAG, "USB still connected, deep sleep cancelled");
+            ESP_LOGW(TAG, "USB connected, deep sleep cancelled");
             s_countdown = 0;
             s_sleep_pending = false;
             app_note_activity();
@@ -395,6 +411,21 @@ static void draw_sleep_countdown(int seconds, app_sleep_reason_t reason)
     display_flush();
 }
 
+static void draw_low_battery(int vbat_mv)
+{
+    static const char *text = "LOW BATTERY";
+    char volts[24];
+    int cv = (vbat_mv + 5) / 10;   // centivolts, rounded
+
+    snprintf(volts, sizeof(volts), "%d.%02d V", cv / 100, cv % 100);
+    display_clear();
+    display_bitmap((DISPLAY_W - ICON_BATTERY_OFF_W) / 2, 0, ICON_BATTERY_OFF_W, ICON_BATTERY_OFF_H,
+                   icon_battery_off_48);
+    display_text((DISPLAY_W - display_text_width(text, 1)) / 2, 47, text, 1);
+    display_text((DISPLAY_W - display_text_width(volts, 1)) / 2, 56, volts, 1);
+    display_flush();
+}
+
 static void ui_task(void *arg)
 {
     app_snapshot_t s;
@@ -414,7 +445,8 @@ static void ui_task(void *arg)
         }
 
         int countdown = s_countdown;
-        if (countdown > 0) {
+        bool batt_icon = s_show_batt_icon;
+        if (batt_icon || countdown > 0) {
             if (!on) {
                 display_power(true);
                 on = true;
@@ -423,7 +455,12 @@ static void ui_task(void *arg)
                 display_set_contrast(CONTRAST_NORMAL);
                 dim = false;
             }
-            draw_sleep_countdown(countdown, s_countdown_reason);
+            if (batt_icon) {
+                app_get_snapshot(&s);
+                draw_low_battery(s.batt.vbat_mv);
+            } else {
+                draw_sleep_countdown(countdown, s_countdown_reason);
+            }
             vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
             continue;
         }

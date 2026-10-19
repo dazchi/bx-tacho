@@ -42,16 +42,20 @@ typedef enum {
     APP_SLEEP_COMMAND,    // console "sleep"
 } app_sleep_reason_t;
 
-// Countdown shown before a low-battery or commanded deep sleep
+// Countdown shown before a commanded deep sleep
 #define APP_SLEEP_COUNTDOWN_S 5
 
 void app_note_activity(void);
 
-// Enter deep sleep (wake-up: USB plugged in, or the power switch). Low-battery
-// and commanded sleeps first count down APP_SLEEP_COUNTDOWN_S on the display;
-// if USB is still connected at the end they are cancelled and this returns
-// false (waking is "USB present", so the chip would reboot at once).
-// Otherwise it does not return.
+// Enter deep sleep (wake-up: USB plugged in, or the power switch).
+// - Command: counts down APP_SLEEP_COUNTDOWN_S on the display.
+// - Low battery: shows a dead-battery icon with the battery voltage, then a
+//   short countdown (LOW_BATT_ICON_S / LOW_BATT_COUNTDOWN_S in main.c);
+//   plugging in USB at any point cancels it so the battery can charge.
+// - Idle timeout: no countdown (the display is already off).
+// If USB is connected at the end, the sleep is cancelled and this returns false
+// (waking is "USB present", so the chip would reboot at once). Otherwise it does
+// not return.
 bool app_enter_deep_sleep(app_sleep_reason_t reason);
 
 // Automatic light sleep on battery (USB always keeps the chip awake)

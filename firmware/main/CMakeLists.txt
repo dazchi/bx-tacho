@@ -11,6 +11,7 @@ idf_component_register(
         "settings.c"
         "cli.c"
         "eventlog.c"
+        "icons.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         esp_driver_gpio
