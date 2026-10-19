@@ -36,5 +36,23 @@ void app_set_mode(app_mode_t mode);
 app_mode_t app_get_mode(void);
 const char *app_mode_name(app_mode_t mode);
 
+typedef enum {
+    APP_SLEEP_IDLE,       // CONFIG_BXT_DEEP_SLEEP_S without activity
+    APP_SLEEP_LOW_BATT,   // below CONFIG_BXT_CUTOFF_BATT_MV
+    APP_SLEEP_COMMAND,    // console "sleep"
+} app_sleep_reason_t;
+
+// Countdown shown before a low-battery or commanded deep sleep
+#define APP_SLEEP_COUNTDOWN_S 5
+
 void app_note_activity(void);
-void app_enter_deep_sleep(void);
+
+// Enter deep sleep (wake-up: USB plugged in, or the power switch). Low-battery
+// and commanded sleeps first count down APP_SLEEP_COUNTDOWN_S on the display;
+// if USB is still connected at the end they are cancelled and this returns
+// false (waking is "USB present", so the chip would reboot at once).
+// Otherwise it does not return.
+bool app_enter_deep_sleep(app_sleep_reason_t reason);
+
+// Automatic light sleep on battery (USB always keeps the chip awake)
+void app_set_light_sleep(bool enable);

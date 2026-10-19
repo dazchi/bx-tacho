@@ -19,3 +19,7 @@ esp_err_t settings_init(void);
 settings_t *settings_get(void);
 esp_err_t settings_save(void);
 void settings_reset(void);
+
+// Automatic light sleep on battery (default on); saved immediately
+bool settings_light_sleep(void);
+esp_err_t settings_set_light_sleep(bool enable);

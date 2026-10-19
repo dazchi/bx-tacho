@@ -6,7 +6,9 @@
 #include <string.h>
 #include "app.h"
 #include "esp_console.h"
+#include "esp_system.h"
 #include "esp_timer.h"
+#include "eventlog.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "load.h"
@@ -41,6 +43,9 @@ static int cmd_status(int argc, char **argv)
     const settings_t *cfg = settings_get();
 
     printf("mode        : %s\n", app_mode_name(s.mode));
+    printf("boot        : #%lu, reset reason %s, light sleep on battery %s\n",
+           (unsigned long)eventlog_boot_count(), eventlog_reset_reason_name(esp_reset_reason()),
+           settings_light_sleep() ? "on" : "off");
     printf("state       : %s\n", launch_state_name(s.state));
     printf("power       : %s, VBAT %d mV (%s), %d%%\n", src_name(s.batt.src), s.batt.vbat_mv,
            s.batt.vbat_valid ? "valid" : "not trusted while on USB", s.batt.percent);
@@ -326,15 +331,40 @@ static int cmd_cfg(int argc, char **argv)
         printf("settings reset to defaults\n");
         return 0;
     }
-    printf("usage: cfg edges <1-16> | cfg reset\n");
+    if (argc == 3 && !strcmp(argv[1], "lightsleep") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
+        bool on = !strcmp(argv[2], "on");
+        settings_set_light_sleep(on);
+        app_set_light_sleep(on);
+        printf("light sleep on battery: %s (saved)\n", argv[2]);
+        return 0;
+    }
+    printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg reset\n");
     return 1;
 }
 
 static int cmd_sleep(int argc, char **argv)
 {
-    printf("Deep sleep. Plug in USB or cycle the power switch to wake.\n");
-    vTaskDelay(pdMS_TO_TICKS(100));
-    app_enter_deep_sleep();
+    printf("Deep sleep in %d s. Unplug USB now, otherwise sleep is cancelled.\n"
+           "Wake up later by plugging in USB or cycling the power switch.\n", APP_SLEEP_COUNTDOWN_S);
+    if (!app_enter_deep_sleep(APP_SLEEP_COMMAND)) {
+        printf("USB still connected: deep sleep cancelled.\n");
+        return 1;
+    }
+    return 0;
+}
+
+static int cmd_events(int argc, char **argv)
+{
+    if (argc == 2 && !strcmp(argv[1], "clear")) {
+        eventlog_clear();
+        printf("event log cleared\n");
+        return 0;
+    }
+    if (argc != 1) {
+        printf("usage: events | events clear\n");
+        return 1;
+    }
+    eventlog_print();
     return 0;
 }
 
@@ -347,8 +377,9 @@ esp_err_t cli_start(void)
         {.command = "rpm", .help = "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", .func = cmd_rpm},
         {.command = "load", .help = "load [count]: print ambient-cancelled LOAD_SENSE readings", .func = cmd_load},
         {.command = "cal", .help = "cal load empty|loaded|clear: calibrate the load sensor", .func = cmd_cal},
-        {.command = "cfg", .help = "cfg edges <n> | cfg reset", .func = cmd_cfg},
+        {.command = "cfg", .help = "cfg edges <n> | cfg lightsleep on|off | cfg reset", .func = cmd_cfg},
         {.command = "sleep", .help = "Enter deep sleep now", .func = cmd_sleep},
+        {.command = "events", .help = "events | events clear: power/sleep event log (survives deep sleep and resets)", .func = cmd_events},
     };
 
     esp_console_repl_t *repl = NULL;

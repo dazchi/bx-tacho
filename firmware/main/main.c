@@ -9,6 +9,7 @@
 #include "esp_pm.h"
 #include "esp_sleep.h"
 #include "esp_timer.h"
+#include "eventlog.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "load.h"
@@ -33,6 +34,15 @@ static volatile app_mode_t s_mode = APP_MODE_RUN;
 static volatile bool s_mode_changed;
 static volatile int64_t s_last_activity_us;
 static esp_pm_lock_handle_t s_usb_pm_lock;
+
+// Deep-sleep hand-off. The UI task owns the display: it draws the countdown
+// and switches the display off, so two tasks never drive the I2C bus at once.
+static volatile int s_countdown;                  // >0: seconds left, shown on the display
+static volatile app_sleep_reason_t s_countdown_reason;
+static volatile bool s_sleep_pending;             // countdown or shutdown in progress
+static volatile bool s_shutdown;                  // countdown over: other tasks leave the hardware alone
+static volatile bool s_ui_parked;                 // UI task has switched the display off
+static bool s_ui_running;
 
 static const gpio_num_t s_held_outputs[] = {
     PIN_LOAD_IR_LED, PIN_RPM_CMP_PWR, PIN_RPM_IR_LED, PIN_RPM_THR_PWM,
@@ -70,16 +80,55 @@ void app_note_activity(void)
     s_last_activity_us = esp_timer_get_time();
 }
 
-void app_enter_deep_sleep(void)
+static void configure_pm(bool light_sleep)
 {
-    ESP_LOGI(TAG, "entering deep sleep, wake on USB plug-in or power switch");
-    if (display_present()) {
-        display_clear();
-        display_text(40, 28, "SLEEP", 1);
-        display_flush();
-        vTaskDelay(pdMS_TO_TICKS(500));
-        display_power(false);
+    esp_pm_config_t pm = {
+        .max_freq_mhz = 160,
+        .min_freq_mhz = 40,
+        .light_sleep_enable = light_sleep,
+    };
+    ESP_ERROR_CHECK(esp_pm_configure(&pm));
+}
+
+void app_set_light_sleep(bool enable)
+{
+    configure_pm(enable);
+}
+
+bool app_enter_deep_sleep(app_sleep_reason_t reason)
+{
+    if (s_sleep_pending) {
+        return false;   // already on its way (e.g. command and low battery at once)
     }
+    s_sleep_pending = true;
+
+    // The idle timeout skips the countdown: the display is already off by then
+    if (reason != APP_SLEEP_IDLE) {
+        s_countdown_reason = reason;
+        for (int i = APP_SLEEP_COUNTDOWN_S; i > 0; i--) {
+            s_countdown = i;
+            ESP_LOGI(TAG, "deep sleep in %d s%s", i, battery_usb_present() ? " - unplug USB now" : "");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+        if (battery_usb_present()) {
+            ESP_LOGW(TAG, "USB still connected, deep sleep cancelled");
+            s_countdown = 0;
+            s_sleep_pending = false;
+            app_note_activity();
+            return false;
+        }
+    }
+
+    s_shutdown = true;
+    s_countdown = 0;
+    for (int i = 0; s_ui_running && !s_ui_parked && i < 50; i++) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    app_snapshot_t s;
+    app_get_snapshot(&s);
+    eventlog_add(EV_DEEP_SLEEP, reason, s.batt.vbat_mv);
+    ESP_LOGI(TAG, "entering deep sleep, wake on USB plug-in or power switch");
 
     rpm_power(false);
     load_hold_end();
@@ -93,6 +142,9 @@ void app_enter_deep_sleep(void)
     }
     gpio_deep_sleep_hold_en();
 
+    // Automatic light sleep leaves a timer wake-up armed for the next tick; without
+    // clearing it, deep sleep ends within a second and the chip reboots.
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     esp_sleep_enable_gpio_wakeup_on_hp_periph_powerdown(BIT64(PIN_VUSB_DET), ESP_GPIO_WAKEUP_GPIO_HIGH);
     esp_deep_sleep_start();
 }
@@ -111,16 +163,23 @@ static void sensor_task(void *arg)
     bool hold = false;
     bool prev_usb = false;
     bool prev_loaded = false;
+    launch_state_t prev_state = launch_get_state();
     int64_t last_poll_us = 0;
     int64_t last_batt_us = -BATTERY_PERIOD_MS * 1000LL;
 
     for (;;) {
+        if (s_shutdown) {
+            // Another task is putting the chip to sleep; keep off the hardware
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
         int64_t now = esp_timer_get_time();
         const settings_t *cfg = settings_get();
 
         app_mode_t mode = s_mode;
         if (s_mode_changed) {
             s_mode_changed = false;
+            eventlog_add(EV_MODE, mode, 0);
             // Hand the hardware over cleanly in either direction
             if (hold) {
                 load_hold_end();
@@ -171,6 +230,7 @@ static void sensor_task(void *arg)
             }
             if (snap.loaded != prev_loaded) {
                 prev_loaded = snap.loaded;
+                eventlog_add(snap.loaded ? EV_LOAD_ON : EV_LOAD_OFF, snap.load_diff_mv, snap.load_pct);
                 app_note_activity();
             }
 
@@ -178,6 +238,10 @@ static void sensor_task(void *arg)
                 app_note_activity();
             }
             snap.state = launch_get_state();
+            if (snap.state != prev_state) {
+                eventlog_add(EV_STATE, snap.state, prev_state);
+                prev_state = snap.state;
+            }
             snap.live_rpm = launch_live_rpm();
             snap.have_result = launch_get_result(&snap.result);
         }
@@ -197,21 +261,27 @@ static void sensor_task(void *arg)
                     esp_pm_lock_release(s_usb_pm_lock);
                 }
                 prev_usb = usb;
+                eventlog_add(usb ? EV_USB_ON : EV_USB_OFF, snap.batt.vbat_mv, 0);
                 app_note_activity();
             }
 
-            if (!usb && snap.batt.vbat_valid && snap.batt.vbat_mv < CONFIG_BXT_CUTOFF_BATT_MV) {
+            if (!usb && !s_sleep_pending && snap.batt.vbat_valid &&
+                snap.batt.vbat_mv < CONFIG_BXT_CUTOFF_BATT_MV) {
                 ESP_LOGW(TAG, "battery %d mV below cutoff", snap.batt.vbat_mv);
-                app_enter_deep_sleep();
+                publish(&snap);
+                app_enter_deep_sleep(APP_SLEEP_LOW_BATT);   // returns if USB is plugged in meanwhile
             }
         }
 
-        snap.idle_ms = (uint32_t)((now - s_last_activity_us) / 1000);
+        // Activity noted during this pass is newer than `now`; measure from the current
+        // time so the idle time can't go negative (and wrap to a huge value)
+        int64_t idle_us = esp_timer_get_time() - s_last_activity_us;
+        snap.idle_ms = idle_us > 0 ? (uint32_t)(idle_us / 1000) : 0;
         publish(&snap);
 
         bool busy = snap.state == LAUNCH_LOADED || snap.state == LAUNCH_PULLING || mode != APP_MODE_RUN;
-        if (!busy && !prev_usb && snap.idle_ms > CONFIG_BXT_DEEP_SLEEP_S * 1000U) {
-            app_enter_deep_sleep();
+        if (!busy && !prev_usb && !s_sleep_pending && snap.idle_ms > CONFIG_BXT_DEEP_SLEEP_S * 1000U) {
+            app_enter_deep_sleep(APP_SLEEP_IDLE);
         }
 
         vTaskDelay(hold ? 1 : pdMS_TO_TICKS(IDLE_TICK_MS));
@@ -308,13 +378,56 @@ static void draw_screen(const app_snapshot_t *s)
     display_flush();
 }
 
+static void draw_sleep_countdown(int seconds, app_sleep_reason_t reason)
+{
+    static const char *title = "DEEP SLEEP IN";
+    const char *why = reason == APP_SLEEP_LOW_BATT ? "LOW BATTERY" : "SLEEP COMMAND";
+    const char *hint = battery_usb_present() ? "UNPLUG USB NOW" : "PLUG IN USB TO WAKE";
+    char big[4];
+
+    display_clear();
+    display_text((DISPLAY_W - display_text_width(title, 1)) / 2, 0, title, 1);
+    display_hline(0, DISPLAY_W - 1, 10);
+    snprintf(big, sizeof(big), "%d", seconds);
+    display_text((DISPLAY_W - display_text_width(big, 4)) / 2, 15, big, 4);
+    display_text((DISPLAY_W - display_text_width(why, 1)) / 2, 46, why, 1);
+    display_text((DISPLAY_W - display_text_width(hint, 1)) / 2, 56, hint, 1);
+    display_flush();
+}
+
 static void ui_task(void *arg)
 {
     app_snapshot_t s;
     bool on = true;
     bool dim = false;
+    int64_t off_since_us = 0;
 
     for (;;) {
+        if (s_shutdown) {
+            if (on) {
+                display_power(false);
+                on = false;
+            }
+            s_ui_parked = true;
+            vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        int countdown = s_countdown;
+        if (countdown > 0) {
+            if (!on) {
+                display_power(true);
+                on = true;
+            }
+            if (dim) {
+                display_set_contrast(CONTRAST_NORMAL);
+                dim = false;
+            }
+            draw_sleep_countdown(countdown, s_countdown_reason);
+            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
+            continue;
+        }
+
         app_get_snapshot(&s);
 
         bool want_on = s.idle_ms < CONFIG_BXT_DISPLAY_OFF_S * 1000U;
@@ -322,6 +435,12 @@ static void ui_task(void *arg)
         if (want_on != on) {
             display_power(want_on);
             on = want_on;
+            if (on) {
+                eventlog_add(EV_DISPLAY_ON, (int)((esp_timer_get_time() - off_since_us) / 1000000), 0);
+            } else {
+                off_since_us = esp_timer_get_time();
+                eventlog_add(EV_DISPLAY_OFF, 0, 0);
+            }
         }
         if (on && want_dim != dim) {
             display_set_contrast(want_dim ? CONTRAST_DIM : CONTRAST_NORMAL);
@@ -343,6 +462,7 @@ void app_main(void)
         gpio_hold_dis(s_held_outputs[i]);
     }
 
+    eventlog_init();
     ESP_ERROR_CHECK(settings_init());
     ESP_ERROR_CHECK(sense_adc_init());
     ESP_ERROR_CHECK(battery_init());
@@ -351,18 +471,14 @@ void app_main(void)
     rpm_set_threshold_mv(settings_get()->rpm_thr_mv);
     launch_init();
 
-    esp_pm_config_t pm = {
-        .max_freq_mhz = 160,
-        .min_freq_mhz = 40,
-        .light_sleep_enable = true,
-    };
-    ESP_ERROR_CHECK(esp_pm_configure(&pm));
+    configure_pm(settings_light_sleep());
     ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "usb", &s_usb_pm_lock));
 
     app_note_activity();
 
     if (display_init() == ESP_OK) {
         display_set_contrast(CONTRAST_NORMAL);
+        s_ui_running = true;
         xTaskCreate(ui_task, "ui", 3072, NULL, 3, NULL);
     }
     xTaskCreate(sensor_task, "sensors", 4096, NULL, 5, NULL);

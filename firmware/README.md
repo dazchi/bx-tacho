@@ -49,6 +49,8 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `load [n]` | Print ambient-cancelled LOAD_SENSE readings |
 | `cal load empty` / `cal load loaded` / `cal load clear` | Calibrate the load sensor |
 | `cfg edges <n>` | Rising edges per launcher revolution |
+| `cfg lightsleep on\|off` | Automatic light sleep on battery (default on), for power debugging |
+| `events` / `events clear` | Power/sleep event log: boots and reset reasons, load changes, state changes, USB, display on/off, deep sleep. Kept in RTC memory, so it survives deep sleep and resets (not power-on) |
 | `sleep` | Deep sleep now |
 
 The console is only reachable while USB is plugged in; light sleep is

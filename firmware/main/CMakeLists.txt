@@ -10,6 +10,7 @@ idf_component_register(
         "font5x7.c"
         "settings.c"
         "cli.c"
+        "eventlog.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         esp_driver_gpio
