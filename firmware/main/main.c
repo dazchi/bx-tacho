@@ -1,6 +1,7 @@
 // BX Tacho: Beyblade X launcher RPM meter, ESP32-C3 firmware.
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "app.h"
 #include "board.h"
 #include "cli.h"
@@ -25,6 +26,7 @@ static const char *TAG = "main";
 #define BATTERY_PERIOD_MS  1000
 #define UI_PERIOD_MS       100
 #define UI_LIVE_PERIOD_MS  50
+#define DIAG_SAMPLE_MS     100    // live sensor readings on the diag screen
 
 #define CONTRAST_NORMAL    0xCF
 #define CONTRAST_DIM       0x10
@@ -206,6 +208,8 @@ static void sensor_task(void *arg)
             launch_init();
             snap.loaded = prev_loaded = false;
             snap.meter = (meter_stats_t) {0};
+            snap.diag = (diag_readings_t) {0};
+            last_poll_us = 0;
             if (mode == APP_MODE_METER) {
                 rpm_power(true);
                 launch_meter_start();
@@ -215,6 +219,23 @@ static void sensor_task(void *arg)
         if (mode == APP_MODE_METER) {
             launch_meter_update(&snap.meter);
             app_note_activity();   // keep the display on while metering
+        } else if (mode == APP_MODE_DIAG) {
+            // Only read the sensors; the console decides what is powered. The
+            // percentage is computed directly so the classifier and its baseline
+            // tracking stay untouched.
+            if (now - last_poll_us >= DIAG_SAMPLE_MS * 1000LL) {
+                last_poll_us = now;
+                diag_readings_t *d = &snap.diag;
+                int span = cfg->load_loaded - cfg->load_empty;
+                d->load_mv = load_measure_raw(4, &d->load_on_mv, &d->load_off_mv);
+                d->load_pct_valid = cfg->load_cal_valid && d->load_mv != INT_MIN &&
+                                    abs(span) >= LOAD_MIN_CONTRAST_MV;
+                d->load_pct = d->load_pct_valid ? (d->load_mv - cfg->load_empty) * 100 / span : 0;
+                d->rpm_on = rpm_is_powered();
+                d->rpm_mv = d->rpm_on ? rpm_read_sense_mv(4) : 0;
+                d->trig = gpio_get_level(PIN_RPM_IR_TRIG) == 1;
+            }
+            app_note_activity();   // keep the display on while diagnosing
         } else if (mode == APP_MODE_RUN) {
             bool fast = snap.loaded || launch_get_state() == LAUNCH_PULLING;
             int diff = INT_MIN;
@@ -363,6 +384,50 @@ static void draw_meter_screen(const app_snapshot_t *s)
     display_flush();
 }
 
+// A reading in double-size digits with a small "MV" after it
+static void draw_value_mv(int x, int y, int mv)
+{
+    char num[12];
+    snprintf(num, sizeof(num), "%d", mv);
+    display_text(x, y, num, 2);
+    display_text(x + display_text_width(num, 2) + 4, y + 7, "MV", 1);
+}
+
+// Diag mode: live LOAD_SENSE (difference large, raw LED on/off beside it) and RPM_SENSE
+static void draw_diag_screen(const app_snapshot_t *s)
+{
+    const diag_readings_t *d = &s->diag;
+    char line[24];
+
+    display_clear();
+    draw_status_line(s);
+
+    display_text(0, 13, "LOAD_SENSE", 1);
+    if (d->load_pct_valid) {
+        snprintf(line, sizeof(line), "%d%%", d->load_pct);
+        display_text(DISPLAY_W - display_text_width(line, 1), 13, line, 1);
+    }
+    if (d->load_mv == INT_MIN) {
+        display_text(0, 22, "ERR", 2);
+    } else {
+        draw_value_mv(0, 22, d->load_mv);
+    }
+    snprintf(line, sizeof(line), "ON %d", d->load_on_mv);
+    display_text(DISPLAY_W - display_text_width(line, 1), 22, line, 1);
+    snprintf(line, sizeof(line), "OFF %d", d->load_off_mv);
+    display_text(DISPLAY_W - display_text_width(line, 1), 30, line, 1);
+
+    display_text(0, 39, "RPM_SENSE", 1);
+    snprintf(line, sizeof(line), "THR %d %s", rpm_get_threshold_mv(), d->trig ? "HI" : "LO");
+    display_text(DISPLAY_W - display_text_width(line, 1), 39, line, 1);
+    if (d->rpm_on) {
+        draw_value_mv(0, 48, d->rpm_mv);
+    } else {
+        display_text(0, 48, "OFF", 2);
+    }
+    display_flush();
+}
+
 static void draw_screen(const app_snapshot_t *s)
 {
     char big[8];
@@ -371,6 +436,10 @@ static void draw_screen(const app_snapshot_t *s)
 
     if (s->mode == APP_MODE_METER) {
         draw_meter_screen(s);
+        return;
+    }
+    if (s->mode == APP_MODE_DIAG) {
+        draw_diag_screen(s);
         return;
     }
 
@@ -487,7 +556,7 @@ static void ui_task(void *arg)
             draw_screen(&s);
         }
 
-        bool live = s.state == LAUNCH_PULLING || s.mode == APP_MODE_METER;
+        bool live = s.state == LAUNCH_PULLING || s.mode != APP_MODE_RUN;
         vTaskDelay(pdMS_TO_TICKS(live ? UI_LIVE_PERIOD_MS : UI_PERIOD_MS));
     }
 }

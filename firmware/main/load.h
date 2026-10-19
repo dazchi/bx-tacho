@@ -14,6 +14,8 @@ esp_err_t load_init(void);
 // difference averaged over `samples` reads. Restores the LED afterwards.
 // Thread-safe. Returns mV, or INT_MIN on ADC error.
 int load_measure(int samples);
+// Same, also returning the raw LED-on and LED-off readings (mV, -1 on ADC error)
+int load_measure_raw(int samples, int *on_mv, int *off_mv);
 
 // Fast mode for while a top is loaded: measure ambient once, then keep the
 // LED on so each sample is a single ADC read.

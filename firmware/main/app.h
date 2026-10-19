@@ -11,6 +11,18 @@ typedef enum {
     APP_MODE_METER,   // continuous RPM on the display, for bench tests
 } app_mode_t;
 
+// Live sensor readings shown in APP_MODE_DIAG
+typedef struct {
+    int load_mv;          // ambient-cancelled LOAD_SENSE (LED on - off)
+    int load_on_mv;       // raw LOAD_SENSE with the LED on
+    int load_off_mv;      // raw LOAD_SENSE with the LED off (ambient and stray light)
+    int load_pct;         // position between the calibrated empty (0) and loaded (100) levels
+    bool load_pct_valid;  // false without a usable load calibration
+    bool rpm_on;          // RPM channel powered (RPM_SENSE only valid then)
+    int rpm_mv;           // RPM_SENSE
+    bool trig;            // comparator output (RPM_IR_TRIG)
+} diag_readings_t;
+
 typedef struct {
     launch_state_t state;
     int live_rpm;
@@ -25,6 +37,7 @@ typedef struct {
     battery_status_t batt;
     app_mode_t mode;
     meter_stats_t meter;      // valid in APP_MODE_METER
+    diag_readings_t diag;     // valid in APP_MODE_DIAG
     uint32_t idle_ms;         // time since the last user-visible activity
 } app_snapshot_t;
 

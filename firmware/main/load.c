@@ -46,7 +46,7 @@ esp_err_t load_init(void)
     return ESP_OK;
 }
 
-int load_measure(int samples)
+int load_measure_raw(int samples, int *on_mv, int *off_mv)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
 
@@ -61,10 +61,21 @@ int load_measure(int samples)
     gpio_set_level(PIN_LOAD_IR_LED, s_hold ? 1 : 0);
     xSemaphoreGive(s_lock);
 
+    if (on_mv) {
+        *on_mv = on;
+    }
+    if (off_mv) {
+        *off_mv = off;
+    }
     if (off < 0 || on < 0) {
         return INT_MIN;
     }
     return on - off;
+}
+
+int load_measure(int samples)
+{
+    return load_measure_raw(samples, NULL, NULL);
 }
 
 void load_hold_begin(void)
