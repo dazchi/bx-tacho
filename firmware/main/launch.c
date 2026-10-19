@@ -29,6 +29,10 @@ static const char *TAG = "launch";
 // onto half speed.
 #define MISSED_EDGE_PCT     170
 
+// Meter mode: average over this window; report 0 RPM after this long without an edge
+#define METER_WINDOW_US     1000000
+#define METER_TIMEOUT_US    2000000
+
 static launch_state_t s_state = LAUNCH_EMPTY;
 
 static uint32_t s_edges[MAX_EDGES];
@@ -46,6 +50,8 @@ static int s_hist_next;
 static int s_long_streak;           // consecutive gaps rejected as references
 static int s_rejected_max_rpm;      // edges dropped in this launch: faster than CONFIG_BXT_MAX_RPM
 static int s_rejected_relative;     // ...or too soon for the recent interval
+
+static uint32_t s_meter_count;      // meter mode: accepted edges, stored in s_edges as a ring
 
 static bool s_was_loaded;
 static bool s_release_seen;
@@ -199,7 +205,14 @@ static bool finish_launch(void)
     return true;
 }
 
-static void handle_edge(uint32_t t, bool can_start, uint32_t min_gap_us)
+static uint32_t min_edge_gap_us(void)
+{
+    return 60000000UL / ((uint32_t)CONFIG_BXT_MAX_RPM * settings_get()->edges_per_rev);
+}
+
+// Chatter filter shared by launches and the meter. Returns false if the edge
+// is dropped.
+static bool accept_edge(uint32_t t, uint32_t min_gap_us)
 {
     if (s_have_last_edge) {
         uint32_t gap = t - s_last_edge;
@@ -211,16 +224,24 @@ static void handle_edge(uint32_t t, bool can_start, uint32_t min_gap_us)
         // Faster than physically possible, or too soon after the last edge: chatter
         if (gap < min_gap_us) {
             s_rejected_max_rpm++;
-            return;
+            return false;
         }
         if (gap < rel_limit) {
             s_rejected_relative++;
-            return;
+            return false;
         }
         filter_record(gap, ref);
     }
     s_last_edge = t;
     s_have_last_edge = true;
+    return true;
+}
+
+static void handle_edge(uint32_t t, bool can_start, uint32_t min_gap_us)
+{
+    if (!accept_edge(t, min_gap_us)) {
+        return;
+    }
 
     if (s_state == LAUNCH_PULLING) {
         if (s_num_edges < MAX_EDGES) {
@@ -250,7 +271,6 @@ bool launch_update(bool loaded, bool armed_always)
 {
     launch_state_t prev = s_state;
     uint32_t now = (uint32_t)esp_timer_get_time();
-    const settings_t *cfg = settings_get();
 
     // Load transitions
     if (loaded && !s_was_loaded && s_state != LAUNCH_PULLING) {
@@ -274,7 +294,7 @@ bool launch_update(bool loaded, bool armed_always)
         filter_reset();
     }
 
-    uint32_t min_gap_us = 60000000UL / ((uint32_t)CONFIG_BXT_MAX_RPM * cfg->edges_per_rev);
+    uint32_t min_gap_us = min_edge_gap_us();
     uint32_t edges[32];
     int n;
     while ((n = rpm_take_edges(edges, 32)) > 0) {
@@ -292,6 +312,81 @@ bool launch_update(bool loaded, bool armed_always)
     }
 
     return s_state != prev || s_state == LAUNCH_PULLING;
+}
+
+void launch_meter_start(void)
+{
+    s_state = LAUNCH_EMPTY;
+    s_window_len = 0;
+    s_have_last_edge = false;
+    filter_reset();
+    s_meter_count = 0;
+    s_rejected_max_rpm = 0;
+    s_rejected_relative = 0;
+}
+
+static inline uint32_t meter_edge(uint32_t i)
+{
+    return s_edges[i % MAX_EDGES];
+}
+
+void launch_meter_update(meter_stats_t *out)
+{
+    uint32_t epr = settings_get()->edges_per_rev;
+    uint32_t min_gap_us = min_edge_gap_us();
+    uint32_t edges[32];
+    int n;
+    while ((n = rpm_take_edges(edges, 32)) > 0) {
+        for (int i = 0; i < n; i++) {
+            if (accept_edge(edges[i], min_gap_us)) {
+                s_edges[s_meter_count % MAX_EDGES] = edges[i];
+                s_meter_count++;
+            }
+        }
+    }
+
+    *out = (meter_stats_t) {
+        .edges = s_meter_count,
+        .rejected_max_rpm = s_rejected_max_rpm,
+        .rejected_relative = s_rejected_relative,
+    };
+
+    // Edges still held in the ring, and how far back from the newest one we can go
+    uint32_t held = s_meter_count < MAX_EDGES ? s_meter_count : MAX_EDGES;
+    if (held <= epr) {
+        return;
+    }
+    uint32_t newest = s_meter_count - 1;
+    uint32_t t_last = meter_edge(newest);
+    if ((uint32_t)esp_timer_get_time() - t_last > METER_TIMEOUT_US) {
+        return;   // stopped
+    }
+
+    // Whole revolutions within the window, but at least one when turning slowly
+    uint32_t steps = 0;
+    while (steps < held - 1 && t_last - meter_edge(newest - steps - 1) <= METER_WINDOW_US) {
+        steps++;
+    }
+    steps -= steps % epr;
+    if (steps == 0) {
+        steps = epr;
+    }
+
+    uint32_t revs = steps / epr;
+    uint32_t span = t_last - meter_edge(newest - steps);
+    uint32_t slowest = 0;
+    uint32_t fastest = UINT32_MAX;
+    for (uint32_t back = 0; back + epr <= steps; back++) {
+        uint32_t p = meter_edge(newest - back) - meter_edge(newest - back - epr);
+        slowest = p > slowest ? p : slowest;
+        fastest = p < fastest ? p : fastest;
+    }
+
+    out->revs = (int)revs;
+    out->avg_rpm = span ? (int)(60000000ULL * revs / span) : 0;
+    out->inst_rpm = period_to_rpm(t_last - meter_edge(newest - epr));
+    out->min_rpm = period_to_rpm(slowest);
+    out->max_rpm = period_to_rpm(fastest);
 }
 
 launch_state_t launch_get_state(void)

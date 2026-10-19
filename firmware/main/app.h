@@ -5,6 +5,12 @@
 #include "battery.h"
 #include "launch.h"
 
+typedef enum {
+    APP_MODE_RUN,     // normal launch measurement
+    APP_MODE_DIAG,    // console drives the sensors directly
+    APP_MODE_METER,   // continuous RPM on the display, for bench tests
+} app_mode_t;
+
 typedef struct {
     launch_state_t state;
     int live_rpm;
@@ -17,16 +23,18 @@ typedef struct {
     int load_pct;             // position between empty (0) and loaded (100)
 
     battery_status_t batt;
-    bool diag;                // console has taken over the sensors
+    app_mode_t mode;
+    meter_stats_t meter;      // valid in APP_MODE_METER
     uint32_t idle_ms;         // time since the last user-visible activity
 } app_snapshot_t;
 
 void app_get_snapshot(app_snapshot_t *out);
 
-// Diagnostic mode pauses the launch state machine so the console can drive
-// the sensors directly.
-void app_set_diag(bool on);
-bool app_is_diag(void);
+// DIAG and METER pause the launch state machine. DIAG lets the console drive
+// the sensors directly; METER keeps the RPM channel on and shows live RPM.
+void app_set_mode(app_mode_t mode);
+app_mode_t app_get_mode(void);
+const char *app_mode_name(app_mode_t mode);
 
 void app_note_activity(void);
 void app_enter_deep_sleep(void);

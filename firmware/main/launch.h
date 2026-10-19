@@ -28,7 +28,24 @@ typedef struct {
     int rejected_relative;  // edges dropped: too soon for the recent interval
 } launch_result_t;
 
+// Continuous RPM meter for bench tests (e.g. a motor spinning the disc).
+// Uses the same edge filter as launches; figures cover the last second.
+typedef struct {
+    int avg_rpm;            // average over the window (0 = stopped)
+    int inst_rpm;           // last full revolution
+    int min_rpm;            // slowest revolution in the window
+    int max_rpm;            // fastest revolution in the window
+    int revs;               // revolutions in the window
+    uint32_t edges;         // edges accepted since the meter started
+    int rejected_max_rpm;   // edges dropped since the meter started
+    int rejected_relative;
+} meter_stats_t;
+
 void launch_init(void);
+
+// The caller powers the RPM channel; start resets the filter and counters.
+void launch_meter_start(void);
+void launch_meter_update(meter_stats_t *out);
 
 // Run one step. `loaded` is the debounced load-sensor state, `armed_always`
 // keeps the RPM channel armed when there is no load calibration.

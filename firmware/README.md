@@ -40,6 +40,8 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 |---|---|
 | `status` | Battery, sensors, calibration, last launch |
 | `diag on` / `diag off` | Pause the launch state machine so you can drive the sensors by hand |
+| `meter on` / `meter off` | Continuous RPM mode for bench tests: RPM channel always on, display shows live RPM (1 s average, min/max, rejected edges) |
+| `meter` / `meter log [s] [ms]` | Print meter readings as CSV, once or every `ms` for `s` seconds |
 | `rpm on` / `rpm off` | Power the RPM channel (diag mode) |
 | `rpm sense [n]` | Print RPM_SENSE in mV (channel must be on) |
 | `rpm scan [s] [apply]` | Record RPM_SENSE min/max while you turn the launcher; `apply` saves the midpoint as the threshold |

@@ -29,8 +29,8 @@ static const char *TAG = "main";
 
 static portMUX_TYPE s_snap_lock = portMUX_INITIALIZER_UNLOCKED;
 static app_snapshot_t s_snap;
-static volatile bool s_diag;
-static volatile bool s_diag_changed;
+static volatile app_mode_t s_mode = APP_MODE_RUN;
+static volatile bool s_mode_changed;
 static volatile int64_t s_last_activity_us;
 static esp_pm_lock_handle_t s_usb_pm_lock;
 
@@ -45,15 +45,24 @@ void app_get_snapshot(app_snapshot_t *out)
     taskEXIT_CRITICAL(&s_snap_lock);
 }
 
-void app_set_diag(bool on)
+void app_set_mode(app_mode_t mode)
 {
-    s_diag = on;
-    s_diag_changed = true;
+    s_mode = mode;
+    s_mode_changed = true;
 }
 
-bool app_is_diag(void)
+app_mode_t app_get_mode(void)
 {
-    return s_diag;
+    return s_mode;
+}
+
+const char *app_mode_name(app_mode_t mode)
+{
+    switch (mode) {
+    case APP_MODE_DIAG:  return "diag";
+    case APP_MODE_METER: return "meter";
+    default:             return "run";
+    }
 }
 
 void app_note_activity(void)
@@ -109,8 +118,9 @@ static void sensor_task(void *arg)
         int64_t now = esp_timer_get_time();
         const settings_t *cfg = settings_get();
 
-        if (s_diag_changed) {
-            s_diag_changed = false;
+        app_mode_t mode = s_mode;
+        if (s_mode_changed) {
+            s_mode_changed = false;
             // Hand the hardware over cleanly in either direction
             if (hold) {
                 load_hold_end();
@@ -120,9 +130,17 @@ static void sensor_task(void *arg)
             load_classifier_reset(false);
             launch_init();
             snap.loaded = prev_loaded = false;
+            snap.meter = (meter_stats_t) {0};
+            if (mode == APP_MODE_METER) {
+                rpm_power(true);
+                launch_meter_start();
+            }
         }
 
-        if (!s_diag) {
+        if (mode == APP_MODE_METER) {
+            launch_meter_update(&snap.meter);
+            app_note_activity();   // keep the display on while metering
+        } else if (mode == APP_MODE_RUN) {
             bool fast = snap.loaded || launch_get_state() == LAUNCH_PULLING;
             int diff = INT_MIN;
             bool sampled = false;
@@ -164,7 +182,7 @@ static void sensor_task(void *arg)
             snap.have_result = launch_get_result(&snap.result);
         }
         snap.load_cal_valid = cfg->load_cal_valid;
-        snap.diag = s_diag;
+        snap.mode = mode;
 
         if (now - last_batt_us >= BATTERY_PERIOD_MS * 1000LL) {
             last_batt_us = now;
@@ -191,7 +209,7 @@ static void sensor_task(void *arg)
         snap.idle_ms = (uint32_t)((now - s_last_activity_us) / 1000);
         publish(&snap);
 
-        bool busy = snap.state == LAUNCH_LOADED || snap.state == LAUNCH_PULLING || s_diag;
+        bool busy = snap.state == LAUNCH_LOADED || snap.state == LAUNCH_PULLING || mode != APP_MODE_RUN;
         if (!busy && !prev_usb && snap.idle_ms > CONFIG_BXT_DEEP_SLEEP_S * 1000U) {
             app_enter_deep_sleep();
         }
@@ -203,8 +221,10 @@ static void sensor_task(void *arg)
 static void draw_status_line(const app_snapshot_t *s)
 {
     const char *left;
-    if (s->diag) {
+    if (s->mode == APP_MODE_DIAG) {
         left = "DIAG";
+    } else if (s->mode == APP_MODE_METER) {
+        left = "METER";
     } else if (s->state == LAUNCH_EMPTY && !s->load_cal_valid) {
         left = "ARMED";
     } else {
@@ -235,11 +255,38 @@ static void draw_status_line(const app_snapshot_t *s)
     display_hline(0, DISPLAY_W - 1, 10);
 }
 
+// Meter mode: last revolution large, then the 1 s average, spread and filter counters
+static void draw_meter_screen(const app_snapshot_t *s)
+{
+    const meter_stats_t *m = &s->meter;
+    char big[8];
+    char line[24];
+
+    display_clear();
+    draw_status_line(s);
+    // 0 once the disc has stopped, rather than the last revolution before it did
+    snprintf(big, sizeof(big), "%d", m->avg_rpm ? m->inst_rpm : 0);
+    display_text((DISPLAY_W - display_text_width(big, 4)) / 2, 14, big, 4);
+
+    snprintf(line, sizeof(line), "MIN %d MAX %d", m->min_rpm, m->max_rpm);
+    display_text(0, 46, line, 1);
+    snprintf(line, sizeof(line), "AVG %d", m->avg_rpm);
+    display_text(0, 56, line, 1);
+    snprintf(line, sizeof(line), "REJ %d/%d", m->rejected_max_rpm, m->rejected_relative);
+    display_text(DISPLAY_W - display_text_width(line, 1), 56, line, 1);
+    display_flush();
+}
+
 static void draw_screen(const app_snapshot_t *s)
 {
     char big[8];
     const char *label;
     const char *note = "";
+
+    if (s->mode == APP_MODE_METER) {
+        draw_meter_screen(s);
+        return;
+    }
 
     if (s->state == LAUNCH_PULLING) {
         snprintf(big, sizeof(big), "%d", s->live_rpm);
@@ -284,7 +331,8 @@ static void ui_task(void *arg)
             draw_screen(&s);
         }
 
-        vTaskDelay(pdMS_TO_TICKS(s.state == LAUNCH_PULLING ? UI_LIVE_PERIOD_MS : UI_PERIOD_MS));
+        bool live = s.state == LAUNCH_PULLING || s.mode == APP_MODE_METER;
+        vTaskDelay(pdMS_TO_TICKS(live ? UI_LIVE_PERIOD_MS : UI_PERIOD_MS));
     }
 }
 

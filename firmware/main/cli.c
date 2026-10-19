@@ -6,6 +6,7 @@
 #include <string.h>
 #include "app.h"
 #include "esp_console.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "load.h"
@@ -17,7 +18,7 @@ static bool s_have_loaded;
 
 static bool require_diag(void)
 {
-    if (!app_is_diag()) {
+    if (app_get_mode() != APP_MODE_DIAG) {
         printf("Run 'diag on' first (pauses the launch state machine).\n");
         return false;
     }
@@ -39,7 +40,7 @@ static int cmd_status(int argc, char **argv)
     app_get_snapshot(&s);
     const settings_t *cfg = settings_get();
 
-    printf("mode        : %s\n", s.diag ? "diag" : "run");
+    printf("mode        : %s\n", app_mode_name(s.mode));
     printf("state       : %s\n", launch_state_name(s.state));
     printf("power       : %s, VBAT %d mV (%s), %d%%\n", src_name(s.batt.src), s.batt.vbat_mv,
            s.batt.vbat_valid ? "valid" : "not trusted while on USB", s.batt.percent);
@@ -60,6 +61,10 @@ static int cmd_status(int argc, char **argv)
                s.result.rejected_max_rpm + s.result.rejected_relative,
                s.result.rejected_max_rpm, s.result.rejected_relative);
     }
+    if (s.mode == APP_MODE_METER) {
+        printf("meter       : avg %d rpm, inst %d, min %d, max %d, %d revs in the last 1 s\n",
+               s.meter.avg_rpm, s.meter.inst_rpm, s.meter.min_rpm, s.meter.max_rpm, s.meter.revs);
+    }
     printf("idle        : %lu ms\n", (unsigned long)s.idle_ms);
     return 0;
 }
@@ -70,10 +75,57 @@ static int cmd_diag(int argc, char **argv)
         printf("usage: diag on|off\n");
         return 1;
     }
-    app_set_diag(strcmp(argv[1], "on") == 0);
+    app_set_mode(strcmp(argv[1], "on") == 0 ? APP_MODE_DIAG : APP_MODE_RUN);
     // Let the sensor task release the hardware before returning
     vTaskDelay(pdMS_TO_TICKS(50));
     printf("diag %s\n", argv[1]);
+    return 0;
+}
+
+static void print_meter_line(int64_t t0_us)
+{
+    app_snapshot_t s;
+    app_get_snapshot(&s);
+    const meter_stats_t *m = &s.meter;
+    printf("%lld,%d,%d,%d,%d,%d,%lu,%d,%d\n", (esp_timer_get_time() - t0_us) / 1000,
+           m->avg_rpm, m->inst_rpm, m->min_rpm, m->max_rpm, m->revs,
+           (unsigned long)m->edges, m->rejected_max_rpm, m->rejected_relative);
+}
+
+static int cmd_meter(int argc, char **argv)
+{
+    if (argc == 2 && (!strcmp(argv[1], "on") || !strcmp(argv[1], "off"))) {
+        bool on = !strcmp(argv[1], "on");
+        app_set_mode(on ? APP_MODE_METER : APP_MODE_RUN);
+        vTaskDelay(pdMS_TO_TICKS(50));
+        printf("meter %s%s\n", argv[1], on ? " (RPM channel on, display shows live RPM)" : "");
+        return 0;
+    }
+    if (app_get_mode() != APP_MODE_METER) {
+        printf("Run 'meter on' first.\n");
+        return 1;
+    }
+
+    printf("t_ms,avg_rpm,inst_rpm,min_rpm,max_rpm,revs,edges,rej_max_rpm,rej_relative\n");
+    int64_t t0 = esp_timer_get_time();
+    if (argc == 1) {
+        print_meter_line(t0);
+        return 0;
+    }
+    if (strcmp(argv[1], "log") || argc > 4) {
+        printf("usage: meter on|off | meter | meter log [seconds] [interval_ms]\n");
+        return 1;
+    }
+    int seconds = argc >= 3 ? atoi(argv[2]) : 10;
+    int interval_ms = argc >= 4 ? atoi(argv[3]) : 500;
+    if (seconds < 1 || seconds > 3600 || interval_ms < 50) {
+        printf("seconds 1-3600, interval_ms >= 50\n");
+        return 1;
+    }
+    for (int64_t end = t0 + seconds * 1000000LL; esp_timer_get_time() < end;) {
+        print_meter_line(t0);
+        vTaskDelay(pdMS_TO_TICKS(interval_ms));
+    }
     return 0;
 }
 
@@ -291,6 +343,7 @@ esp_err_t cli_start(void)
     const esp_console_cmd_t cmds[] = {
         {.command = "status", .help = "Show sensors, battery, calibration and the last launch", .func = cmd_status},
         {.command = "diag", .help = "diag on|off: pause the state machine for manual sensor control", .func = cmd_diag},
+        {.command = "meter", .help = "meter on|off | meter | meter log [seconds] [interval_ms]: continuous RPM (CSV)", .func = cmd_meter},
         {.command = "rpm", .help = "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", .func = cmd_rpm},
         {.command = "load", .help = "load [count]: print ambient-cancelled LOAD_SENSE readings", .func = cmd_load},
         {.command = "cal", .help = "cal load empty|loaded|clear: calibrate the load sensor", .func = cmd_cal},
