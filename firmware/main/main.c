@@ -6,6 +6,7 @@
 #include "board.h"
 #include "cli.h"
 #include "display.h"
+#include "esp_app_desc.h"
 #include "esp_log.h"
 #include "esp_pm.h"
 #include "esp_sleep.h"
@@ -27,6 +28,7 @@ static const char *TAG = "main";
 #define UI_PERIOD_MS       100
 #define UI_LIVE_PERIOD_MS  50
 #define DIAG_SAMPLE_MS     100    // live sensor readings on the diag screen
+#define SPLASH_MS          1000   // boot screen
 
 #define CONTRAST_NORMAL    0xCF
 #define CONTRAST_DIM       0x10
@@ -495,12 +497,30 @@ static void draw_low_battery(int vbat_mv)
     display_flush();
 }
 
+// Boot screen: icon, project name and firmware version
+static void draw_splash(void)
+{
+    char ver[40];
+
+    snprintf(ver, sizeof(ver), "FW V%s", esp_app_get_description()->version);
+    display_clear();
+    // Logo lockup: icon on the left, name (two lines) and version on the right
+    display_bitmap(6, (DISPLAY_H - ICON_BEYBLADE_H) / 2, ICON_BEYBLADE_W, ICON_BEYBLADE_H, icon_beyblade_40);
+    display_text(54, 12, "BX", 2);
+    display_text(54, 28, "TACHO", 2);
+    display_text(54, 46, ver, 1);
+    display_flush();
+}
+
 static void ui_task(void *arg)
 {
     app_snapshot_t s;
     bool on = true;
     bool dim = false;
     int64_t off_since_us = 0;
+
+    draw_splash();
+    vTaskDelay(pdMS_TO_TICKS(SPLASH_MS));
 
     for (;;) {
         if (s_shutdown) {

@@ -2,7 +2,8 @@
 """Convert a stroked SVG icon (e.g. Tabler Icons) into a 1-bit C bitmap.
 
 Supports the path commands Tabler uses (M/m, L/l, H/h, V/v, A/a, Z/z) with
-round caps and joins. Output is row-major, 1 bit per pixel, MSB = leftmost
+round caps and joins, per-path stroke-width, and fill (fill="currentColor",
+stroke="none" for solid shapes). Output is row-major, 1 bit per pixel, MSB = leftmost
 pixel, rows padded to whole bytes, as drawn by display_bitmap().
 
     python svg_icon_to_c.py battery-off.svg --size 48 --name icon_battery_off_48 --preview
@@ -109,20 +110,27 @@ def path_to_polylines(d):
 def render(svg_path, size, stroke_scale):
     root = ET.parse(svg_path).getroot()
     vb = [float(v) for v in root.get("viewBox", "0 0 24 24").split()]
-    stroke = float(root.get("stroke-width", "2")) * stroke_scale
+    root_stroke = float(root.get("stroke-width", "2"))
+    root_fill = root.get("fill", "none")
     big = size * SUPERSAMPLE
     s = big / vb[2]
     img = Image.new("L", (big, big), 0)
     draw = ImageDraw.Draw(img)
-    w = stroke * s
     for el in root.iter():
-        if not el.tag.endswith("path") or el.get("stroke") == "none":
+        if not el.tag.endswith("path"):
             continue
+        # Per-path stroke-width / stroke="none" / fill override the <svg> defaults
+        w = float(el.get("stroke-width", root_stroke)) * stroke_scale * s
+        stroked = el.get("stroke") != "none"
+        filled = el.get("fill", root_fill) not in ("none", "transparent")
         for poly in path_to_polylines(el.get("d")):
             pts = [((px - vb[0]) * s, (py - vb[1]) * s) for px, py in poly]
-            draw.line(pts, fill=255, width=max(1, round(w)), joint="curve")
-            for px, py in (pts[0], pts[-1]):   # round caps
-                draw.ellipse((px - w / 2, py - w / 2, px + w / 2, py + w / 2), fill=255)
+            if filled and len(pts) > 2:
+                draw.polygon(pts, fill=255)
+            if stroked:
+                draw.line(pts, fill=255, width=max(1, round(w)), joint="curve")
+                for px, py in (pts[0], pts[-1]):   # round caps
+                    draw.ellipse((px - w / 2, py - w / 2, px + w / 2, py + w / 2), fill=255)
     small = img.resize((size, size), Image.BOX)
     return [[1 if small.getpixel((cx, cy)) >= 128 else 0 for cx in range(size)] for cy in range(size)]
 

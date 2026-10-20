@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "app.h"
+#include "esp_app_desc.h"
 #include "esp_console.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -42,6 +43,8 @@ static int cmd_status(int argc, char **argv)
     app_get_snapshot(&s);
     const settings_t *cfg = settings_get();
 
+    const esp_app_desc_t *app = esp_app_get_description();
+    printf("firmware    : %s v%s, ESP-IDF %s\n", app->project_name, app->version, app->idf_ver);
     printf("mode        : %s\n", app_mode_name(s.mode));
     printf("boot        : #%lu, reset reason %s, light sleep on battery %s\n",
            (unsigned long)eventlog_boot_count(), eventlog_reset_reason_name(esp_reset_reason()),

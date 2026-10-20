@@ -23,4 +23,5 @@ idf_component_register(
         esp_pm
         nvs_flash
         console
+        esp_app_format
 )
