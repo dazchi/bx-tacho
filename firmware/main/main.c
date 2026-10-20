@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_pm.h"
 #include "esp_sleep.h"
+#include "driver/usb_serial_jtag.h"
 #include "esp_timer.h"
 #include "eventlog.h"
 #include "freertos/FreeRTOS.h"
@@ -366,7 +367,10 @@ static void sensor_task(void *arg)
         publish(&snap);
 
         bool busy = snap.state == LAUNCH_LOADED || snap.state == LAUNCH_PULLING || mode != APP_MODE_RUN;
-        if (!busy && !prev_usb && !s_sleep_pending && snap.idle_ms > CONFIG_BXT_DEEP_SLEEP_S * 1000U) {
+        // A PC on a data-only cable (no VBUS) still counts as "USB": keep the console up
+        bool usb_host = usb_serial_jtag_is_connected();
+        if (!busy && !prev_usb && !usb_host && !s_sleep_pending &&
+            snap.idle_ms > CONFIG_BXT_DEEP_SLEEP_S * 1000U) {
             app_enter_deep_sleep(APP_SLEEP_IDLE);
         }
 

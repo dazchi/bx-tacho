@@ -24,5 +24,6 @@ idf_component_register(
         esp_pm
         nvs_flash
         console
+        esp_driver_usb_serial_jtag
         esp_app_format
 )

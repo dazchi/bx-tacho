@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "app.h"
+#include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
 #include "esp_console.h"
 #include "esp_system.h"
@@ -55,6 +56,8 @@ static int cmd_status(int argc, char **argv)
     printf("state       : %s\n", launch_state_name(s.state));
     printf("power       : %s, VBAT %d mV (%s), %d%%\n", src_name(s.batt.src), s.batt.vbat_mv,
            s.batt.vbat_valid ? "valid" : "not trusted while on USB", s.batt.percent);
+    printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
+           usb_serial_jtag_is_connected() ? "connected" : "none");
     printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped\n",
            rpm_is_powered() ? "on" : "off", rpm_get_threshold_mv(), cfg->edges_per_rev,
            (unsigned long)rpm_overflow_count());

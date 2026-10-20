@@ -20,6 +20,11 @@ CONFIG_FREERTOS_HZ=1000
 CONFIG_PM_ENABLE=y
 CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
 
+# The ESP32-C3's USB console stops working in light sleep. Block light sleep
+# while a USB host is actually talking to the chip (SOF packets), also on a
+# data-only cable without VBUS; without a host it is released within ~3 ms.
+CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
+
 # VUSB_DET is driven by the R2/R5 divider; internal pulls would load it
 # during deep sleep.
 CONFIG_ESP_SLEEP_GPIO_ENABLE_INTERNAL_RESISTORS=n
