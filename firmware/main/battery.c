@@ -3,6 +3,7 @@
 #include "board.h"
 #include "esp_timer.h"
 #include "sense_adc.h"
+#include "vbat_cal.h"
 
 #define VBAT_SETTLE_US  (BATTERY_SETTLE_MS * 1000LL)
 
@@ -45,6 +46,11 @@ int battery_percent_from_mv(int mv)
     return 100;
 }
 
+int battery_read_pin_mv(int samples)
+{
+    return sense_adc_read_mv(ADC_CH_VBAT, samples);
+}
+
 void battery_update(battery_status_t *out)
 {
     bool usb = battery_usb_present();
@@ -57,12 +63,12 @@ void battery_update(battery_status_t *out)
         return;
     }
 
-    int mv = sense_adc_read_mv(ADC_CH_VBAT, 16);
-    if (mv < 0) {
+    int pin_mv = battery_read_pin_mv(16);
+    if (pin_mv < 0) {
         out->vbat_valid = false;
         return;
     }
-    out->vbat_mv = mv * 2;
+    out->vbat_mv = vbat_cal_apply(pin_mv);
     // While USB is present the charger lifts the reading; only trust it on battery.
     out->vbat_valid = !usb;
     out->percent = battery_percent_from_mv(out->vbat_mv);

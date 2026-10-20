@@ -19,6 +19,7 @@
 #include "rpm.h"
 #include "sense_adc.h"
 #include "settings.h"
+#include "vbat_cal.h"
 
 static const char *TAG = "main";
 
@@ -28,6 +29,7 @@ static const char *TAG = "main";
 #define UI_PERIOD_MS       100
 #define UI_LIVE_PERIOD_MS  50
 #define DIAG_SAMPLE_MS     100    // live sensor readings on the diag screen
+#define VBATCAL_SAMPLE_MS  250    // live VBAT readings on the calibration screen
 #define SPLASH_MS          1000   // boot screen
 
 #define CONTRAST_NORMAL    0xCF
@@ -43,6 +45,7 @@ static volatile app_mode_t s_mode = APP_MODE_RUN;
 static volatile bool s_mode_changed;
 static volatile int64_t s_last_activity_us;
 static esp_pm_lock_handle_t s_usb_pm_lock;
+static esp_pm_lock_handle_t s_cal_pm_lock;    // no light sleep during VBAT calibration
 
 // Deep-sleep hand-off. The UI task owns the display: it draws the countdown
 // and switches the display off, so two tasks never drive the I2C bus at once.
@@ -81,6 +84,7 @@ const char *app_mode_name(app_mode_t mode)
     switch (mode) {
     case APP_MODE_DIAG:  return "diag";
     case APP_MODE_METER: return "meter";
+    case APP_MODE_VBATCAL: return "vbat-cal";
     default:             return "run";
     }
 }
@@ -188,6 +192,7 @@ static void sensor_task(void *arg)
     int raw_on_mv = 0;          // raw LOAD_SENSE readings of the latest sample, for the event log
     int raw_off_mv = 0;
     bool raw_from_hold = false;
+    bool cal_lock_held = false;
     launch_state_t prev_state = launch_get_state();
     int64_t last_poll_us = 0;
     // First battery reading once VBAT has settled
@@ -217,16 +222,36 @@ static void sensor_task(void *arg)
             snap.loaded = prev_loaded = false;
             snap.meter = (meter_stats_t) {0};
             snap.diag = (diag_readings_t) {0};
+            snap.vbatcal = (vbatcal_readings_t) {0};
             last_poll_us = 0;
             if (mode == APP_MODE_METER) {
                 rpm_power(true);
                 launch_meter_start();
+            }
+            // Calibration runs from a supply on J1 with a data-only USB link (no
+            // VBUS), so the firmware sees "battery": keep the USB console alive
+            bool want_cal_lock = mode == APP_MODE_VBATCAL;
+            if (want_cal_lock != cal_lock_held) {
+                if (want_cal_lock) {
+                    esp_pm_lock_acquire(s_cal_pm_lock);
+                } else {
+                    esp_pm_lock_release(s_cal_pm_lock);
+                }
+                cal_lock_held = want_cal_lock;
             }
         }
 
         if (mode == APP_MODE_METER) {
             launch_meter_update(&snap.meter);
             app_note_activity();   // keep the display on while metering
+        } else if (mode == APP_MODE_VBATCAL) {
+            if (now - last_poll_us >= VBATCAL_SAMPLE_MS * 1000LL) {
+                last_poll_us = now;
+                int pin = battery_read_pin_mv(16);
+                snap.vbatcal.pin_mv = pin;
+                snap.vbatcal.vbat_mv = pin >= 0 ? vbat_cal_apply(pin) : -1;
+            }
+            app_note_activity();   // keep the display on while calibrating
         } else if (mode == APP_MODE_DIAG) {
             // Only read the sensors; the console decides what is powered. The
             // percentage is computed directly so the classifier and its baseline
@@ -317,7 +342,8 @@ static void sensor_task(void *arg)
             last_batt_us = now;
             battery_update(&snap.batt);
 
-            if (!usb && !s_sleep_pending && snap.batt.vbat_valid &&
+            // No cutoff while calibrating: the low calibration points are below it
+            if (!usb && !s_sleep_pending && mode != APP_MODE_VBATCAL && snap.batt.vbat_valid &&
                 snap.batt.vbat_mv < CONFIG_BXT_CUTOFF_BATT_MV) {
                 ESP_LOGW(TAG, "battery %d mV below cutoff", snap.batt.vbat_mv);
                 publish(&snap);
@@ -355,6 +381,8 @@ static void draw_status_line(const app_snapshot_t *s)
         left = "DIAG";
     } else if (s->mode == APP_MODE_METER) {
         left = "METER";
+    } else if (s->mode == APP_MODE_VBATCAL) {
+        left = "VBAT CAL";
     } else if (s->state == LAUNCH_EMPTY && !s->load_cal_valid) {
         left = "ARMED";
     } else {
@@ -451,6 +479,36 @@ static void draw_diag_screen(const app_snapshot_t *s)
     display_flush();
 }
 
+// VBAT calibration: VBAT (calibrated or nominal) large, the ADC pin voltage and
+// the number of points captured so far
+static void draw_vbatcal_screen(const app_snapshot_t *s)
+{
+    const vbatcal_readings_t *v = &s->vbatcal;
+    char line[24];
+
+    display_clear();
+    draw_status_line(s);
+
+    display_text(0, 13, "VBAT", 1);
+    display_text(DISPLAY_W - display_text_width(vbat_cal_valid() ? "CAL" : "NOMINAL", 1), 13,
+                 vbat_cal_valid() ? "CAL" : "NOMINAL", 1);
+    if (v->vbat_mv < 0) {
+        display_text(0, 22, "ERR", 2);
+    } else {
+        draw_value_mv(0, 22, v->vbat_mv);
+    }
+
+    display_text(0, 39, "ADC PIN", 1);
+    snprintf(line, sizeof(line), "POINTS %d", vbat_cal_session_points());
+    display_text(DISPLAY_W - display_text_width(line, 1), 39, line, 1);
+    if (v->pin_mv < 0) {
+        display_text(0, 48, "ERR", 2);
+    } else {
+        draw_value_mv(0, 48, v->pin_mv);
+    }
+    display_flush();
+}
+
 static void draw_screen(const app_snapshot_t *s)
 {
     char big[8];
@@ -463,6 +521,10 @@ static void draw_screen(const app_snapshot_t *s)
     }
     if (s->mode == APP_MODE_DIAG) {
         draw_diag_screen(s);
+        return;
+    }
+    if (s->mode == APP_MODE_VBATCAL) {
+        draw_vbatcal_screen(s);
         return;
     }
 
@@ -611,6 +673,7 @@ void app_main(void)
 
     eventlog_init();
     ESP_ERROR_CHECK(settings_init());
+    ESP_ERROR_CHECK(vbat_cal_init());   // after settings_init(): the default NVS partition is set up
     ESP_ERROR_CHECK(sense_adc_init());
     ESP_ERROR_CHECK(battery_init());
     ESP_ERROR_CHECK(rpm_init());
@@ -620,6 +683,7 @@ void app_main(void)
 
     configure_pm(settings_light_sleep());
     ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "usb", &s_usb_pm_lock));
+    ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "vbatcal", &s_cal_pm_lock));
 
     app_note_activity();
 

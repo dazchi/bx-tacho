@@ -1,0 +1,9 @@
+# Name,   Type, SubType, Offset,   Size,   Flags
+# The first three entries match ESP-IDF's single-app layout (same offsets), so
+# settings in "nvs" survive the switch to this table.
+nvs,      data, nvs,     0x9000,   0x6000,
+phy_init, data, phy,     0xf000,   0x1000,
+factory,  app,  factory, 0x10000,  1M,
+# Production data (VBAT calibration). The firmware never erases this partition;
+# only a recalibration or a full flash erase replaces it.
+fctry,    data, nvs,     0x110000, 0x3000,

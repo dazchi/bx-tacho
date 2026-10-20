@@ -2,6 +2,11 @@
 CONFIG_IDF_TARGET="esp32c3"
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 
+# Partition table with an extra "fctry" NVS partition for production data
+# (VBAT calibration) that `cfg reset` and NVS recovery never erase
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
 # Console and flashing over the native USB Serial/JTAG (IO18/IO19).
 # UART0 TX (IO21) is RPM_IR_LED, so keep the console off UART0.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

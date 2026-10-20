@@ -24,4 +24,6 @@ typedef struct {
 esp_err_t battery_init(void);
 bool battery_usb_present(void);
 void battery_update(battery_status_t *out);
+// VBAT_SENSE at the ADC pin (VBAT / 2 nominally), averaged; -1 on error
+int battery_read_pin_mv(int samples);
 int battery_percent_from_mv(int mv);

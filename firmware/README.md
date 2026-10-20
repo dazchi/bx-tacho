@@ -48,6 +48,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `rpm thr [mV]` | Show or set the comparator threshold (capped at 2000 mV) |
 | `load [n]` | Print ambient-cancelled LOAD_SENSE readings |
 | `cal load empty` / `cal load loaded` / `cal load clear` | Calibrate the load sensor |
+| `cal vbat start` … `stop` | Production VBAT calibration, see below |
 | `cfg edges <n>` | Rising edges per launcher revolution |
 | `cfg lightsleep on\|off` | Automatic light sleep on battery (default on), for power debugging |
 | `events` / `events clear` | Power/sleep event log: boots and reset reasons, load changes, state changes, USB, display on/off, deep sleep. Kept in RTC memory, so it survives deep sleep and resets (not power-on) |
@@ -67,3 +68,34 @@ disabled then so the USB link stays up.
 
 Without a load calibration the RPM channel stays armed all the time, so
 launches are still measured; the display shows **ARMED** instead of **READY**.
+
+## VBAT calibration (production)
+
+Corrects the R3/R9 divider and ADC error (typically 10-40 mV) with a
+straight-line fit. Run once per board.
+
+**Setup**
+- Power the board **only** from a bench supply on **J1** (pad 1 VBAT+,
+  pad 2 GND), power switch ON, current limit about 300 mA, no battery.
+- Connect USB **data-only** (VBUS cut, e.g. a USB power blocker). With VBUS
+  present the TP4054 charger pushes current into J1 and spoils the reading;
+  the firmware refuses to calibrate then.
+- Read the voltage **at the J1 pads** with a multimeter, not on the supply.
+- Stay within 3.2-4.4 V (the board runs from the supply; the ADC sees VBAT/2).
+
+**Steps**
+```
+cal vbat start
+cal vbat point 3300      # set supply, enter the multimeter reading (mV)
+cal vbat point 3700
+cal vbat point 4000
+cal vbat point 4300
+cal vbat save            # fit, check, store
+cal vbat verify 3600     # different voltage; PASS within +-10 mV
+cal vbat stop
+```
+`cal vbat show` (and `status`) print the stored calibration.
+
+The calibration lives in its own NVS partition (`fctry`, see
+`partitions.csv`). `cfg reset` and NVS recovery never touch it; only a new
+calibration or a full flash erase replaces it.

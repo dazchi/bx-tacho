@@ -15,6 +15,9 @@
 #include "load.h"
 #include "rpm.h"
 #include "settings.h"
+#include "vbat_cal.h"
+
+static void print_vbat_cal(const vbat_cal_t *c);
 
 static bool s_have_empty;
 static bool s_have_loaded;
@@ -72,6 +75,12 @@ static int cmd_status(int argc, char **argv)
     if (s.mode == APP_MODE_METER) {
         printf("meter       : avg %d rpm, inst %d, min %d, max %d, %d revs in the last 1 s\n",
                s.meter.avg_rpm, s.meter.inst_rpm, s.meter.min_rpm, s.meter.max_rpm, s.meter.revs);
+    }
+    if (vbat_cal_valid()) {
+        printf("vbat cal    : ");
+        print_vbat_cal(vbat_cal_get());
+    } else {
+        printf("vbat cal    : none (nominal divider ratio). See 'cal vbat start'.\n");
     }
     printf("idle        : %lu ms\n", (unsigned long)s.idle_ms);
     return 0;
@@ -261,9 +270,217 @@ static int cmd_load(int argc, char **argv)
     return 0;
 }
 
+// ---- VBAT calibration (production) -------------------------------------------
+
+#define VBAT_POINT_SETTLE_MS   300   // R3/R9 + C5 settle in ~24 ms; allow for the supply too
+#define VBAT_POINT_MAX_SPREAD  6     // mV at the pin between 8 group averages
+#define VBAT_POINT_PLAUSIBLE   400   // max |entered - nominal reading| (mV), catches typos
+#define VBAT_POINT_MIN_GAP     100   // between calibration points (mV)
+
+static void print_vbat_cal_procedure(void)
+{
+    printf("VBAT calibration. Setup:\n"
+           "  - Power the board ONLY from the supply on J1 (+ to pad 1 VBAT+, - to pad 2 GND),\n"
+           "    power switch ON, current limit about 300 mA. No battery connected.\n"
+           "  - Connect USB data-only (VBUS cut), otherwise the charger drives VBAT.\n"
+           "  - Measure the voltage at the J1 pads with a multimeter (not the supply display).\n"
+           "  - Stay within %d-%d mV.\n"
+           "Steps:\n"
+           "  1. For each point: set the supply, read the multimeter, enter 'cal vbat point <mV>'.\n"
+           "     Suggested points: 3300, 3700, 4000, 4300 mV (at least 2, spanning >= 500 mV).\n"
+           "  2. 'cal vbat save' fits and stores the calibration.\n"
+           "  3. 'cal vbat verify <mV>' at a different voltage (e.g. 3600) checks it (+-%d mV).\n"
+           "  4. 'cal vbat stop' returns to normal operation.\n",
+           VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV, VBAT_CAL_VERIFY_TOL_MV);
+}
+
+static bool vbat_cal_usb_power_check(void)
+{
+    if (battery_usb_present()) {
+        printf("USB power (VBUS) detected: the charger would drive VBAT and spoil the reading.\n"
+               "Use a data-only USB connection and power the board from the supply on J1.\n");
+        return false;
+    }
+    return true;
+}
+
+// Average of 8 groups of 16 readings at the VBAT_SENSE pin; *spread = max - min of the groups
+static int measure_vbat_pin(int *spread)
+{
+    vTaskDelay(pdMS_TO_TICKS(VBAT_POINT_SETTLE_MS));
+    int lo = INT_MAX;
+    int hi = INT_MIN;
+    int sum = 0;
+    for (int g = 0; g < 8; g++) {
+        int mv = battery_read_pin_mv(16);
+        if (mv < 0) {
+            return -1;
+        }
+        sum += mv;
+        lo = mv < lo ? mv : lo;
+        hi = mv > hi ? mv : hi;
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+    *spread = hi - lo;
+    return (sum + 4) / 8;
+}
+
+static void print_vbat_cal(const vbat_cal_t *c)
+{
+    printf("gain %ld.%06ld, offset %ld mV, %u points over %d-%d mV, max fit error %d mV\n",
+           (long)(c->gain_ppm / 1000000), (long)(c->gain_ppm % 1000000), (long)c->offset_mv,
+           c->points, c->min_mv, c->max_mv, c->max_err_mv);
+}
+
+static int cmd_cal_vbat(int argc, char **argv)
+{
+    const char *sub = argc >= 2 ? argv[1] : "";
+
+    if (!strcmp(sub, "show") && argc == 2) {
+        if (vbat_cal_valid()) {
+            printf("stored VBAT calibration: ");
+            print_vbat_cal(vbat_cal_get());
+        } else {
+            printf("no VBAT calibration stored (readings use the nominal divider ratio x2)\n");
+        }
+        for (int i = 0; i < vbat_cal_session_points(); i++) {
+            int pin, vbat;
+            vbat_cal_session_point(i, &pin, &vbat);
+            printf("  session point %d: VBAT %d mV, pin %d mV\n", i + 1, vbat, pin);
+        }
+        return 0;
+    }
+    if (!strcmp(sub, "start") && argc == 2) {
+        if (!vbat_cal_usb_power_check()) {
+            return 1;
+        }
+        vbat_cal_session_begin();
+        app_set_mode(APP_MODE_VBATCAL);
+        vTaskDelay(pdMS_TO_TICKS(50));
+        print_vbat_cal_procedure();
+        return 0;
+    }
+    if (!strcmp(sub, "stop") && argc == 2) {
+        if (app_get_mode() != APP_MODE_VBATCAL) {
+            printf("Not in VBAT calibration mode.\n");
+            return 1;
+        }
+        app_set_mode(APP_MODE_RUN);
+        vTaskDelay(pdMS_TO_TICKS(50));
+        printf("VBAT calibration mode ended\n");
+        return 0;
+    }
+
+    if (app_get_mode() != APP_MODE_VBATCAL) {
+        printf("Run 'cal vbat start' first.\n");
+        return 1;
+    }
+    if (!vbat_cal_usb_power_check()) {
+        return 1;
+    }
+
+    if (!strcmp(sub, "point") && argc == 3) {
+        int vbat = atoi(argv[2]);
+        if (vbat < VBAT_CAL_MIN_MV || vbat > VBAT_CAL_MAX_MV) {
+            printf("Enter the measured voltage in mV, %d-%d.\n", VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV);
+            return 1;
+        }
+        for (int i = 0; i < vbat_cal_session_points(); i++) {
+            int pin, have;
+            vbat_cal_session_point(i, &pin, &have);
+            if (abs(have - vbat) < VBAT_POINT_MIN_GAP) {
+                printf("Already have a point at %d mV; use points at least %d mV apart "
+                       "('cal vbat start' starts over).\n", have, VBAT_POINT_MIN_GAP);
+                return 1;
+            }
+        }
+        int spread;
+        int pin = measure_vbat_pin(&spread);
+        if (pin < 0) {
+            printf("ADC read failed\n");
+            return 1;
+        }
+        if (spread > VBAT_POINT_MAX_SPREAD) {
+            printf("Reading unstable (%d mV spread at the pin). Check the supply and connections.\n", spread);
+            return 1;
+        }
+        int nominal = vbat_cal_nominal(pin);
+        if (abs(nominal - vbat) > VBAT_POINT_PLAUSIBLE) {
+            printf("Measured %d mV nominal vs %d mV entered: too far apart. Check the value and wiring.\n",
+                   nominal, vbat);
+            return 1;
+        }
+        if (vbat_cal_session_add(pin, vbat) != ESP_OK) {
+            printf("Maximum of %d points reached. 'cal vbat save' or 'cal vbat start' to start over.\n",
+                   VBAT_CAL_MAX_POINTS);
+            return 1;
+        }
+        printf("point %d: VBAT %d mV, pin %d mV (nominal reading %d mV, %+d mV)\n",
+               vbat_cal_session_points(), vbat, pin, nominal, nominal - vbat);
+        return 0;
+    }
+    if (!strcmp(sub, "save") && argc == 2) {
+        vbat_cal_t cal = {0};
+        int resid[VBAT_CAL_MAX_POINTS] = {0};
+        const char *why = vbat_cal_session_fit(&cal, resid);
+        // cal.points is set whenever a line was fitted, also if it was then rejected
+        if (cal.points > 0) {
+            printf("  VBAT mV   pin mV   fit error\n");
+            for (int i = 0; i < vbat_cal_session_points(); i++) {
+                int pin, vbat;
+                vbat_cal_session_point(i, &pin, &vbat);
+                printf("  %7d  %7d  %+6d mV\n", vbat, pin, resid[i]);
+            }
+        }
+        if (why) {
+            printf("Not saved: %s.\n", why);
+            return 1;
+        }
+        if (vbat_cal_save(&cal) != ESP_OK) {
+            printf("Saving failed (factory partition unavailable?).\n");
+            return 1;
+        }
+        printf("Saved: ");
+        print_vbat_cal(&cal);
+        printf("Now check it: set another voltage and run 'cal vbat verify <mV>'.\n");
+        return 0;
+    }
+    if (!strcmp(sub, "verify") && argc == 3) {
+        if (!vbat_cal_valid()) {
+            printf("No calibration stored yet ('cal vbat save').\n");
+            return 1;
+        }
+        int actual = atoi(argv[2]);
+        if (actual < VBAT_CAL_MIN_MV || actual > VBAT_CAL_MAX_MV) {
+            printf("Enter the measured voltage in mV, %d-%d.\n", VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV);
+            return 1;
+        }
+        int spread;
+        int pin = measure_vbat_pin(&spread);
+        if (pin < 0) {
+            printf("ADC read failed\n");
+            return 1;
+        }
+        int measured = vbat_cal_apply(pin);
+        int err = measured - actual;
+        bool pass = abs(err) <= VBAT_CAL_VERIFY_TOL_MV && spread <= VBAT_POINT_MAX_SPREAD;
+        printf("VBAT %d mV measured vs %d mV actual: %+d mV (nominal would be %+d mV)%s -> %s\n",
+               measured, actual, err, vbat_cal_nominal(pin) - actual,
+               spread > VBAT_POINT_MAX_SPREAD ? ", reading unstable" : "", pass ? "PASS" : "FAIL");
+        return pass ? 0 : 1;
+    }
+
+    printf("usage: cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
+    return 1;
+}
+
 static int cmd_cal(int argc, char **argv)
 {
     settings_t *cfg = settings_get();
+
+    if (argc >= 2 && !strcmp(argv[1], "vbat")) {
+        return cmd_cal_vbat(argc - 1, argv + 1);
+    }
 
     if (argc == 3 && !strcmp(argv[1], "load")) {
         if (!strcmp(argv[2], "clear")) {
@@ -307,7 +524,8 @@ static int cmd_cal(int argc, char **argv)
         return 0;
     }
 usage:
-    printf("usage: cal load empty|loaded|clear\n");
+    printf("usage: cal load empty|loaded|clear\n"
+           "       cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
     return 1;
 }
 
@@ -379,7 +597,7 @@ esp_err_t cli_start(void)
         {.command = "meter", .help = "meter on|off | meter | meter log [seconds] [interval_ms]: continuous RPM (CSV)", .func = cmd_meter},
         {.command = "rpm", .help = "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", .func = cmd_rpm},
         {.command = "load", .help = "load [count]: print ambient-cancelled LOAD_SENSE readings", .func = cmd_load},
-        {.command = "cal", .help = "cal load empty|loaded|clear: calibrate the load sensor", .func = cmd_cal},
+        {.command = "cal", .help = "cal load empty|loaded|clear: load sensor; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", .func = cmd_cal},
         {.command = "cfg", .help = "cfg edges <n> | cfg lightsleep on|off | cfg reset", .func = cmd_cfg},
         {.command = "sleep", .help = "Enter deep sleep now", .func = cmd_sleep},
         {.command = "events", .help = "events | events clear: power/sleep event log (survives deep sleep and resets)", .func = cmd_events},

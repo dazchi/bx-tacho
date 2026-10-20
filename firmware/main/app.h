@@ -9,7 +9,14 @@ typedef enum {
     APP_MODE_RUN,     // normal launch measurement
     APP_MODE_DIAG,    // console drives the sensors directly
     APP_MODE_METER,   // continuous RPM on the display, for bench tests
+    APP_MODE_VBATCAL, // production VBAT calibration: stays awake, no low-battery cutoff
 } app_mode_t;
+
+// Live readings shown in APP_MODE_VBATCAL
+typedef struct {
+    int pin_mv;           // VBAT_SENSE at the ADC pin
+    int vbat_mv;          // VBAT with the stored calibration (nominal x2 if none)
+} vbatcal_readings_t;
 
 // Live sensor readings shown in APP_MODE_DIAG
 typedef struct {
@@ -38,6 +45,7 @@ typedef struct {
     app_mode_t mode;
     meter_stats_t meter;      // valid in APP_MODE_METER
     diag_readings_t diag;     // valid in APP_MODE_DIAG
+    vbatcal_readings_t vbatcal;   // valid in APP_MODE_VBATCAL
     uint32_t idle_ms;         // time since the last user-visible activity
 } app_snapshot_t;
 
