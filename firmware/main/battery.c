@@ -4,8 +4,7 @@
 #include "esp_timer.h"
 #include "sense_adc.h"
 
-// The R3/R9 divider with C5 has a ~24 ms time constant; give it 150 ms after boot.
-#define VBAT_SETTLE_US  150000
+#define VBAT_SETTLE_US  (BATTERY_SETTLE_MS * 1000LL)
 
 esp_err_t battery_init(void)
 {

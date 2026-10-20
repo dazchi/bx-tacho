@@ -90,13 +90,24 @@ void load_hold_begin(void)
     xSemaphoreGive(s_lock);
 }
 
-int load_hold_sample(void)
+int load_hold_sample_raw(int *on_mv, int *off_mv)
 {
     int on = sense_adc_read_mv(ADC_CH_LOAD_SENSE, 2);
+    if (on_mv) {
+        *on_mv = on;
+    }
+    if (off_mv) {
+        *off_mv = s_ambient_mv;
+    }
     if (on < 0 || s_ambient_mv < 0) {
         return INT_MIN;
     }
     return on - s_ambient_mv;
+}
+
+int load_hold_sample(void)
+{
+    return load_hold_sample_raw(NULL, NULL);
 }
 
 void load_hold_end(void)

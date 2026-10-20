@@ -17,6 +17,10 @@ typedef struct {
     bool vbat_valid;      // false while charging or before the first good reading
 } battery_status_t;
 
+// The R3/R9 divider with C5 has a ~24 ms time constant; VBAT is not read
+// until this long after boot (vbat_mv stays 0 until the first reading).
+#define BATTERY_SETTLE_MS 150
+
 esp_err_t battery_init(void);
 bool battery_usb_present(void);
 void battery_update(battery_status_t *out);

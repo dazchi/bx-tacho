@@ -182,10 +182,16 @@ static void sensor_task(void *arg)
     app_snapshot_t snap = {0};
     bool hold = false;
     bool prev_usb = false;
+    bool usb_event_pending = false;   // USB change not yet logged (waiting for a VBAT reading)
+    int64_t usb_event_us = 0;
     bool prev_loaded = false;
+    int raw_on_mv = 0;          // raw LOAD_SENSE readings of the latest sample, for the event log
+    int raw_off_mv = 0;
+    bool raw_from_hold = false;
     launch_state_t prev_state = launch_get_state();
     int64_t last_poll_us = 0;
-    int64_t last_batt_us = -BATTERY_PERIOD_MS * 1000LL;
+    // First battery reading once VBAT has settled
+    int64_t last_batt_us = (BATTERY_SETTLE_MS - BATTERY_PERIOD_MS) * 1000LL;
 
     for (;;) {
         if (s_shutdown) {
@@ -248,7 +254,8 @@ static void sensor_task(void *arg)
                     load_hold_begin();
                     hold = true;
                 }
-                diff = load_hold_sample();
+                diff = load_hold_sample_raw(&raw_on_mv, &raw_off_mv);
+                raw_from_hold = true;
                 sampled = true;
             } else {
                 if (hold) {
@@ -257,7 +264,8 @@ static void sensor_task(void *arg)
                 }
                 if (now - last_poll_us >= LOAD_POLL_MS * 1000LL) {
                     last_poll_us = now;
-                    diff = load_measure(4);
+                    diff = load_measure_raw(4, &raw_on_mv, &raw_off_mv);
+                    raw_from_hold = false;
                     sampled = true;
                 }
             }
@@ -269,7 +277,9 @@ static void sensor_task(void *arg)
             }
             if (snap.loaded != prev_loaded) {
                 prev_loaded = snap.loaded;
-                eventlog_add(snap.loaded ? EV_LOAD_ON : EV_LOAD_OFF, snap.load_diff_mv, snap.load_pct);
+                // Raw values of the sample that completed the switch, and how it was taken
+                eventlog_add_ext(snap.loaded ? EV_LOAD_ON : EV_LOAD_OFF, snap.load_diff_mv, snap.load_pct,
+                                 raw_on_mv, raw_off_mv, raw_from_hold ? EV_FLAG_LOAD_HOLD : 0);
                 app_note_activity();
             }
 
@@ -287,22 +297,25 @@ static void sensor_task(void *arg)
         snap.load_cal_valid = cfg->load_cal_valid;
         snap.mode = mode;
 
+        // USB presence is checked on every pass (one GPIO read), not with the battery:
+        // the ESP32-C3's USB console does not survive light sleep, so the lock that
+        // blocks it must be taken straight away, including right after boot
+        bool usb = battery_usb_present();
+        if (usb != prev_usb) {
+            if (usb) {
+                esp_pm_lock_acquire(s_usb_pm_lock);
+            } else {
+                esp_pm_lock_release(s_usb_pm_lock);
+            }
+            prev_usb = usb;
+            usb_event_pending = true;
+            usb_event_us = now;
+            app_note_activity();
+        }
+
         if (now - last_batt_us >= BATTERY_PERIOD_MS * 1000LL) {
             last_batt_us = now;
             battery_update(&snap.batt);
-
-            bool usb = snap.batt.src != POWER_SRC_BATTERY;
-            if (usb != prev_usb) {
-                // Keep the USB console alive while plugged in
-                if (usb) {
-                    esp_pm_lock_acquire(s_usb_pm_lock);
-                } else {
-                    esp_pm_lock_release(s_usb_pm_lock);
-                }
-                prev_usb = usb;
-                eventlog_add(usb ? EV_USB_ON : EV_USB_OFF, snap.batt.vbat_mv, 0);
-                app_note_activity();
-            }
 
             if (!usb && !s_sleep_pending && snap.batt.vbat_valid &&
                 snap.batt.vbat_mv < CONFIG_BXT_CUTOFF_BATT_MV) {
@@ -310,6 +323,14 @@ static void sensor_task(void *arg)
                 publish(&snap);
                 app_enter_deep_sleep(APP_SLEEP_LOW_BATT);   // returns if USB is plugged in meanwhile
             }
+        }
+
+        // Log a USB change once there is a battery reading to go with it (at boot that
+        // comes after VBAT has settled); give up waiting after one battery period
+        if (usb_event_pending &&
+            (snap.batt.vbat_mv > 0 || now - usb_event_us > BATTERY_PERIOD_MS * 1000LL)) {
+            eventlog_add(prev_usb ? EV_USB_ON : EV_USB_OFF, snap.batt.vbat_mv, 0);
+            usb_event_pending = false;
         }
 
         // Activity noted during this pass is newer than `now`; measure from the current

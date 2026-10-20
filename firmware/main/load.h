@@ -21,6 +21,8 @@ int load_measure_raw(int samples, int *on_mv, int *off_mv);
 // LED on so each sample is a single ADC read.
 void load_hold_begin(void);
 int load_hold_sample(void);
+// Same, also returning the raw LED-on reading and the ambient measured at load_hold_begin()
+int load_hold_sample_raw(int *on_mv, int *off_mv);
 void load_hold_end(void);
 
 // Debounced classifier. Feed it every measurement; returns the loaded state.
