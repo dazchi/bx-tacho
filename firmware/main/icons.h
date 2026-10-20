@@ -11,3 +11,15 @@ extern const uint8_t icon_battery_off_48[];
 #define ICON_BEYBLADE_W 40
 #define ICON_BEYBLADE_H 40
 extern const uint8_t icon_beyblade_40[];
+
+// Status-line battery: the outline plus charging and charge-complete variants, same size
+#define ICON_BATTERY_W 16
+#define ICON_BATTERY_H 9
+extern const uint8_t icon_battery_16x9[];
+extern const uint8_t icon_battery_charging_16x9[];
+extern const uint8_t icon_battery_full_16x9[];
+// Level bar area inside icon_battery_16x9, relative to the icon's top-left
+#define ICON_BATTERY_FILL_X 2
+#define ICON_BATTERY_FILL_Y 2
+#define ICON_BATTERY_FILL_W 10
+#define ICON_BATTERY_FILL_H 5

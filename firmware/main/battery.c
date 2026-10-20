@@ -69,7 +69,8 @@ void battery_update(battery_status_t *out)
         return;
     }
     out->vbat_mv = vbat_cal_apply(pin_mv);
-    // While USB is present the charger lifts the reading; only trust it on battery.
-    out->vbat_valid = !usb;
+    // The charge current lifts the reading, so only trust it when no charging is
+    // going on: on battery, or on USB once the TP4054 has finished (FULL)
+    out->vbat_valid = out->src != POWER_SRC_CHARGING;
     out->percent = battery_percent_from_mv(out->vbat_mv);
 }

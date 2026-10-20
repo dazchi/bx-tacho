@@ -55,7 +55,7 @@ static int cmd_status(int argc, char **argv)
            settings_light_sleep() ? "on" : "off");
     printf("state       : %s\n", launch_state_name(s.state));
     printf("power       : %s, VBAT %d mV (%s), %d%%\n", src_name(s.batt.src), s.batt.vbat_mv,
-           s.batt.vbat_valid ? "valid" : "not trusted while on USB", s.batt.percent);
+           s.batt.vbat_valid ? "valid" : "not trusted while charging", s.batt.percent);
     printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
            usb_serial_jtag_is_connected() ? "connected" : "none");
     printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped\n",

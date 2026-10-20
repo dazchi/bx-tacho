@@ -129,3 +129,43 @@ const uint8_t icon_beyblade_40[200] = {
     0x00, 0x01, 0xFF, 0x80, 0x00,
 };
 
+// Hand-drawn battery icons for the status line (fit above the y=10 rule).
+// Charging: filled body with a bolt breaking through the outline, separated from
+// the fill and outline by a 1 px gap on all sides (diagonals included).
+const uint8_t icon_battery_charging_16x9[18] = {
+    0x7C, 0xD8,   // .#####..##.##...
+    0x81, 0x84,   // #......##....#..
+    0xB3, 0x34,   // #.##..##..##.#..
+    0xA6, 0x17,   // #.#..##....#.###
+    0xAF, 0xD7,   // #.#.######.#.###
+    0xA1, 0x97,   // #.#....##..#.###
+    0xB3, 0x34,   // #.##..##..##.#..
+    0x86, 0x04,   // #....##......#..
+    0x6C, 0xF8,   // .##.##..#####...
+};
+
+// Charge complete (FULL): filled body with a check mark cut out of it
+const uint8_t icon_battery_full_16x9[18] = {
+    0x7F, 0xF8,   // .############...
+    0x80, 0x04,   // #............#..
+    0xBF, 0xB4,   // #.#######.##.#..
+    0xB7, 0x77,   // #.##.###.###.###
+    0xBA, 0xF7,   // #.###.#.####.###
+    0xBD, 0xF7,   // #.####.#####.###
+    0xBF, 0xF4,   // #.##########.#..
+    0x80, 0x04,   // #............#..
+    0x7F, 0xF8,   // .############...
+};
+
+// Empty outline; the level bar is drawn inside it (ICON_BATTERY_FILL_*)
+const uint8_t icon_battery_16x9[18] = {
+    0x7F, 0xF8,   // .############...
+    0x80, 0x04,   // #............#..
+    0x80, 0x04,   // #............#..
+    0x80, 0x07,   // #............###
+    0x80, 0x07,   // #............###
+    0x80, 0x07,   // #............###
+    0x80, 0x04,   // #............#..
+    0x80, 0x04,   // #............#..
+    0x7F, 0xF8,   // .############...
+};

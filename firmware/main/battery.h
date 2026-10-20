@@ -12,8 +12,8 @@ typedef enum {
 
 typedef struct {
     power_src_t src;
-    int vbat_mv;          // last reading; raised by the charger while USB is present
-    int percent;          // 0-100, only meaningful on battery
+    int vbat_mv;          // last reading; raised by the charge current while charging
+    int percent;          // 0-100, only meaningful when vbat_valid
     bool vbat_valid;      // false while charging or before the first good reading
 } battery_status_t;
 

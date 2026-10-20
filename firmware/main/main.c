@@ -393,28 +393,53 @@ static void draw_status_line(const app_snapshot_t *s)
         static const char *names[] = {"READY", "LOADED", "LAUNCH!", "RESULT"};
         left = names[s->state];
     }
-    display_text(0, 0, left, 1);
+    // Icons span rows 0-8 and the text rows 1-7 (centred on them), above the rule at y=10
+    const int icon_y = 0;
+    const int text_y = icon_y + 1;
+    display_text(0, text_y, left, 1);
 
     char right[12];
+    int right_end = DISPLAY_W;
+    const int icon_x = DISPLAY_W - ICON_BATTERY_W;
     switch (s->batt.src) {
     case POWER_SRC_CHARGING:
-        snprintf(right, sizeof(right), "CHG");
+        display_bitmap(icon_x, icon_y, ICON_BATTERY_W, ICON_BATTERY_H, icon_battery_charging_16x9);
+        right_end = icon_x - 2;
+        // The charge current lifts this a little, so it is only a rough guide
+        if (s->batt.vbat_mv > 0) {
+            int dv = (s->batt.vbat_mv + 50) / 100;   // decivolts, rounded
+            snprintf(right, sizeof(right), "%d.%dV", dv / 10, dv % 10);
+        } else {
+            right[0] = '\0';
+        }
         break;
     case POWER_SRC_FULL:
+        display_bitmap(icon_x, icon_y, ICON_BATTERY_W, ICON_BATTERY_H, icon_battery_full_16x9);
+        right_end = icon_x - 2;
         snprintf(right, sizeof(right), "FULL");
         break;
     default:
         if (!s->batt.vbat_valid) {
             right[0] = '\0';
-        } else if (s->batt.vbat_mv < CONFIG_BXT_LOW_BATT_MV) {
+            break;
+        }
+        if (s->batt.vbat_mv < CONFIG_BXT_LOW_BATT_MV) {
             snprintf(right, sizeof(right), "LOW %d%%", s->batt.percent);
         } else {
             snprintf(right, sizeof(right), "%d%%", s->batt.percent);
         }
+        // Level bar in 10 % steps, rounded up so any charge left shows a sliver
+        display_bitmap(icon_x, icon_y, ICON_BATTERY_W, ICON_BATTERY_H, icon_battery_16x9);
+        int fill_w = (s->batt.percent * ICON_BATTERY_FILL_W + 99) / 100;
+        for (int y = 0; fill_w > 0 && y < ICON_BATTERY_FILL_H; y++) {
+            display_hline(icon_x + ICON_BATTERY_FILL_X, icon_x + ICON_BATTERY_FILL_X + fill_w - 1,
+                          icon_y + ICON_BATTERY_FILL_Y + y);
+        }
+        right_end = icon_x - 2;
         break;
     }
-    display_text(DISPLAY_W - display_text_width(right, 1), 0, right, 1);
-    display_hline(0, DISPLAY_W - 1, 10);
+    display_text(right_end - display_text_width(right, 1), text_y, right, 1);
+    display_hline(0, DISPLAY_W - 1, icon_y + ICON_BATTERY_H + 1);
 }
 
 // Meter mode: last revolution large, then the 1 s average, spread and filter counters
