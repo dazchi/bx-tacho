@@ -94,6 +94,11 @@ sources and open questions: [docs/bbp-protocol.md](docs/bbp-protocol.md).
 - BLE runs alongside automatic light sleep (modem sleep, with the main crystal
   kept on), which raises the sleep current. `ble off` if you don't use an app.
   Deep sleep ends the connection; the app reconnects after a wake-up.
+- **Switching BLE without a console:** put a top on and take it off 5 times in
+  a row, each load within 1.5 s of the previous one. The display shows
+  `BLE ON` or `BLE OFF`, then BX Tacho restarts with the new setting (same as
+  `ble on|off`; logged as `BLE GESTURE` in `events`). Flashing the merged
+  binary resets it to on.
 
 ## VBAT calibration (production)
 

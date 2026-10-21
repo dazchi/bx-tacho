@@ -16,10 +16,11 @@ typedef enum {
     EV_DISPLAY_OFF,
     EV_DEEP_SLEEP,    // a = app_sleep_reason_t, b = VBAT mV
     EV_MODE,          // a = new app mode
+    EV_BLE_GESTURE,   // a = 1 BLE switched on, 0 off (by the load-sensor gesture)
 } ev_type_t;
 
-// Load sample came from hold mode (LED held on, ambient measured once) rather
-// than a full LED-off/on poll
+// Load sample came from a short LED flash (while the RPM channel is armed)
+// rather than a full LED-off/on poll
 #define EV_FLAG_LOAD_FLASH 0x01
 
 // Call once at boot: validates the RTC block and records an EV_BOOT entry

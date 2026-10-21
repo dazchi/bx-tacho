@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_pm.h"
 #include "esp_sleep.h"
+#include "esp_system.h"
 #include "driver/usb_serial_jtag.h"
 #include "esp_timer.h"
 #include "eventlog.h"
@@ -62,6 +63,13 @@ static const char *TAG = "main";
 #define LOW_BATT_ICON_S       2
 #define LOW_BATT_COUNTDOWN_S  3
 
+// Load-sensor gesture: BLE_GESTURE_COUNT loads in a row (top on, off, on, ...),
+// each within BLE_GESTURE_GAP_MS of the one before, switch BLE on or off. The
+// setting is applied by a restart, after BLE_GESTURE_SHOW_MS on the display.
+#define BLE_GESTURE_COUNT     5
+#define BLE_GESTURE_GAP_MS    1500
+#define BLE_GESTURE_SHOW_MS   1500
+
 static portMUX_TYPE s_snap_lock = portMUX_INITIALIZER_UNLOCKED;
 static app_snapshot_t s_snap;
 static volatile app_mode_t s_mode = APP_MODE_RUN;
@@ -78,6 +86,7 @@ static volatile app_sleep_reason_t s_countdown_reason;
 static volatile bool s_sleep_pending;             // countdown or shutdown in progress
 static volatile bool s_shutdown;                  // countdown over: other tasks leave the hardware alone
 static volatile bool s_ui_parked;                 // UI task has switched the display off
+static volatile int s_ble_gesture_msg;            // 1/2: BLE switched off/on, shown before the restart
 static bool s_ui_running;
 
 static const gpio_num_t s_held_outputs[] = {
@@ -217,6 +226,37 @@ static bool load_flash_due(uint32_t now, uint32_t last_flash)
     // the next edge (or for the disc to stand still): when it is overdue, as early
     // in a pull, a flash would be likely to land on it.
     return since_edge + LOAD_FLASH_LEN_US + LOAD_FLASH_TAIL_US <= zone;
+}
+
+// Counts loads towards the BLE gesture; true when the gesture is complete
+static bool ble_gesture_load(int64_t now_us)
+{
+    static int count;
+    static int64_t last_us;
+    if (count > 0 && now_us - last_us <= BLE_GESTURE_GAP_MS * 1000LL) {
+        count++;
+    } else {
+        count = 1;
+    }
+    last_us = now_us;
+    if (count < BLE_GESTURE_COUNT) {
+        return false;
+    }
+    count = 0;
+    return true;
+}
+
+// Flips the saved BLE setting and restarts to apply it (as the 'ble' command)
+static void ble_gesture_apply(void)
+{
+    bool on = !settings_ble();
+    settings_set_ble(on);
+    eventlog_add(EV_BLE_GESTURE, on, 0);
+    ESP_LOGI(TAG, "load gesture: BLE %s, restarting", on ? "on" : "off");
+    s_ble_gesture_msg = on ? 2 : 1;
+    bbp_stop();   // the app sees the disconnect at once
+    vTaskDelay(pdMS_TO_TICKS(BLE_GESTURE_SHOW_MS));
+    esp_restart();
 }
 
 static void publish(const app_snapshot_t *snap)
@@ -361,6 +401,10 @@ static void sensor_task(void *arg)
                                  raw_on_mv, raw_off_mv, raw_from_flash ? EV_FLAG_LOAD_FLASH : 0);
                 app_note_activity();
                 bbp_set_attached(snap.loaded);
+                if (snap.loaded && launch_get_state() != LAUNCH_PULLING &&
+                    ble_gesture_load(esp_timer_get_time())) {
+                    ble_gesture_apply();   // does not return
+                }
             }
 
             if (launch_update(snap.loaded, !cfg->load_cal_valid)) {
@@ -708,6 +752,20 @@ static void draw_low_battery(int vbat_mv)
     display_flush();
 }
 
+// Confirmation of the BLE gesture, shown until the restart
+static void draw_ble_gesture(bool on)
+{
+    const char *big = on ? "BLE ON" : "BLE OFF";
+    static const char *note = "RESTARTING";
+    int w = on ? ICON_BLE_ON_W : ICON_BLE_OFF_W;
+
+    display_clear();
+    display_bitmap((DISPLAY_W - w) / 2, 6, w, ICON_BLE_H, on ? icon_ble_on_5x9 : icon_ble_off_9x9);
+    display_text((DISPLAY_W - display_text_width(big, 2)) / 2, 22, big, 2);
+    display_text((DISPLAY_W - display_text_width(note, 1)) / 2, 50, note, 1);
+    display_flush();
+}
+
 // Boot screen: icon, project name and firmware version
 static void draw_splash(void)
 {
@@ -741,6 +799,21 @@ static void ui_task(void *arg)
             }
             s_ui_parked = true;
             vTaskDelay(pdMS_TO_TICKS(100));
+            continue;
+        }
+
+        int gesture = s_ble_gesture_msg;
+        if (gesture) {
+            if (!on) {
+                display_power(true);
+                on = true;
+            }
+            if (dim) {
+                display_set_contrast(CONTRAST_NORMAL);
+                dim = false;
+            }
+            draw_ble_gesture(gesture == 2);
+            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
             continue;
         }
 

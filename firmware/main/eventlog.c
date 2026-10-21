@@ -160,6 +160,9 @@ static void print_entry(const ev_entry_t *e)
     case EV_MODE:
         printf("MODE         %s\n", app_mode_name(e->a));
         break;
+    case EV_BLE_GESTURE:
+        printf("BLE GESTURE  BLE switched %s, restarting\n", e->a ? "on" : "off");
+        break;
     default:
         printf("?            %d %d\n", e->a, e->b);
         break;
