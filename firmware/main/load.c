@@ -14,6 +14,8 @@ static const char *TAG = "load";
 
 // ITR8307 rise time is ~20 us; 1 ms is generous and also lets C10 (100 us) settle
 #define LED_SETTLE_US   1000
+// Flash: 4 time constants of C10 (about 98 %), well inside LOAD_FLASH_LEN_US
+#define FLASH_SETTLE_US 400
 
 // Hysteresis and debounce (HANDOVER.md 6.2)
 #define LOADED_PCT      60
@@ -25,9 +27,7 @@ static const char *TAG = "load";
 #define BASELINE_DIV        32  // EMA weight 1/32
 
 static SemaphoreHandle_t s_lock;
-static bool s_hold;
-static bool s_forced;
-static int s_ambient_mv;
+static bool s_forced;   // diag: LED held on
 
 static bool s_loaded;
 static int s_streak;
@@ -59,7 +59,7 @@ int load_measure_raw(int samples, int *on_mv, int *off_mv)
     esp_rom_delay_us(LED_SETTLE_US);
     int on = sense_adc_read_mv(ADC_CH_LOAD_SENSE, samples);
 
-    gpio_set_level(PIN_LOAD_IR_LED, s_hold ? 1 : 0);
+    gpio_set_level(PIN_LOAD_IR_LED, s_forced ? 1 : 0);
     xSemaphoreGive(s_lock);
 
     if (on_mv) {
@@ -79,52 +79,38 @@ int load_measure(int samples)
     return load_measure_raw(samples, NULL, NULL);
 }
 
-void load_hold_begin(void)
+int load_flash_sample_raw(int *on_mv, int *off_mv)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
-    gpio_set_level(PIN_LOAD_IR_LED, 0);
-    esp_rom_delay_us(LED_SETTLE_US);
-    s_ambient_mv = sense_adc_read_mv(ADC_CH_LOAD_SENSE, 8);
+    // Ambient first: the LED has been off since the last flash
+    int off = sense_adc_read_mv(ADC_CH_LOAD_SENSE, 2);
     gpio_set_level(PIN_LOAD_IR_LED, 1);
-    esp_rom_delay_us(LED_SETTLE_US);
-    s_hold = true;
-    xSemaphoreGive(s_lock);
-}
-
-int load_hold_sample_raw(int *on_mv, int *off_mv)
-{
+    esp_rom_delay_us(FLASH_SETTLE_US);
     int on = sense_adc_read_mv(ADC_CH_LOAD_SENSE, 2);
+    gpio_set_level(PIN_LOAD_IR_LED, s_forced ? 1 : 0);
+    xSemaphoreGive(s_lock);
+
     if (on_mv) {
         *on_mv = on;
     }
     if (off_mv) {
-        *off_mv = s_ambient_mv;
+        *off_mv = off;
     }
-    if (on < 0 || s_ambient_mv < 0) {
+    if (off < 0 || on < 0) {
         return INT_MIN;
     }
-    return on - s_ambient_mv;
+    return on - off;
 }
 
-int load_hold_sample(void)
+void load_led_off(void)
 {
-    return load_hold_sample_raw(NULL, NULL);
-}
-
-void load_hold_end(void)
-{
-    xSemaphoreTake(s_lock, portMAX_DELAY);
-    s_hold = false;
-    s_forced = false;
-    gpio_set_level(PIN_LOAD_IR_LED, 0);
-    xSemaphoreGive(s_lock);
+    load_led_force(false);
 }
 
 void load_led_force(bool on)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     s_forced = on;
-    s_hold = on;   // load_measure_raw() leaves the LED as s_hold says
     gpio_set_level(PIN_LOAD_IR_LED, on ? 1 : 0);
     xSemaphoreGive(s_lock);
 }

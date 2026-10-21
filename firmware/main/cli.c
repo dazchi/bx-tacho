@@ -59,9 +59,9 @@ static int cmd_status(int argc, char **argv)
            s.batt.vbat_valid ? "valid" : "not trusted while charging", s.batt.percent);
     printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
            usb_serial_jtag_is_connected() ? "connected" : "none");
-    printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped\n",
+    printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped, %lu masked by load flashes\n",
            rpm_is_powered() ? "on" : "off", rpm_get_threshold_mv(), cfg->edges_per_rev,
-           (unsigned long)rpm_overflow_count());
+           (unsigned long)rpm_overflow_count(), (unsigned long)rpm_masked_count());
     if (cfg->load_cal_valid) {
         printf("load        : %s, %d mV (%d%%), empty %d mV, loaded %d mV\n",
                s.loaded ? "LOADED" : "empty", s.load_diff_mv, s.load_pct,

@@ -17,19 +17,19 @@ int load_measure(int samples);
 // Same, also returning the raw LED-on and LED-off readings (mV, -1 on ADC error)
 int load_measure_raw(int samples, int *on_mv, int *off_mv);
 
-// Fast mode for while a top is loaded: measure ambient once, then keep the
-// LED on so each sample is a single ADC read.
-void load_hold_begin(void);
-int load_hold_sample(void);
-// Same, also returning the raw LED-on reading and the ambient measured at load_hold_begin()
-int load_hold_sample_raw(int *on_mv, int *off_mv);
-void load_hold_end(void);
+// Fast sample for while the RPM channel is armed: the LED is lit only for a short
+// flash (about LOAD_FLASH_LEN_US), because its light reflected off a loaded top
+// reaches the RPM sensor and can hide edges. Slightly less settled than
+// load_measure_raw(). The caller masks RPM edges around it (rpm_mask_begin/end).
+#define LOAD_FLASH_LEN_US 500   // upper bound of the time the LED is lit
+int load_flash_sample_raw(int *on_mv, int *off_mv);
 
-// Diag: keep the LED on continuously, as it is while a top is loaded and during
-// a launch, e.g. to check for crosstalk into the RPM sensor. Cleared again by
-// load_led_force(false) or load_hold_end().
+// Diag/meter: keep the LED on continuously (crosstalk tests). Cleared again by
+// load_led_force(false) or load_led_off().
 void load_led_force(bool on);
 bool load_led_forced(void);
+// LED off and any forcing cleared (deep sleep, mode changes)
+void load_led_off(void);
 
 // Debounced classifier. Feed it every measurement; returns the loaded state.
 // Always false while the calibration is invalid.

@@ -32,6 +32,17 @@ static volatile uint32_t s_head;
 static volatile uint32_t s_tail;
 static volatile uint32_t s_overflow;
 
+// Load LED flash masking (rpm_mask_begin/end)
+static volatile bool s_masking;
+static volatile bool s_mask_tail;
+static volatile uint32_t s_mask_until;
+static volatile uint32_t s_masked;
+
+#define RECENT_EDGES 4
+static volatile uint32_t s_recent[RECENT_EDGES];   // last unmasked edges, newest first
+static volatile int s_recent_count;
+static TaskHandle_t s_notify_task;
+
 static bool s_powered;
 static int s_thr_mv = RPM_THR_DEFAULT_MV;
 static esp_pm_lock_handle_t s_pm_sleep_lock;
@@ -40,6 +51,26 @@ static esp_pm_lock_handle_t s_pm_apb_lock;
 static void IRAM_ATTR rpm_edge_isr(void *arg)
 {
     uint32_t now = (uint32_t)esp_timer_get_time();
+    if (s_mask_tail && (int32_t)(now - s_mask_until) >= 0) {
+        s_mask_tail = false;
+    }
+    if (s_masking || s_mask_tail) {
+        s_masked++;
+        return;
+    }
+    for (int i = RECENT_EDGES - 1; i > 0; i--) {
+        s_recent[i] = s_recent[i - 1];
+    }
+    s_recent[0] = now;
+    if (s_recent_count < RECENT_EDGES) {
+        s_recent_count++;
+    }
+    if (s_notify_task != NULL) {
+        BaseType_t woken = pdFALSE;
+        vTaskNotifyGiveFromISR(s_notify_task, &woken);
+        portYIELD_FROM_ISR(woken);
+    }
+
     uint32_t head = s_head;
     if (head - s_tail >= RING_SIZE) {
         s_overflow++;
@@ -101,6 +132,50 @@ esp_err_t rpm_init(void)
     return ESP_OK;
 }
 
+void rpm_set_notify_task(TaskHandle_t task)
+{
+    s_notify_task = task;
+}
+
+void rpm_mask_begin(void)
+{
+    s_masking = true;
+}
+
+void rpm_mask_end(uint32_t tail_us)
+{
+    s_mask_until = (uint32_t)esp_timer_get_time() + tail_us;
+    s_mask_tail = true;
+    s_masking = false;
+}
+
+uint32_t rpm_masked_count(void)
+{
+    return s_masked;
+}
+
+int rpm_recent_edges(uint32_t *last, uint32_t *shortest)
+{
+    // Consistent copy: the ISR may shift the list between the reads
+    uint32_t t[RECENT_EDGES];
+    int n;
+    do {
+        n = s_recent_count;
+        for (int i = 0; i < RECENT_EDGES; i++) {
+            t[i] = s_recent[i];
+        }
+    } while (t[0] != s_recent[0]);
+
+    uint32_t best = UINT32_MAX;
+    for (int i = 0; i + 1 < n; i++) {
+        uint32_t gap = t[i] - t[i + 1];
+        best = gap < best ? gap : best;
+    }
+    *last = t[0];
+    *shortest = best;
+    return n;
+}
+
 void rpm_set_threshold_mv(int mv)
 {
     if (mv < 0) {
@@ -137,6 +212,7 @@ void rpm_power(bool on)
 
         // Drop anything left over from before, then start counting
         s_tail = __atomic_load_n(&s_head, __ATOMIC_ACQUIRE);
+        s_recent_count = 0;
         gpio_intr_enable(PIN_RPM_IR_TRIG);
         s_powered = true;
     } else {

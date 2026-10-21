@@ -137,7 +137,7 @@ static void print_entry(const ev_entry_t *e)
     case EV_LOAD_OFF:
         printf("%-12s LOAD_SENSE %d mV (%d%%), ON %d OFF %d mV, %s\n",
                e->type == EV_LOAD_ON ? "LOAD ON" : "LOAD OFF", e->a, e->b, e->c, e->d,
-               (e->flags & EV_FLAG_LOAD_HOLD) ? "hold" : "poll");
+               (e->flags & EV_FLAG_LOAD_FLASH) ? "flash" : "poll");
         break;
     case EV_STATE:
         printf("STATE        %s -> %s\n", launch_state_name(e->b), launch_state_name(e->a));

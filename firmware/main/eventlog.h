@@ -8,7 +8,7 @@
 typedef enum {
     EV_BOOT,          // a = reset reason, b = wake-up cause bits
     EV_LOAD_ON,       // a = LOAD_SENSE mV, b = %, c = raw LED-on mV, d = raw LED-off mV,
-    EV_LOAD_OFF,      //   flags: EV_FLAG_LOAD_HOLD if sampled in hold mode (else poll)
+    EV_LOAD_OFF,      //   flags: EV_FLAG_LOAD_FLASH if a fast flash sample (else a poll)
     EV_STATE,         // a = new launch state, b = old launch state
     EV_USB_ON,        // a = VBAT mV
     EV_USB_OFF,       // a = VBAT mV
@@ -20,7 +20,7 @@ typedef enum {
 
 // Load sample came from hold mode (LED held on, ambient measured once) rather
 // than a full LED-off/on poll
-#define EV_FLAG_LOAD_HOLD 0x01
+#define EV_FLAG_LOAD_FLASH 0x01
 
 // Call once at boot: validates the RTC block and records an EV_BOOT entry
 void eventlog_init(void);

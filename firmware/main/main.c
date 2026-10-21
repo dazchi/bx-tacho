@@ -26,6 +26,27 @@
 static const char *TAG = "main";
 
 #define LOAD_POLL_MS       50     // idle polling of the load sensor
+
+// Load sampling while the RPM channel is armed (top loaded, launch). The load
+// LED's light reflected off a loaded top reaches the RPM sensor and hides edges,
+// so the LED is only flashed (load_flash_sample_raw), never while the next RPM
+// edge is due, and rpm.c drops edges during a flash and LOAD_FLASH_TAIL_US after
+// it (RPM_SENSE filter R15/C12, about 50 us), which catches any the light causes.
+#define LOAD_FLASH_GAP_US     1000     // between flashes while the disc turns
+#define LOAD_FLASH_IDLE_US    10000    // ...while it is still
+#define LOAD_FLASH_TAIL_US    200
+// Flash only in this first part of an edge interval, measured as the shortest of
+// the last three: clear of the next edge even if the disc speeds up 2.5x within
+// one interval. A flash that does land on an edge masks it, and the interval
+// after it reads double; with only the last interval as the measure, that stretched
+// the zone onto the next edge, which was masked in turn, and the scheduler held
+// itself at half speed for many revolutions.
+#define LOAD_FLASH_ZONE_PCT   40
+// ...and never later than this after an edge: early in a pull the speed can
+// more than double from one edge to the next
+#define LOAD_FLASH_ZONE_MAX_US 8000
+#define LOAD_FLASH_FIRST_US   20000    // assumed interval after the first edge
+#define DISC_STILL_US         250000   // no edge for this long: the disc is still
 #define IDLE_TICK_MS       20
 #define BATTERY_PERIOD_MS  1000
 #define UI_PERIOD_MS       100
@@ -158,7 +179,7 @@ bool app_enter_deep_sleep(app_sleep_reason_t reason)
 
     bbp_stop();
     rpm_power(false);
-    load_hold_end();
+    load_led_off();
 
     // Hold every output LOW so nothing back-feeds the unpowered RPM channel
     for (int i = 0; i < sizeof(s_held_outputs) / sizeof(s_held_outputs[0]); i++) {
@@ -176,6 +197,28 @@ bool app_enter_deep_sleep(app_sleep_reason_t reason)
     esp_deep_sleep_start();
 }
 
+// Whether now is a safe moment to flash the load LED (see LOAD_FLASH_*)
+static bool load_flash_due(uint32_t now, uint32_t last_flash)
+{
+    uint32_t since_flash = now - last_flash;
+    if (since_flash < LOAD_FLASH_GAP_US) {
+        return false;
+    }
+    uint32_t last, shortest;
+    int n = rpm_recent_edges(&last, &shortest);
+    uint32_t since_edge = now - last;
+    if (n == 0 || since_edge > DISC_STILL_US) {
+        return since_flash >= LOAD_FLASH_IDLE_US;
+    }
+    uint32_t interval = (n >= 2 && shortest <= DISC_STILL_US) ? shortest : LOAD_FLASH_FIRST_US;
+    uint32_t zone = interval * LOAD_FLASH_ZONE_PCT / 100;
+    zone = zone < LOAD_FLASH_ZONE_MAX_US ? zone : LOAD_FLASH_ZONE_MAX_US;
+    // Done, light gone, well before the next edge is due. Past the zone, wait for
+    // the next edge (or for the disc to stand still): when it is overdue, as early
+    // in a pull, a flash would be likely to land on it.
+    return since_edge + LOAD_FLASH_LEN_US + LOAD_FLASH_TAIL_US <= zone;
+}
+
 static void publish(const app_snapshot_t *snap)
 {
     taskENTER_CRITICAL(&s_snap_lock);
@@ -187,14 +230,15 @@ static void publish(const app_snapshot_t *snap)
 static void sensor_task(void *arg)
 {
     app_snapshot_t snap = {0};
-    bool hold = false;
+    bool fast_load = false;      // flash sampling, waking on RPM edges
+    uint32_t last_flash_us = 0;
     bool prev_usb = false;
     bool usb_event_pending = false;   // USB change not yet logged (waiting for a VBAT reading)
     int64_t usb_event_us = 0;
     bool prev_loaded = false;
     int raw_on_mv = 0;          // raw LOAD_SENSE readings of the latest sample, for the event log
     int raw_off_mv = 0;
-    bool raw_from_hold = false;
+    bool raw_from_flash = false;
     bool cal_lock_held = false;
     launch_state_t prev_state = launch_get_state();
     int64_t last_poll_us = 0;
@@ -215,10 +259,10 @@ static void sensor_task(void *arg)
             s_mode_changed = false;
             eventlog_add(EV_MODE, mode, 0);
             // Hand the hardware over cleanly in either direction
-            if (hold || load_led_forced()) {
-                load_hold_end();
-                hold = false;
+            if (load_led_forced()) {
+                load_led_off();
             }
+            fast_load = false;
             rpm_power(false);
             load_classifier_reset(false);
             launch_init();
@@ -283,22 +327,22 @@ static void sensor_task(void *arg)
             bool sampled = false;
 
             if (fast && cfg->load_cal_valid) {
-                if (!hold) {
-                    load_hold_begin();
-                    hold = true;
+                fast_load = true;
+                uint32_t t = (uint32_t)esp_timer_get_time();
+                if (load_flash_due(t, last_flash_us)) {
+                    last_flash_us = t;
+                    rpm_mask_begin();
+                    diff = load_flash_sample_raw(&raw_on_mv, &raw_off_mv);
+                    rpm_mask_end(LOAD_FLASH_TAIL_US);
+                    raw_from_flash = true;
+                    sampled = true;
                 }
-                diff = load_hold_sample_raw(&raw_on_mv, &raw_off_mv);
-                raw_from_hold = true;
-                sampled = true;
             } else {
-                if (hold) {
-                    load_hold_end();
-                    hold = false;
-                }
+                fast_load = false;
                 if (now - last_poll_us >= LOAD_POLL_MS * 1000LL) {
                     last_poll_us = now;
                     diff = load_measure_raw(4, &raw_on_mv, &raw_off_mv);
-                    raw_from_hold = false;
+                    raw_from_flash = false;
                     sampled = true;
                 }
             }
@@ -312,7 +356,7 @@ static void sensor_task(void *arg)
                 prev_loaded = snap.loaded;
                 // Raw values of the sample that completed the switch, and how it was taken
                 eventlog_add_ext(snap.loaded ? EV_LOAD_ON : EV_LOAD_OFF, snap.load_diff_mv, snap.load_pct,
-                                 raw_on_mv, raw_off_mv, raw_from_hold ? EV_FLAG_LOAD_HOLD : 0);
+                                 raw_on_mv, raw_off_mv, raw_from_flash ? EV_FLAG_LOAD_FLASH : 0);
                 app_note_activity();
                 bbp_set_attached(snap.loaded);
             }
@@ -397,7 +441,12 @@ static void sensor_task(void *arg)
             app_enter_deep_sleep(APP_SLEEP_IDLE);
         }
 
-        vTaskDelay(hold ? 1 : pdMS_TO_TICKS(IDLE_TICK_MS));
+        if (fast_load) {
+            // Back right after the next RPM edge (to flash early in the interval), or in 1 ms
+            ulTaskNotifyTake(pdTRUE, 1);
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(IDLE_TICK_MS));
+        }
     }
 }
 
@@ -772,7 +821,9 @@ void app_main(void)
         s_ui_running = true;
         xTaskCreate(ui_task, "ui", 3072, NULL, 3, NULL);
     }
-    xTaskCreate(sensor_task, "sensors", 4096, NULL, 5, NULL);
+    TaskHandle_t sensors;
+    xTaskCreate(sensor_task, "sensors", 4096, NULL, 5, &sensors);
+    rpm_set_notify_task(sensors);
 
     ESP_ERROR_CHECK(cli_start());
     ESP_LOGI(TAG, "BX Tacho ready. Type 'help' for console commands.");

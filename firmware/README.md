@@ -48,6 +48,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `rpm scan [s] [apply]` | Record RPM_SENSE min/max while you turn the launcher; `apply` saves the midpoint as the threshold |
 | `rpm thr [mV]` | Show or set the comparator threshold (capped at 2000 mV) |
 | `load [n]` | Print ambient-cancelled LOAD_SENSE readings |
+| `load led on\|off` | Hold the load LED on (diag or meter mode), to test its crosstalk into the RPM sensor. In normal use it is only flashed while the RPM channel is armed: its light reflected off a loaded top hides RPM edges |
 | `cal load empty` / `cal load loaded` / `cal load clear` | Calibrate the load sensor |
 | `cal vbat start` … `stop` | Production VBAT calibration, see below |
 | `cfg edges <n>` | Rising edges per launcher revolution |

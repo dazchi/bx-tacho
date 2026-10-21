@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // LMV331 input range ends about 0.7-1 V below its 3.3 V supply
 #define RPM_THR_MAX_MV      2000
@@ -30,3 +32,17 @@ int rpm_take_edges(uint32_t *out, int max);
 
 // Edges lost because the buffer filled up between calls
 uint32_t rpm_overflow_count(void);
+
+// Notify `task` (xTaskNotifyGive) on every edge, so it can act right after one
+void rpm_set_notify_task(TaskHandle_t task);
+
+// Edge masking around a load LED flash, whose light can reach the RPM sensor:
+// edges from rpm_mask_begin() until tail_us after rpm_mask_end() are dropped.
+void rpm_mask_begin(void);
+void rpm_mask_end(uint32_t tail_us);
+uint32_t rpm_masked_count(void);
+
+// The last unmasked edge since the channel was powered, and the shortest of the
+// (up to three) intervals between the edges before it. Returns how many edges
+// that is based on: 0 (nothing valid), 1 (only *last), up to 4.
+int rpm_recent_edges(uint32_t *last, uint32_t *shortest);
