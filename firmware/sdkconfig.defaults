@@ -28,3 +28,19 @@ CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
 # VUSB_DET is driven by the R2/R5 divider; internal pulls would load it
 # during deep sleep.
 CONFIG_ESP_SLEEP_GPIO_ENABLE_INTERNAL_RESISTORS=n
+
+# Battle Pass emulation (main/bbp.c): BLE peripheral on NimBLE, one connection
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+
+# BLE alongside automatic light sleep. The board has no 32 kHz crystal, so the
+# main crystal clocks the controller and stays powered in light sleep.
+CONFIG_BT_CTRL_MODEM_SLEEP=y
+CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1=y
+CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL=y
+CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP=y
+CONFIG_ESP_PHY_MAC_BB_PD=y

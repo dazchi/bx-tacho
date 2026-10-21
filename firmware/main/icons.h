@@ -23,3 +23,13 @@ extern const uint8_t icon_battery_full_16x9[];
 #define ICON_BATTERY_FILL_Y 2
 #define ICON_BATTERY_FILL_W 10
 #define ICON_BATTERY_FILL_H 5
+
+// Status-line BLE state, after react-icons FaBluetoothB, MdOutlineBluetoothConnected
+// and LuBluetoothOff, redrawn by hand at 9 px
+#define ICON_BLE_H 9
+#define ICON_BLE_ON_W 5
+extern const uint8_t icon_ble_on_5x9[];
+#define ICON_BLE_CONNECTED_W 9
+extern const uint8_t icon_ble_connected_9x9[];
+#define ICON_BLE_OFF_W 9
+extern const uint8_t icon_ble_off_9x9[];

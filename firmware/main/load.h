@@ -25,6 +25,12 @@ int load_hold_sample(void);
 int load_hold_sample_raw(int *on_mv, int *off_mv);
 void load_hold_end(void);
 
+// Diag: keep the LED on continuously, as it is while a top is loaded and during
+// a launch, e.g. to check for crosstalk into the RPM sensor. Cleared again by
+// load_led_force(false) or load_hold_end().
+void load_led_force(bool on);
+bool load_led_forced(void);
+
 // Debounced classifier. Feed it every measurement; returns the loaded state.
 // Always false while the calibration is invalid.
 bool load_classify(int diff_mv);

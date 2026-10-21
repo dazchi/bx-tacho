@@ -169,3 +169,42 @@ const uint8_t icon_battery_16x9[18] = {
     0x80, 0x04,   // #............#..
     0x7F, 0xF8,   // .############...
 };
+
+// BLE on, no app connected: the Bluetooth rune
+const uint8_t icon_ble_on_5x9[9] = {
+    0x20,   // ..#..
+    0x30,   // ..##.
+    0xA8,   // #.#.#
+    0x70,   // .###.
+    0x20,   // ..#..
+    0x70,   // .###.
+    0xA8,   // #.#.#
+    0x30,   // ..##.
+    0x20,   // ..#..
+};
+
+// App connected: the rune with a dot either side
+const uint8_t icon_ble_connected_9x9[18] = {
+    0x08, 0x00,   // ....#....
+    0x0C, 0x00,   // ....##...
+    0x2A, 0x00,   // ..#.#.#..
+    0x1C, 0x00,   // ...###...
+    0x88, 0x80,   // #...#...#
+    0x1C, 0x00,   // ...###...
+    0x2A, 0x00,   // ..#.#.#..
+    0x0C, 0x00,   // ....##...
+    0x08, 0x00,   // ....#....
+};
+
+// BLE off: the rune struck through, with a 1 px gap either side of the slash
+const uint8_t icon_ble_off_9x9[18] = {
+    0x88, 0x00,   // #...#....
+    0x4C, 0x00,   // .#..##...
+    0x2A, 0x00,   // ..#.#.#..
+    0x14, 0x00,   // ...#.#...
+    0x08, 0x00,   // ....#....
+    0x14, 0x00,   // ...#.#...
+    0x2A, 0x00,   // ..#.#.#..
+    0x0D, 0x00,   // ....##.#.
+    0x08, 0x80,   // ....#...#
+};

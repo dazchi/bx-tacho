@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "app.h"
+#include "bbp.h"
 #include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
 #include "esp_console.h"
@@ -85,6 +86,11 @@ static int cmd_status(int argc, char **argv)
     } else {
         printf("vbat cal    : none (nominal divider ratio). See 'cal vbat start'.\n");
     }
+    bbp_info_t b;
+    bbp_get_info(&b);
+    printf("battle pass : BLE %s, %d shots in history, %lu total, max %u\n",
+           !b.radio_on ? "off" : (b.subscribed ? "app listening" : (b.connected ? "connected" : "advertising")),
+           b.count, (unsigned long)b.total, b.max_sp);
     printf("idle        : %lu ms\n", (unsigned long)s.idle_ms);
     return 0;
 }
@@ -265,6 +271,18 @@ static int average_load(void)
 
 static int cmd_load(int argc, char **argv)
 {
+    if (argc == 3 && !strcmp(argv[1], "led") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
+        // Diag, or meter mode (which never drives the load LED) to test it at speed
+        app_mode_t mode = app_get_mode();
+        if (mode != APP_MODE_DIAG && mode != APP_MODE_METER) {
+            printf("Run 'diag on' or 'meter on' first.\n");
+            return 1;
+        }
+        load_led_force(!strcmp(argv[2], "on"));
+        printf("load IR LED held %s%s\n", argv[2],
+               !strcmp(argv[2], "on") ? " (as while a top is loaded); load readings paused" : "");
+        return 0;
+    }
     int n = argc == 2 ? atoi(argv[1]) : 10;
     for (int i = 0; i < n; i++) {
         printf("LOAD_SENSE (LED on - off) %d mV\n", load_measure(8));
@@ -566,6 +584,130 @@ static int cmd_cfg(int argc, char **argv)
     return 1;
 }
 
+// Microseconds as milliseconds with one decimal, right-aligned in 7 characters
+static void print_ms(uint32_t us)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%lu.%lu", (unsigned long)(us / 1000), (unsigned long)(us % 1000 / 100));
+    printf("%7s", buf);
+}
+
+// Last launch, edge by edge: interval, RPM over one revolution, the release
+// seen by the load sensor and the edges the chatter filter dropped
+static int cmd_launch(int argc, char **argv)
+{
+    static uint32_t edges[200];
+    static launch_trace_t info;
+    int max = argc > 1 ? atoi(argv[1]) : 60;
+    if (argc > 2 || max < 2 || max > (int)(sizeof(edges) / sizeof(edges[0]))) {
+        printf("usage: launch [edges 2-200, default 60]\n");
+        return 1;
+    }
+    if (!launch_get_trace(edges, max, &info)) {
+        printf("No finished launch yet.\n");
+        return 1;
+    }
+    int epr = settings_get()->edges_per_rev;
+    int n = info.num_edges < max ? info.num_edges : max;
+    uint32_t t0 = edges[0];
+
+    printf("%d edges (showing %d), %d edge(s)/rev, release %s", info.num_edges, n, epr,
+           info.release_seen ? "at " : "not seen by the load sensor");
+    if (info.release_seen) {
+        uint32_t rel = info.release_us - t0;
+        printf("+%lu.%lu ms", (unsigned long)(rel / 1000), (unsigned long)(rel % 1000 / 100));
+    }
+    printf(", %d edge(s) dropped by the filter", info.num_rejected);
+    if (info.lock_recoveries > 0) {
+        printf(", filter lock recovered %d time(s)", info.lock_recoveries);
+    }
+    printf("\n");
+    printf("  #   t (ms)  interval (us)  rpm (1 rev)\n");
+
+    int r = 0;   // next dropped edge to print
+    bool release_printed = !info.release_seen;
+    for (int i = 0; i < n; i++) {
+        // Dropped edges and the release, in time order before this edge
+        while (r < info.num_rejected && (int32_t)(info.rejected_us[r] - edges[i]) < 0) {
+            printf("     ");
+            print_ms(info.rejected_us[r] - t0);
+            printf("   -- dropped (%s)\n", info.rejected_max_rpm[r] ? "max rpm" : "too soon");
+            r++;
+        }
+        if (!release_printed && (int32_t)(info.release_us - edges[i]) < 0) {
+            printf("     ");
+            print_ms(info.release_us - t0);
+            printf("   -- release (load sensor)\n");
+            release_printed = true;
+        }
+        printf("%3d  ", i);
+        print_ms(edges[i] - t0);
+        if (i > 0) {
+            printf("  %13lu", (unsigned long)(edges[i] - edges[i - 1]));
+        }
+        if (i >= epr) {
+            printf("  %11lu", (unsigned long)(60000000ULL / (edges[i] - edges[i - epr])));
+        }
+        printf("\n");
+    }
+    return 0;
+}
+
+static int cmd_ble(int argc, char **argv)
+{
+    if (argc == 2 && (!strcmp(argv[1], "on") || !strcmp(argv[1], "off"))) {
+        bool on = !strcmp(argv[1], "on");
+        if (on == settings_ble()) {
+            printf("BLE is already %s\n", argv[1]);
+            return 0;
+        }
+        settings_set_ble(on);
+        printf("BLE %s (saved). Restarting to apply...\n", argv[1]);
+        vTaskDelay(pdMS_TO_TICKS(200));
+        esp_restart();
+    }
+    if (argc != 1) {
+        printf("usage: ble | ble on|off\n");
+        return 1;
+    }
+
+    bbp_info_t b;
+    bbp_get_info(&b);
+    printf("BLE: %s", b.radio_on ? "on, " BBP_DEVICE_NAME : "off");
+    if (b.radio_on) {
+        printf(", %s", b.subscribed ? "app listening" : (b.connected ? "connected" : "advertising"));
+    }
+    printf("\n");
+    return 0;
+}
+
+// The Battle Pass shot history that apps read (kept with BLE off too)
+static int cmd_history(int argc, char **argv)
+{
+    if (argc == 2 && !strcmp(argv[1], "clear")) {
+        bbp_clear_history();
+        printf("Shot history cleared: last %d shots, total count, max and latest curve\n",
+               BBP_HISTORY_LEN);
+        return 0;
+    }
+    if (argc != 1) {
+        printf("usage: history | history clear\n");
+        return 1;
+    }
+
+    bbp_info_t b;
+    bbp_get_info(&b);
+    printf("shots   : %d in history, %lu total, max %u\n", b.count, (unsigned long)b.total, b.max_sp);
+    for (int i = 0; i < b.count; i++) {
+        // Ten per line, oldest first
+        printf("%s%5u", i % 10 ? " " : (i ? "\n          " : "history : "), b.sp[i]);
+    }
+    if (b.count > 0) {
+        printf("\n");
+    }
+    return 0;
+}
+
 static int cmd_sleep(int argc, char **argv)
 {
     printf("Deep sleep in %d s. Unplug USB now, otherwise sleep is cancelled.\n"
@@ -599,9 +741,12 @@ esp_err_t cli_start(void)
         {.command = "diag", .help = "diag on|off: pause the state machine for manual sensor control", .func = cmd_diag},
         {.command = "meter", .help = "meter on|off | meter | meter log [seconds] [interval_ms]: continuous RPM (CSV)", .func = cmd_meter},
         {.command = "rpm", .help = "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", .func = cmd_rpm},
-        {.command = "load", .help = "load [count]: print ambient-cancelled LOAD_SENSE readings", .func = cmd_load},
+        {.command = "load", .help = "load [count]: print ambient-cancelled LOAD_SENSE readings; load led on|off: hold the load LED (diag or meter mode)", .func = cmd_load},
         {.command = "cal", .help = "cal load empty|loaded|clear: load sensor; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", .func = cmd_cal},
         {.command = "cfg", .help = "cfg edges <n> | cfg lightsleep on|off | cfg reset", .func = cmd_cfg},
+        {.command = "launch", .help = "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", .func = cmd_launch},
+        {.command = "ble", .help = "ble | ble on|off: Battle Pass emulation over BLE (on|off restarts)", .func = cmd_ble},
+        {.command = "history", .help = "history | history clear: shot history sent to Battle Pass apps (last 50, total, max, latest curve)", .func = cmd_history},
         {.command = "sleep", .help = "Enter deep sleep now", .func = cmd_sleep},
         {.command = "events", .help = "events | events clear: power/sleep event log (survives deep sleep and resets)", .func = cmd_events},
     };

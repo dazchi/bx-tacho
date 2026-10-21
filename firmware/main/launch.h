@@ -55,4 +55,27 @@ bool launch_update(bool loaded, bool armed_always);
 launch_state_t launch_get_state(void);
 int launch_live_rpm(void);
 bool launch_get_result(launch_result_t *out);   // false until the first launch
+
+// Revolution periods of the last launch in time order, from the start of the
+// pull, including the spin-down after the release (the Battle Pass curve).
+// Returns how many were copied, at most `max`.
+#define LAUNCH_CURVE_MAX 32
+int launch_get_curve(uint32_t *periods_us, int max);
+
+// Raw record of the last launch, for the console: edge timestamps (us), the
+// release seen by the load sensor, and the edges the chatter filter dropped.
+#define LAUNCH_TRACE_REJECTS 48
+typedef struct {
+    int num_edges;            // accepted edges in the launch (all of them, not just those copied)
+    bool release_seen;
+    uint32_t release_us;      // same clock as the edges
+    int num_rejected;         // dropped edges stored below (the first LAUNCH_TRACE_REJECTS)
+    int lock_recoveries;      // times the filter was found locked and the dropped edges restored
+    uint32_t rejected_us[LAUNCH_TRACE_REJECTS];
+    bool rejected_max_rpm[LAUNCH_TRACE_REJECTS];   // true: faster than the max; false: too soon (relative)
+} launch_trace_t;
+
+// Copies the first `max` edges of the last launch. Returns false if there is
+// no finished launch (none yet, or one in progress).
+bool launch_get_trace(uint32_t *edges, int max, launch_trace_t *info);
 const char *launch_state_name(launch_state_t s);

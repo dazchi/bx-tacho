@@ -31,6 +31,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `main/battery.c` | VBAT, USB presence, charge state |
 | `main/display.c` | SSD1315 OLED via `esp_lcd`, framebuffer and 5×7 font |
 | `main/settings.c` | Calibration stored in NVS |
+| `main/bbp.c` | Battle Pass (BX-09) emulation over BLE and the shot history, see below |
 | `main/cli.c` | Bring-up and calibration console |
 | `main/main.c` | Tasks, light sleep, display dimming, deep sleep |
 
@@ -52,6 +53,10 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `cfg edges <n>` | Rising edges per launcher revolution |
 | `cfg lightsleep on\|off` | Automatic light sleep on battery (default on), for power debugging |
 | `events` / `events clear` | Power/sleep event log: boots and reset reasons, load changes, state changes, USB, display on/off, deep sleep. Kept in RTC memory, so it survives deep sleep and resets (not power-on) |
+| `launch [n]` | Last launch edge by edge (first `n` edges, default 60): time, interval, RPM, with the release seen by the load sensor and any edges the chatter filter dropped |
+| `ble` | Battle Pass link state |
+| `ble on\|off` | Battle Pass emulation over BLE (default on); saves and restarts |
+| `history` / `history clear` | Shot history sent to Battle Pass apps; `clear` wipes the last 50 shots, the total count, the max and the latest curve |
 | `sleep` | Deep sleep now |
 
 The console is only reachable while USB is plugged in; light sleep is
@@ -68,6 +73,26 @@ disabled then so the USB link stays up.
 
 Without a load calibration the RPM channel stays armed all the time, so
 launches are still measured; the display shows **ARMED** instead of **READY**.
+
+## Battle Pass emulation (BLE)
+
+BX Tacho advertises as a Takara Tomy BEYBATTLE PASS (BX-09), `BEYBLADE_TOOL01`,
+so third-party Battle Pass apps can connect and read launches. Protocol,
+sources and open questions: [docs/bbp-protocol.md](docs/bbp-protocol.md).
+
+- Loading a top and taking it off send the attach/detach status.
+- Each launch adds its peak RPM to the history (last 50, plus lifetime count
+  and max) and sends the history with the launch curve: the first 32
+  revolutions from the start of the pull, including the spin-down.
+- The history is kept in NVS (namespace `bbp`) and survives power cycles,
+  deep sleep and `cfg reset`; `history clear` wipes it. It is recorded even with
+  BLE off. Flashing the merged binary at 0x0 erases it, like the other NVS
+  settings.
+- Commands from the app: `0x51` status, `0x74` history and curve; anything
+  else (including `0x75`, meaning unconfirmed) is logged and ignored.
+- BLE runs alongside automatic light sleep (modem sleep, with the main crystal
+  kept on), which raises the sleep current. `ble off` if you don't use an app.
+  Deep sleep ends the connection; the app reconnects after a wake-up.
 
 ## VBAT calibration (production)
 

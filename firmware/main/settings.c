@@ -13,6 +13,7 @@ static const char *TAG = "settings";
 #define NVS_KEY       "settings"
 // Kept outside the settings blob so adding it did not invalidate saved calibration
 #define NVS_KEY_LIGHT_SLEEP "lightsleep"
+#define NVS_KEY_BLE         "ble"
 // Bump when settings_t changes layout; stale blobs are then ignored.
 #define SETTINGS_VERSION 1
 
@@ -23,6 +24,7 @@ typedef struct {
 
 static settings_t s_settings;
 static bool s_light_sleep = true;
+static bool s_ble = true;
 
 bool settings_light_sleep(void)
 {
@@ -35,6 +37,24 @@ esp_err_t settings_set_light_sleep(bool enable)
     nvs_handle_t h;
     ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h), TAG, "open");
     esp_err_t err = nvs_set_u8(h, NVS_KEY_LIGHT_SLEEP, enable ? 1 : 0);
+    if (err == ESP_OK) {
+        err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err;
+}
+
+bool settings_ble(void)
+{
+    return s_ble;
+}
+
+esp_err_t settings_set_ble(bool enable)
+{
+    s_ble = enable;
+    nvs_handle_t h;
+    ESP_RETURN_ON_ERROR(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h), TAG, "open");
+    esp_err_t err = nvs_set_u8(h, NVS_KEY_BLE, enable ? 1 : 0);
     if (err == ESP_OK) {
         err = nvs_commit(h);
     }
@@ -72,6 +92,10 @@ esp_err_t settings_init(void)
     uint8_t light_sleep;
     if (nvs_get_u8(h, NVS_KEY_LIGHT_SLEEP, &light_sleep) == ESP_OK) {
         s_light_sleep = light_sleep != 0;
+    }
+    uint8_t ble;
+    if (nvs_get_u8(h, NVS_KEY_BLE, &ble) == ESP_OK) {
+        s_ble = ble != 0;
     }
 
     settings_blob_t blob;

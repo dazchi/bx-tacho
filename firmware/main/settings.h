@@ -23,3 +23,7 @@ void settings_reset(void);
 // Automatic light sleep on battery (default on); saved immediately
 bool settings_light_sleep(void);
 esp_err_t settings_set_light_sleep(bool enable);
+
+// Battle Pass emulation over BLE (default on); saved immediately, applied at boot
+bool settings_ble(void);
+esp_err_t settings_set_ble(bool enable);

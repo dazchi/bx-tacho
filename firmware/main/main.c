@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "app.h"
+#include "bbp.h"
 #include "board.h"
 #include "cli.h"
 #include "display.h"
@@ -155,6 +156,7 @@ bool app_enter_deep_sleep(app_sleep_reason_t reason)
     eventlog_add(EV_DEEP_SLEEP, reason, s.batt.vbat_mv);
     ESP_LOGI(TAG, "entering deep sleep, wake on USB plug-in or power switch");
 
+    bbp_stop();
     rpm_power(false);
     load_hold_end();
 
@@ -213,7 +215,7 @@ static void sensor_task(void *arg)
             s_mode_changed = false;
             eventlog_add(EV_MODE, mode, 0);
             // Hand the hardware over cleanly in either direction
-            if (hold) {
+            if (hold || load_led_forced()) {
                 load_hold_end();
                 hold = false;
             }
@@ -221,6 +223,7 @@ static void sensor_task(void *arg)
             load_classifier_reset(false);
             launch_init();
             snap.loaded = prev_loaded = false;
+            bbp_set_attached(false);
             snap.meter = (meter_stats_t) {0};
             snap.diag = (diag_readings_t) {0};
             snap.vbatcal = (vbatcal_readings_t) {0};
@@ -261,7 +264,11 @@ static void sensor_task(void *arg)
                 last_poll_us = now;
                 diag_readings_t *d = &snap.diag;
                 int span = cfg->load_loaded - cfg->load_empty;
-                d->load_mv = load_measure_raw(4, &d->load_on_mv, &d->load_off_mv);
+                // With the LED forced on ('load led on') a measurement would blink
+                // it off; keep it steady and the last load reading instead
+                if (!load_led_forced()) {
+                    d->load_mv = load_measure_raw(4, &d->load_on_mv, &d->load_off_mv);
+                }
                 d->load_pct_valid = cfg->load_cal_valid && d->load_mv != INT_MIN &&
                                     abs(span) >= LOAD_MIN_CONTRAST_MV;
                 d->load_pct = d->load_pct_valid ? (d->load_mv - cfg->load_empty) * 100 / span : 0;
@@ -307,18 +314,24 @@ static void sensor_task(void *arg)
                 eventlog_add_ext(snap.loaded ? EV_LOAD_ON : EV_LOAD_OFF, snap.load_diff_mv, snap.load_pct,
                                  raw_on_mv, raw_off_mv, raw_from_hold ? EV_FLAG_LOAD_HOLD : 0);
                 app_note_activity();
+                bbp_set_attached(snap.loaded);
             }
 
             if (launch_update(snap.loaded, !cfg->load_cal_valid)) {
                 app_note_activity();
             }
             snap.state = launch_get_state();
+            snap.live_rpm = launch_live_rpm();
+            snap.have_result = launch_get_result(&snap.result);
             if (snap.state != prev_state) {
                 eventlog_add(EV_STATE, snap.state, prev_state);
                 prev_state = snap.state;
+                if (snap.state == LAUNCH_RESULT) {
+                    uint32_t curve[LAUNCH_CURVE_MAX];
+                    int n = launch_get_curve(curve, LAUNCH_CURVE_MAX);
+                    bbp_record_shot(snap.result.peak_rpm, curve, n);
+                }
             }
-            snap.live_rpm = launch_live_rpm();
-            snap.have_result = launch_get_result(&snap.result);
         }
         snap.load_cal_valid = cfg->load_cal_valid;
         snap.mode = mode;
@@ -342,6 +355,13 @@ static void sensor_task(void *arg)
         if (now - last_batt_us >= BATTERY_PERIOD_MS * 1000LL) {
             last_batt_us = now;
             battery_update(&snap.batt);
+            // Battle Pass battery level: the charge current lifts the reading, so
+            // while charging keep the last trusted value
+            if (snap.batt.src == POWER_SRC_FULL) {
+                bbp_set_battery_percent(100);
+            } else if (snap.batt.vbat_valid) {
+                bbp_set_battery_percent(snap.batt.percent);
+            }
 
             // No cutoff while calibrating: the low calibration points are below it
             if (!usb && !s_sleep_pending && mode != APP_MODE_VBATCAL && snap.batt.vbat_valid &&
@@ -366,7 +386,10 @@ static void sensor_task(void *arg)
         snap.idle_ms = idle_us > 0 ? (uint32_t)(idle_us / 1000) : 0;
         publish(&snap);
 
-        bool busy = snap.state == LAUNCH_LOADED || snap.state == LAUNCH_PULLING || mode != APP_MODE_RUN;
+        // LOADED doesn't count as busy: left loaded (or face down on a table, which
+        // the load sensor also sees as loaded) it sleeps after the same idle timeout.
+        // Loading and every state change are activity, so the timer starts afresh then.
+        bool busy = snap.state == LAUNCH_PULLING || mode != APP_MODE_RUN;
         // A PC on a data-only cable (no VBUS) still counts as "USB": keep the console up
         bool usb_host = usb_serial_jtag_is_connected();
         if (!busy && !prev_usb && !usb_host && !s_sleep_pending &&
@@ -375,6 +398,25 @@ static void sensor_task(void *arg)
         }
 
         vTaskDelay(hold ? 1 : pdMS_TO_TICKS(IDLE_TICK_MS));
+    }
+}
+
+// BLE state icon, centred on the status line. The icons are odd widths with the
+// rune in the middle column, so the rune stays put as the state changes. The
+// longest labels ("VBAT CAL" left, "LOW xx%" + battery right) leave it room.
+static void draw_ble_icon(int y)
+{
+    switch (bbp_link_state()) {
+    case BBP_LINK_CONNECTED:
+        display_bitmap((DISPLAY_W - ICON_BLE_CONNECTED_W) / 2, y, ICON_BLE_CONNECTED_W, ICON_BLE_H,
+                       icon_ble_connected_9x9);
+        break;
+    case BBP_LINK_ADVERTISING:
+        display_bitmap((DISPLAY_W - ICON_BLE_ON_W) / 2, y, ICON_BLE_ON_W, ICON_BLE_H, icon_ble_on_5x9);
+        break;
+    default:
+        display_bitmap((DISPLAY_W - ICON_BLE_OFF_W) / 2, y, ICON_BLE_OFF_W, ICON_BLE_H, icon_ble_off_9x9);
+        break;
     }
 }
 
@@ -399,6 +441,7 @@ static void draw_status_line(const app_snapshot_t *s)
     display_text(0, text_y, left, 1);
 
     char right[12];
+    const char *low = NULL;   // "LOW" ahead of the percentage, set below
     int right_end = DISPLAY_W;
     const int icon_x = DISPLAY_W - ICON_BATTERY_W;
     switch (s->batt.src) {
@@ -424,10 +467,9 @@ static void draw_status_line(const app_snapshot_t *s)
             break;
         }
         if (s->batt.vbat_mv < CONFIG_BXT_LOW_BATT_MV) {
-            snprintf(right, sizeof(right), "LOW %d%%", s->batt.percent);
-        } else {
-            snprintf(right, sizeof(right), "%d%%", s->batt.percent);
+            low = "LOW";
         }
+        snprintf(right, sizeof(right), "%d%%", s->batt.percent);
         // Level bar in 10 % steps, rounded up so any charge left shows a sliver
         display_bitmap(icon_x, icon_y, ICON_BATTERY_W, ICON_BATTERY_H, icon_battery_16x9);
         int fill_w = (s->batt.percent * ICON_BATTERY_FILL_W + 99) / 100;
@@ -438,7 +480,13 @@ static void draw_status_line(const app_snapshot_t *s)
         right_end = icon_x - 2;
         break;
     }
-    display_text(right_end - display_text_width(right, 1), text_y, right, 1);
+    int right_x = right_end - display_text_width(right, 1);
+    display_text(right_x, text_y, right, 1);
+    if (low != NULL) {
+        // Closer than a space (7 px) so it keeps clear of the centred BLE icon
+        display_text(right_x - 3 - display_text_width(low, 1), text_y, low, 1);
+    }
+    draw_ble_icon(icon_y);
     display_hline(0, DISPLAY_W - 1, icon_y + ICON_BATTERY_H + 1);
 }
 
@@ -703,6 +751,9 @@ void app_main(void)
     eventlog_init();
     ESP_ERROR_CHECK(settings_init());
     ESP_ERROR_CHECK(vbat_cal_init());   // after settings_init(): the default NVS partition is set up
+    if (bbp_init(settings_ble()) != ESP_OK) {
+        ESP_LOGE(TAG, "Battle Pass emulation unavailable");   // the meter works without it
+    }
     ESP_ERROR_CHECK(sense_adc_init());
     ESP_ERROR_CHECK(battery_init());
     ESP_ERROR_CHECK(rpm_init());

@@ -26,6 +26,7 @@ static const char *TAG = "load";
 
 static SemaphoreHandle_t s_lock;
 static bool s_hold;
+static bool s_forced;
 static int s_ambient_mv;
 
 static bool s_loaded;
@@ -114,8 +115,23 @@ void load_hold_end(void)
 {
     xSemaphoreTake(s_lock, portMAX_DELAY);
     s_hold = false;
+    s_forced = false;
     gpio_set_level(PIN_LOAD_IR_LED, 0);
     xSemaphoreGive(s_lock);
+}
+
+void load_led_force(bool on)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_forced = on;
+    s_hold = on;   // load_measure_raw() leaves the LED as s_hold says
+    gpio_set_level(PIN_LOAD_IR_LED, on ? 1 : 0);
+    xSemaphoreGive(s_lock);
+}
+
+bool load_led_forced(void)
+{
+    return s_forced;
 }
 
 void load_classifier_reset(bool loaded)

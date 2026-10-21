@@ -13,6 +13,7 @@ idf_component_register(
         "eventlog.c"
         "icons.c"
         "vbat_cal.c"
+        "bbp.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         esp_driver_gpio
@@ -26,4 +27,5 @@ idf_component_register(
         console
         esp_driver_usb_serial_jtag
         esp_app_format
+        bt
 )
