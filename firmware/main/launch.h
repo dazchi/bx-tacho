@@ -54,6 +54,8 @@ bool launch_update(bool loaded, bool armed_always);
 
 launch_state_t launch_get_state(void);
 int launch_live_rpm(void);
+// True from the release (seen by the load sensor) until the launch ends
+bool launch_released(void);
 bool launch_get_result(launch_result_t *out);   // false until the first launch
 
 // Revolution periods of the last launch in time order, from the start of the

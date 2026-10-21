@@ -519,6 +519,11 @@ launch_state_t launch_get_state(void)
     return s_state;
 }
 
+bool launch_released(void)
+{
+    return s_state == LAUNCH_PULLING && s_release_seen;
+}
+
 int launch_live_rpm(void)
 {
     int epr = settings_get()->edges_per_rev;

@@ -329,7 +329,9 @@ static void sensor_task(void *arg)
             if (fast && cfg->load_cal_valid) {
                 fast_load = true;
                 uint32_t t = (uint32_t)esp_timer_get_time();
-                if (load_flash_due(t, last_flash_us)) {
+                // Once the release is seen the launch needs no more load readings
+                // until it ends: no flashes during the spin-down
+                if (!launch_released() && load_flash_due(t, last_flash_us)) {
                     last_flash_us = t;
                     rpm_mask_begin();
                     diff = load_flash_sample_raw(&raw_on_mv, &raw_off_mv);
