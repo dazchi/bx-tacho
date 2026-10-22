@@ -11,6 +11,17 @@ const READY = 0x04;    // unlocked, and ready for the next command
 const HELLO = 0x05;    // asks for the banner, or for the code
 const CODE = 0x15;     // enter the code shown on the display
 
+// "bx-tacho 0.7.1" (reading needs no code), or null for firmware without the console
+export async function readVersion(server) {
+  try {
+    const service = await server.getPrimaryService(CONSOLE_SERVICE);
+    const value = await (await service.getCharacteristic(TX_UUID)).readValue();
+    return new TextDecoder().decode(value);
+  } catch {
+    return null;
+  }
+}
+
 export class BleConsole {
   // onText(string); onReady() when ready for a command (also once unlocked);
   // onCode() when BX Tacho wants the code on its display

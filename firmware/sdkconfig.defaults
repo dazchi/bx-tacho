@@ -7,6 +7,10 @@ CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 
+# Updates over BLE: a new firmware that resets before confirming itself
+# (main.c) is replaced by the previous one at the next boot
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
 # Console and flashing over the native USB Serial/JTAG (IO18/IO19).
 # UART0 TX (IO21) is RPM_IR_LED, so keep the console off UART0.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

@@ -6,6 +6,10 @@ const ESPTOOL_URL = 'https://cdn.jsdelivr.net/npm/esptool-js@0.7.0/bundle.js';
 export const APP_ADDRESS = 0x10000;
 export const BOOTLOADER_ADDRESS = 0x0;
 export const PART_TABLE_ADDRESS = 0x8000;
+// Which of the two app slots boots (firmware/partitions.csv); blank boots ota_0,
+// the slot at APP_ADDRESS
+const OTADATA_ADDRESS = 0x10e000;
+const OTADATA_SIZE = 0x2000;
 const PART_TABLE = 0x8000;
 const IMAGE_MAGIC = 0xe9;
 const APP_DESC_MAGIC = 0xabcd5432;
@@ -54,8 +58,11 @@ export function analyzeImage(bytes) {
   return { kind: 'app', address: APP_ADDRESS, version: app.version, size: bytes.length };
 }
 
-// The bootloader and partition table bundled with this page, for a full-chip
-// erase (which removes them too). They match the firmware's partitions.csv.
+// The bootloader and partition table bundled with this page, written with every
+// update: they match the firmware's partitions.csv, and bring a board that still
+// has the older single-app table to the one with two slots (updates over
+// Bluetooth). Plus a blank otadata, so the board boots what's written at
+// APP_ADDRESS rather than an older image in the other slot.
 export async function loadBootFiles() {
   const get = async (name) => new Uint8Array(await (await fetch(`firmware/${name}`, { cache: 'no-cache' })).arrayBuffer());
   const [boot, table] = await Promise.all([get('bootloader.bin'), get('partition-table.bin')]);
@@ -65,6 +72,7 @@ export async function loadBootFiles() {
   return [
     { data: boot, address: BOOTLOADER_ADDRESS },
     { data: table, address: PART_TABLE_ADDRESS },
+    { data: new Uint8Array(OTADATA_SIZE).fill(0xff), address: OTADATA_ADDRESS },
   ];
 }
 

@@ -1,9 +1,17 @@
 # Name,   Type, SubType, Offset,   Size,   Flags
-# The first three entries match ESP-IDF's single-app layout (same offsets), so
-# settings in "nvs" survive the switch to this table.
+# nvs and phy_init match ESP-IDF's single-app layout (same offsets), so settings
+# in "nvs" survive the switch to this table.
 nvs,      data, nvs,     0x9000,   0x6000,
 phy_init, data, phy,     0xf000,   0x1000,
-factory,  app,  factory, 0x10000,  1M,
+# Two app slots for updates over BLE (main/ble_ota.c). ota_0 is where the
+# single "factory" app was, so a board moved to this table keeps booting it.
+ota_0,    app,  ota_0,   0x10000,  0xfe000,
+# Which slot boots. Blank (all 0xFF, as a USB update leaves it): ota_0. In the
+# last 8 KB of the old factory slot, so that everything a flash from 0x0 (the
+# merged image) writes still ends below fctry.
+otadata,  data, ota,     0x10e000, 0x2000,
 # Production data (VBAT calibration). The firmware never erases this partition;
-# only a recalibration or a full flash erase replaces it.
+# only a recalibration or a full flash erase replaces it. It stays at the offset
+# it had in the single-app table.
 fctry,    data, nvs,     0x110000, 0x3000,
+ota_1,    app,  ota_1,   0x120000, 0xfe000,

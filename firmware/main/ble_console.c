@@ -315,6 +315,11 @@ bool ble_console_code(uint32_t *code)
     return true;
 }
 
+bool ble_console_unlocked(void)
+{
+    return s_unlocked && s_conn != BLE_HS_CONN_HANDLE_NONE;
+}
+
 int ble_console_init(void)
 {
     s_console.write = tx_write;

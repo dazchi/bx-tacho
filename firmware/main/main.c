@@ -5,11 +5,13 @@
 #include "app.h"
 #include "bbp.h"
 #include "ble_console.h"
+#include "ble_ota.h"
 #include "board.h"
 #include "cli.h"
 #include "display.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
+#include "esp_ota_ops.h"
 #include "esp_pm.h"
 #include "esp_sleep.h"
 #include "esp_system.h"
@@ -767,6 +769,32 @@ static void draw_ble_gesture(bool on)
     display_flush();
 }
 
+// Firmware update over BLE: percent written, then RESTARTING
+static void draw_update(int percent, bool restarting)
+{
+    static const char *title = "FIRMWARE UPDATE";
+    char big[8];
+
+    display_clear();
+    display_text((DISPLAY_W - display_text_width(title, 1)) / 2, 0, title, 1);
+    display_hline(0, DISPLAY_W - 1, 10);
+    if (restarting) {
+        display_text((DISPLAY_W - display_text_width("DONE", 3)) / 2, 20, "DONE", 3);
+        display_text((DISPLAY_W - display_text_width("RESTARTING", 1)) / 2, 54, "RESTARTING", 1);
+    } else {
+        snprintf(big, sizeof(big), "%d%%", percent);
+        display_text((DISPLAY_W - display_text_width(big, 3)) / 2, 16, big, 3);
+        display_text((DISPLAY_W - display_text_width("DO NOT TURN OFF", 1)) / 2, 40, "DO NOT TURN OFF", 1);
+        // Bar: a baseline across, filled above it as far as written
+        int fill = percent * DISPLAY_W / 100;
+        for (int y = 50; fill > 0 && y < 56; y++) {
+            display_hline(0, fill - 1, y);
+        }
+        display_hline(0, DISPLAY_W - 1, 57);
+    }
+    display_flush();
+}
+
 // The console over BLE is locked: the code to type into the web app
 static void draw_console_code(uint32_t value)
 {
@@ -831,6 +859,22 @@ static void ui_task(void *arg)
                 dim = false;
             }
             draw_ble_gesture(gesture == 2);
+            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
+            continue;
+        }
+
+        int update_pct;
+        bool restarting;
+        if (ble_ota_progress(&update_pct, &restarting)) {
+            if (!on) {
+                display_power(true);
+                on = true;
+            }
+            if (dim) {
+                display_set_contrast(CONTRAST_NORMAL);
+                dim = false;
+            }
+            draw_update(update_pct, restarting);
             vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
             continue;
         }
@@ -934,5 +978,14 @@ void app_main(void)
     rpm_set_notify_task(sensors);
 
     ESP_ERROR_CHECK(cli_start());
+
+    // After an update over BLE the new firmware runs on probation: a reset
+    // before this point boots the previous firmware again (bootloader rollback)
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(esp_ota_get_running_partition(), &ota_state) == ESP_OK &&
+        ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+        esp_ota_mark_app_valid_cancel_rollback();
+        ESP_LOGI(TAG, "new firmware started fine, update confirmed");
+    }
     ESP_LOGI(TAG, "BX Tacho ready. Type 'help' for console commands.");
 }

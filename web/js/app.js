@@ -3,7 +3,8 @@ import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.11.0/l
 import { LANGUAGES, browserLanguage, choice, fmt, setAttr, setLanguage, setPlain, setText, t } from './i18n.js';
 import { curveToPoints, peakOf } from './bbp.js';
 import { BleLink, bleSupported } from './ble.js';
-import { BleConsole } from './bleconsole.js';
+import { BleConsole, readVersion } from './bleconsole.js';
+import { BleUpdater, OtaError } from './bleota.js';
 import { drawCurve, drawHistory } from './chart.js';
 import { analyzeImage, flashFirmware, loadBootFiles } from './flasher.js';
 import { drawPixelText, pixelWidth, revealPixelText } from './pixelfont.js';
@@ -19,6 +20,8 @@ const state = {
   status: null,          // last status packet
   consoleOpening: false, // console over Bluetooth: starting
   consoleUsed: false,    // ...opened before: its output stays on screen
+  bfw: null,             // firmware to send over Bluetooth: { bytes, info }
+  updating: false,       // ...being sent
   fw: null,              // { bytes, info, name }
 };
 
@@ -87,6 +90,7 @@ function setLink(kind) {
   for (const c of document.querySelectorAll('.quick .chip[data-cmd]')) c.disabled = kind !== 'usb';
   $('term-empty').hidden = kind === 'usb';
   updateFlashButton();
+  updateBleUpdateButton();
 
   if (!serialSupported()) {
     note('usb-note', 'note.noSerial', {}, 'bad');
@@ -256,14 +260,17 @@ function fwLog(line) {
   log.scrollTop = log.scrollHeight;
 }
 
-// tone 'ok' marks the success message (green, bold)
-function fwProgress(k, key, params = {}, tone = '') {
-  $('fw-progress').hidden = false;
-  $('fw-fill').style.width = `${Math.round(k * 100)}%`;
-  const text = $('fw-text');
+// The progress bar `id`-progress with `id`-fill and `id`-text. Tone 'ok' marks
+// the success message (green, bold), 'bad' a failure.
+function progress(id, k, key, params = {}, tone = '') {
+  $(`${id}-progress`).hidden = false;
+  $(`${id}-fill`).style.width = `${Math.round(k * 100)}%`;
+  const text = $(`${id}-text`);
   setText(text, key, params);
   text.dataset.tone = tone;
 }
+
+const fwProgress = (...args) => progress('fw', ...args);
 
 // The chip resets after flashing and comes back as a new USB device
 async function reconnectAfterFlash() {
@@ -285,14 +292,12 @@ async function flash() {
   const eraseAll = $('fw-erase').checked;
   if (eraseAll && !confirm(t('fw.confirmErase'))) return;
 
-  let files = [{ data: bytes, address: info.address }];
-  if (eraseAll) {
-    try {
-      files = [...await loadBootFiles(), ...files];
-    } catch {
-      fwProgress(0, 'fw.bootFilesBad');
-      return;
-    }
+  let files;
+  try {
+    files = [...await loadBootFiles(), { data: bytes, address: info.address }];
+  } catch {
+    fwProgress(0, 'fw.bootFilesBad');
+    return;
   }
 
   let port;
@@ -353,6 +358,9 @@ const ble = new BleLink({
     if (bcon.open) bleTerm.write(`\r\n\x1b[90m${t('term.disconnected')}\x1b[0m\r\n`);
     bcon.reset();
     closeCodeDialog();
+    settleUnlock(new OtaError('bota.err.disconnected'));
+    updater.close();
+    setPlain($('bota-current'), '');
     state.consoleOpening = false;
     setLink(null);
   },
@@ -367,6 +375,9 @@ async function connectBle() {
     note('ble-note', null);
     await ble.connect();
     setLink('ble');
+    // What's on BX Tacho now, for the firmware update
+    const version = (await readVersion(ble.server))?.split(' ')[1];
+    if (version && state.link === 'ble') setText($('bota-current'), 'bota.current', { v: version });
   } catch (e) {
     await ble.disconnect().catch(() => {});
     if (e.name !== 'NotFoundError') {
@@ -463,6 +474,7 @@ const bcon = new BleConsole({
   onText: (text) => bleTerm.write(text),
   onReady: () => {
     renderConsole();
+    settleUnlock(null);
     if (codeDialog.open) {
       closeCodeDialog();
       $('bcon-input').focus();
@@ -533,15 +545,16 @@ $('code-form').addEventListener('submit', async (e) => {
 });
 
 // Cancel, or Esc: no console then
+function cancelCode() {
+  closeCodeDialog();
+  settleUnlock(new OtaError('bota.err.cancelled'));
+  if (bcon.open) toggleConsole();
+}
 codeDialog.addEventListener('cancel', (e) => {
   e.preventDefault();
-  closeCodeDialog();
-  if (bcon.open) toggleConsole();
+  cancelCode();
 });
-$('code-cancel').addEventListener('click', () => {
-  closeCodeDialog();
-  if (bcon.open) toggleConsole();
-});
+$('code-cancel').addEventListener('click', cancelCode);
 
 async function toggleConsole() {
   if (bcon.open) {
@@ -562,6 +575,7 @@ async function toggleConsole() {
     bcon.reset();
     if (e.code === 'noConsole') note('bcon-note', 'bcon.noConsole', {}, 'bad');
     else if (state.link === 'ble') note('bcon-note', 'bcon.openFailed', { msg: e.message }, 'bad');
+    settleUnlock(new OtaError(e.code === 'noConsole' ? 'bota.err.noService' : 'bota.err.other', e.message));
   }
   state.consoleOpening = false;
   renderConsole();
@@ -613,6 +627,102 @@ $('bcon-clear').addEventListener('click', () => {
   bleTerm.clear();
   renderConsole();
 });
+
+// ---------------------------------------------------------------- firmware over Bluetooth
+
+const updater = new BleUpdater();
+let unlockWaiters = [];
+
+// Resolves once the console is unlocked with the code on the display, opening
+// it (and so the code dialog) if needed: BX Tacho only takes updates then
+function unlockConsole() {
+  if (bcon.open && !bcon.locked) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    unlockWaiters.push({ resolve, reject });
+    if (!bcon.open && !state.consoleOpening) toggleConsole();
+  });
+}
+
+function settleUnlock(err) {
+  const waiters = unlockWaiters;
+  unlockWaiters = [];
+  for (const w of waiters) {
+    if (err) w.reject(err);
+    else w.resolve();
+  }
+}
+
+const botaProgress = (...args) => progress('bota', ...args);
+
+async function loadBleFirmware(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const info = analyzeImage(bytes);
+  state.bfw = info.kind === 'invalid' ? null : { bytes, info };
+  const box = $('bota-info');
+  box.hidden = false;
+  box.dataset.kind = info.kind;
+  if (info.kind === 'invalid') {
+    setPlain($('bota-name'), file.name);
+    setText($('bota-detail'), info.reason, { project: info.project });
+  } else {
+    setText($('bota-name'), info.version ? 'fw.version' : 'fw.unknownVersion', { v: info.version });
+    setText($('bota-detail'), 'fw.keep', { size: kb(info.size) });
+  }
+  $('bota-progress').hidden = true;
+  updateBleUpdateButton();
+}
+
+function updateBleUpdateButton() {
+  $('bota-update').disabled = !state.bfw || state.link !== 'ble' || state.updating;
+}
+
+$('bota-file').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) loadBleFirmware(f);
+});
+
+const botaDrop = $('bota-drop');
+botaDrop.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  botaDrop.dataset.over = 'true';
+});
+botaDrop.addEventListener('dragleave', () => {
+  botaDrop.dataset.over = 'false';
+});
+botaDrop.addEventListener('drop', (e) => {
+  e.preventDefault();
+  botaDrop.dataset.over = 'false';
+  const f = e.dataTransfer.files[0];
+  if (f) loadBleFirmware(f);
+});
+
+const BOTA_PHASES = { erase: 'bota.p.erasing', write: 'bota.p.writing', check: 'bota.p.checking' };
+
+async function updateOverBle() {
+  state.updating = true;
+  updateBleUpdateButton();
+  try {
+    botaProgress(0, 'bota.p.unlock');
+    await unlockConsole();
+    if (!updater.chr) await updater.open(ble.server);
+    note('bota-warn', 'bota.warn');
+    await updater.update(state.bfw.bytes, (k, phase) => botaProgress(k, BOTA_PHASES[phase], { pct: Math.round(k * 100) }));
+    botaProgress(1, 'bota.p.done', {}, 'ok');
+  } catch (e) {
+    const err = e instanceof OtaError ? e : new OtaError('bota.err.other', e.message);
+    botaProgress(0, err.key, { msg: err.message }, 'bad');
+  }
+  note('bota-warn', null);
+  state.updating = false;
+  updateBleUpdateButton();
+}
+
+// Closing or reloading the page in the middle drops the update: ask first
+window.addEventListener('beforeunload', (e) => {
+  if (state.updating) e.preventDefault();
+});
+
+$('bota-update').addEventListener('click', updateOverBle);
 
 // ---------------------------------------------------------------- demo data
 

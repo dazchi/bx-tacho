@@ -27,3 +27,6 @@ void ble_console_gap_event(const struct ble_gap_event *event);
 
 // True while a code waits to be entered on the other side, for the display
 bool ble_console_code(uint32_t *code);
+
+// True once the code has been entered on this connection (ble_ota.c needs it too)
+bool ble_console_unlocked(void);

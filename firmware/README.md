@@ -18,6 +18,18 @@ idf.py -p COMx flash monitor
 
 If automatic download mode fails, hold BOOT (SW3), tap RESET (SW2), release BOOT.
 
+`idf.py flash` writes the bootloader, the partition table, the app and a blank
+`otadata`. Flashing by hand, write `otadata` with the app: with two app slots,
+an app written alone at 0x10000 doesn't boot if the board last ran the other
+slot.
+
+```
+python -m esptool --chip esp32c3 -p COMx -b 460800 write-flash 0x10000 build/bx-tacho.bin 0x10e000 build/ota_data_initial.bin
+```
+
+A board that still has the older single-app partition table needs the full set
+once (`idf.py flash`, or the web app's USB update, which always writes it).
+
 Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`).
 
 ## Layout
@@ -34,6 +46,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `main/bbp.c` | Battle Pass (BX-09) emulation over BLE and the shot history, see below |
 | `main/cli.c` | Bring-up and calibration console |
 | `main/ble_console.c` | The console over BLE (unlocked with a code on the display), see below |
+| `main/ble_ota.c` | Firmware updates over BLE, see below |
 | `main/main.c` | Tasks, light sleep, display dimming, deep sleep |
 
 ## Console (USB Serial/JTAG, or Bluetooth)
@@ -119,6 +132,30 @@ sources and open questions: [docs/bbp-protocol.md](docs/bbp-protocol.md).
   `BLE ON` or `BLE OFF`, then BX Tacho restarts with the new setting (same as
   `ble on|off`; logged as `BLE GESTURE` in `events`). Flashing the merged
   binary resets it to on.
+
+## Firmware updates over Bluetooth
+
+From the web app's Bluetooth tab: pick `bx-tacho.bin`, enter the code on the
+display (as for the console), and BX Tacho takes the image in about a minute,
+showing `FIRMWARE UPDATE` and the percentage, then restarts into it. Protocol:
+`main/ble_ota.h`.
+
+- `partitions.csv` has two app slots, `ota_0` (where the single app used to be)
+  and `ota_1`, and `otadata`, which says which one boots. An update goes to the
+  slot not running; the current firmware stays until the new image is complete
+  and checked: valid for this chip (ESP-IDF's image and hash check) and project
+  name `bx-tacho`. A dropped link, a bad file or a power cut leaves BX Tacho on
+  its current firmware.
+- **Rollback:** the new firmware is on probation until it has started all its
+  tasks (end of `app_main`); a reset before that boots the previous firmware
+  again (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`).
+- On battery it refuses unless the battery is above 50 % (plug in USB, or
+  charge first). The display says `DO NOT TURN OFF` while it runs, and the web
+  page asks before it's closed or reloaded.
+- Settings, history and both calibrations are kept: NVS and `fctry` aren't in
+  the app slots.
+- Boards from before the two slots need one update over USB first (web app or
+  `idf.py flash`); until then the web app says so.
 
 ## VBAT calibration (production)
 

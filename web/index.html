@@ -56,7 +56,7 @@
         <aside class="flash" aria-labelledby="flash-title">
           <div class="flash__intro">
             <h2 class="title title--small" id="flash-title" data-i18n="fw.title">Update firmware</h2>
-            <p class="body" data-i18n-html="fw.intro">Choose <code>bx-tacho.bin</code> from a firmware build. Your shot history and settings are kept.</p>
+            <p class="body body--wide" data-i18n-html="fw.intro">Choose <code>bx-tacho.bin</code> from a firmware build. Your shot history and settings are kept.</p>
           </div>
           <div class="flash__controls">
             <label class="drop" id="drop">
@@ -156,7 +156,7 @@
           <h2 class="title title--small" id="bcon-title" data-i18n="bcon.title">Console</h2>
           <button class="btn" id="bcon-open" disabled data-i18n="bcon.open">Open console</button>
         </div>
-        <p class="body" data-i18n="bcon.intro">The same commands as over USB, without the cable: the way to run the battery calibration, which needs BX Tacho off USB power. Each time you connect, you enter the 6-digit code BX Tacho shows on its display.</p>
+        <p class="body body--wide" data-i18n="bcon.intro">The same commands as over USB, without the cable: the way to run the battery calibration, which needs BX Tacho off USB power. Each time you connect, you enter the 6-digit code BX Tacho shows on its display.</p>
         <p class="note" id="bcon-note" hidden></p>
         <div class="screen screen--term screen--bterm">
           <div id="ble-terminal" class="term" aria-label="BX Tacho console" data-i18n-attr="aria-label:term.aria"></div>
@@ -176,6 +176,31 @@
           <button class="chip" data-bcmd="ble" disabled>ble</button>
           <button class="chip" data-bcmd="help" disabled>help</button>
           <button class="chip chip--quiet" id="bcon-clear" data-i18n="term.clear">Clear screen</button>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="bota-title">
+        <div class="bar-row">
+          <h2 class="title title--small" id="bota-title" data-i18n="bota.title">Update firmware</h2>
+          <p class="aside-text" id="bota-current"></p>
+        </div>
+        <p class="body body--wide" data-i18n="bota.intro">Install a new bx-tacho.bin over Bluetooth, unlocked with the code on BX Tacho's display. It takes about a minute; then BX Tacho restarts into it. If anything goes wrong, it keeps its current firmware.</p>
+        <div class="flash__controls">
+          <label class="drop" id="bota-drop">
+            <input type="file" id="bota-file" accept=".bin,application/octet-stream">
+            <span class="drop__label" data-i18n="fw.choose">Choose firmware file</span>
+            <span class="drop__hint" data-i18n="fw.drop">or drop it here</span>
+          </label>
+          <div class="fw" id="bota-info" hidden>
+            <p class="fw__name" id="bota-name"></p>
+            <p class="fw__detail" id="bota-detail"></p>
+          </div>
+          <button class="btn btn--primary btn--wide" id="bota-update" disabled data-i18n="bota.update">Update over Bluetooth</button>
+          <p class="note" id="bota-warn" hidden></p>
+          <div class="progress" id="bota-progress" hidden>
+            <div class="progress__track"><div class="progress__fill" id="bota-fill"></div></div>
+            <p class="progress__text" id="bota-text"></p>
+          </div>
         </div>
       </section>
     </section>

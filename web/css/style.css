@@ -206,6 +206,10 @@ button {
   max-width: 60ch;
 }
 
+.body--wide {
+  max-width: none;
+}
+
 .aside-text {
   margin: 0;
   font-size: var(--t-small);
@@ -386,10 +390,6 @@ button {
 }
 
 /* The controls span the page; the text keeps a readable line length */
-.flash__intro {
-  max-width: 720px;
-}
-
 .flash__intro,
 .flash__controls {
   display: grid;
@@ -532,6 +532,10 @@ button {
 .progress__text[data-tone='ok'] {
   color: var(--ok);
   font-weight: 700;
+}
+
+.progress__text[data-tone='bad'] {
+  color: var(--bad);
 }
 
 .fw-log {

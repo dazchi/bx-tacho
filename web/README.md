@@ -70,7 +70,11 @@ the language changes.
 ## Firmware updates
 
 Choose `bx-tacho.bin` from `firmware/build/`. It's written at `0x10000`, so
-the shot history, load calibration and settings in NVS are kept. The page
+the shot history, load calibration and settings in NVS are kept. Every update
+also writes the bootloader and partition table bundled in `firmware/`, and a
+blank `otadata` so the board boots the app just written rather than one in the
+other slot. That also moves a board that still has the older single-app table
+to the two slots that Bluetooth updates need. The page
 reads the file's header first and refuses anything else: the merged image
 (`bx-tacho-merged.bin`), images without an ESP-IDF app description (such as
 `bootloader.bin`), other projects, other chips. This prevents picking the
@@ -79,8 +83,7 @@ project (ESP-IDF project name `bx-tacho`), including your own changes, is
 accepted.
 
 **Advanced: erase the whole chip first.** For a chip that won't start or a
-blank one. The page erases all of the flash, then writes the bootloader and
-partition table bundled in `firmware/` along with the app. This also deletes
+blank one. The page erases all of the flash before writing. This also deletes
 the factory VBAT calibration (`fctry` partition), so it asks first.
 `firmware/bootloader.bin` and `firmware/partition-table.bin` come from
 `firmware/build/bootloader/` and `firmware/build/partition_table/`; copy them
@@ -94,6 +97,10 @@ If an update fails and BX Tacho no longer starts: hold BOOT (SW3), tap RESET
 (SW2), release BOOT, and update again with **Erase the whole chip first**
 ticked.
 
+**Over Bluetooth** (Bluetooth tab, *Update firmware*): the same file check,
+then the code from BX Tacho's display, then about a minute. See "Firmware
+updates over Bluetooth" in `firmware/README.md`.
+
 ## Files
 
 | File | Purpose |
@@ -104,12 +111,13 @@ ticked.
 | `js/flasher.js` | Image check and flashing with esptool-js |
 | `js/ble.js` | Web Bluetooth link |
 | `js/bleconsole.js` | The console over Bluetooth, on that link (see `firmware/main/ble_console.h`) |
+| `js/bleota.js` | Firmware updates over Bluetooth (see `firmware/main/ble_ota.h`) |
 | `js/bbp.js` | Battle Pass packet parser (see `firmware/docs/bbp-protocol.md`) |
 | `js/chart.js` | Launch curve and history strip (SVG) |
 | `js/i18n.js`, `js/locales/*.js` | Language detection, translation lookup, the strings per language |
 | `js/pixelfont.js`, `js/font5x7.js` | The OLED's 5×7 font, for the readout and wordmark |
 | `img/icon-*.png` | Site icon, a square crop of `firmware/assets/icons/beyblade-reference.jpg` (512, 96 and 64 px with transparent corners; 180 px opaque for iOS) |
-| `firmware/` | Bootloader and partition table for a full-chip erase |
+| `firmware/` | Bootloader and partition table, written with every USB update |
 
 `js/font5x7.js` is generated from `firmware/main/font5x7.c`. If the firmware
 font changes, run `python web/tools/gen-font.py` from the repository root.

@@ -15,6 +15,7 @@ idf_component_register(
         "vbat_cal.c"
         "bbp.c"
         "ble_console.c"
+        "ble_ota.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         esp_driver_gpio
@@ -28,5 +29,6 @@ idf_component_register(
         console
         esp_driver_usb_serial_jtag
         esp_app_format
+        app_update
         bt
 )
