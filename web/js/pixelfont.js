@@ -2,7 +2,7 @@
 import { FONT, FONT_FIRST } from './font5x7.js';
 
 function glyph(ch) {
-  let c = ch.toUpperCase().charCodeAt(0);
+  let c = ch.charCodeAt(0);
   if (c < FONT_FIRST || c >= FONT_FIRST + FONT.length) c = '?'.charCodeAt(0);
   return FONT[c - FONT_FIRST];
 }

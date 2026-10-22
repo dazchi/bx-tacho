@@ -58,6 +58,7 @@ static const char *TAG = "main";
 #define DIAG_SAMPLE_MS     100    // live sensor readings on the diag screen
 #define VBATCAL_SAMPLE_MS  250    // live VBAT readings on the calibration screen
 #define SPLASH_MS          1000   // boot screen
+#define CREDIT_MS          1000   // ...then the credit
 
 #define CONTRAST_NORMAL    0xCF
 #define CONTRAST_DIM       0x10
@@ -827,6 +828,20 @@ static void draw_splash(void)
     display_flush();
 }
 
+// Second boot screen: who made it
+static void draw_credit(void)
+{
+    static const char *by = "MADE BY";
+    static const char *name = "DAZCHI";
+    static const char *url = "github.com/dazchi";
+
+    display_clear();
+    display_text((DISPLAY_W - display_text_width(by, 1)) / 2, 8, by, 1);
+    display_text((DISPLAY_W - display_text_width(name, 2)) / 2, 22, name, 2);
+    display_text((DISPLAY_W - display_text_width(url, 1)) / 2, 46, url, 1);
+    display_flush();
+}
+
 static void ui_task(void *arg)
 {
     app_snapshot_t s;
@@ -836,6 +851,8 @@ static void ui_task(void *arg)
 
     draw_splash();
     vTaskDelay(pdMS_TO_TICKS(SPLASH_MS));
+    draw_credit();
+    vTaskDelay(pdMS_TO_TICKS(CREDIT_MS));
 
     for (;;) {
         if (s_shutdown) {

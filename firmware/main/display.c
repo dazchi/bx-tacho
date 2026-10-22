@@ -119,7 +119,7 @@ void display_text(int x, int y, const char *s, int scale)
     for (; *s; s++, x += 6 * scale) {
         const uint8_t *g = font5x7_glyph(*s);
         for (int col = 0; col < 5; col++) {
-            for (int row = 0; row < 7; row++) {
+            for (int row = 0; row < 8; row++) {   // row 7: descenders (font5x7.h)
                 if (!(g[col] & (1 << row))) {
                     continue;
                 }
