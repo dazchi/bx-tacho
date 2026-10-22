@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Darren Chi
 idf_component_register(
     SRCS
         "main.c"

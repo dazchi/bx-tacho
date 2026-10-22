@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Launch curve and history strip, drawn as plain SVG.
 import { peakOf } from './bbp.js';
 import { fmt, t } from './i18n.js';

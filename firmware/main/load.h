@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Load-detect channel: KEY2 aimed at the launcher's rising center part,
 // read through the ADC with ambient-light cancellation (HANDOVER.md 3.7, 6.2).
 #pragma once

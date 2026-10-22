@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // 1-bit bitmaps for the OLED, drawn with display_bitmap().
 // Row-major, MSB = leftmost pixel, rows padded to whole bytes.
 #pragma once

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // RPM sensor channel: KEY1 reflective sensor + LMV331 comparator with a
 // PWM-generated threshold (HANDOVER.md 3.6 and 6.1).
 #pragma once

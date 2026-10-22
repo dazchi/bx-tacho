@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Shared ADC1 one-shot unit for VBAT_SENSE, RPM_SENSE and LOAD_SENSE.
 #pragma once
 

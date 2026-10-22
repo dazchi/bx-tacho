@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // English, the reference: every key must exist here. Other languages fall back
 // to these strings for any key they don't have.
 export default {

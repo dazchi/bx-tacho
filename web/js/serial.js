@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Web Serial link to BX Tacho's USB console (USB Serial/JTAG, so the baud rate is nominal).
 
 export const serialSupported = () => 'serial' in navigator;

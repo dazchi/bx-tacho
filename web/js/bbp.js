@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // BEYBATTLE PASS (BX-09) protocol, as BX Tacho speaks it.
 // See firmware/docs/bbp-protocol.md for the packet layout and sources.
 

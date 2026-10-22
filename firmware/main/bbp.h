@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // BEYBATTLE PASS (BX-09) emulation over BLE, so that third-party Battle Pass
 // apps can read launches. Protocol and sources: docs/bbp-protocol.md.
 //

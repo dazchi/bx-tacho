@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Web Bluetooth link to BX Tacho's Battle Pass service.
 import { Assembler, CMD_HISTORY, CMD_STATUS, CMD_UUID, DATA_UUID, DEVICE_NAME, SERVICE_UUID } from './bbp.js';
 import { CONSOLE_SERVICE } from './bleconsole.js';

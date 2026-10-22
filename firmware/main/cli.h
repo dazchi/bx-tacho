@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Bring-up and calibration console: the REPL on USB Serial/JTAG, and the same
 // commands for other consoles (BLE, ble_console.c), each from a task of its own
 // bound to it with cli_bind_console().

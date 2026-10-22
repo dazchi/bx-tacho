@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // 日本語
 export default {
   'meta.description': 'BX Tacho ランチャー回転計にブラウザから接続：コンソール、ファームウェア更新、シュートデータ。',

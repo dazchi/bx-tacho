@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Darren Chi
 # Publishes web/ (the BX Tacho web app) to GitHub Pages.
 # One-time setup: repository Settings > Pages > Build and deployment > Source: GitHub Actions.
 name: Deploy web app

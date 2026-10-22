@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Pixel text in the BX Tacho OLED font: 6 px per character cell, 7 px tall.
 import { FONT, FONT_FIRST } from './font5x7.js';
 

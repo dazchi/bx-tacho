@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Darren Chi
 """Generate assets/icons/beyblade.svg: a spinning top seen from above, simplified
 from a swirl-blade logo: curved blades around a gear hub, plus two motion swooshes.
 

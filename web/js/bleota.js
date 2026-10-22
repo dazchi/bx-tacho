@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Firmware update over Bluetooth (firmware: main/ble_ota.h), on the link that
 // BleLink opened. BX Tacho only accepts it while the console is unlocked with
 // the code on its display; app.js takes care of that first.

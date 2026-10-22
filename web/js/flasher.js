@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Firmware update over Web Serial with esptool-js (loaded only when needed).
 import { t } from './i18n.js';
 

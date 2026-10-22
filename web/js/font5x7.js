@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Generated from firmware/main/font5x7.c: the same 5x7 glyphs the OLED uses,
 // ASCII 0x20 ("space") to 0x7E ("~"). Each glyph is 5 columns, bit 0 at the top.
 // Regenerate if the firmware font changes (see web/README.md).

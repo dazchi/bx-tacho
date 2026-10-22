@@ -1,0 +1,46 @@
+BX Tacho
+Copyright (C) 2026 Darren Chi
+https://github.com/dazchi/bx-tacho
+
+BX Tacho (the firmware, the web app, the hardware design and the tools in
+this repository) is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+BX Tacho is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+BX Tacho, in the file LICENSE. If not, see <https://www.gnu.org/licenses/>.
+
+
+Parts under other terms
+-----------------------
+
+- The "battery-off" icon (firmware/assets/icons/battery-off.svg, and its
+  bitmap in firmware/main/icons.c) is from Tabler Icons, MIT License,
+  Copyright (c) 2020-2026 Paweł Kuna. The license text is in
+  firmware/main/icons.c.
+
+- Footprints, symbols and 3D models imported from third-party component
+  libraries (in hardware/lib.pretty, hardware/lib.3dshapes and
+  hardware/lib.kicad_sym, such as the LCSC/EasyEDA parts) keep the terms of
+  the library they came from.
+
+- firmware/assets/icons/beyblade-reference.jpg is an AI-generated concept
+  image (Google Gemini); the site icons in web/img are crops of it. They are
+  included as they are.
+
+- web/firmware/bootloader.bin is built from the ESP-IDF bootloader,
+  Apache License 2.0, Copyright Espressif Systems
+  (https://github.com/espressif/esp-idf/blob/master/LICENSE).
+
+The firmware is built with ESP-IDF and NimBLE (Apache License 2.0), which the
+GPL version 3 is compatible with. The web app loads xterm.js (MIT), esptool-js
+(Apache License 2.0) and the Archivo and JetBrains Mono fonts (SIL Open Font
+License) from CDNs; they are not part of this repository.
+
+Beyblade and Beybattle Pass are trademarks of Takara Tomy. BX Tacho is an
+independent project, not affiliated with or endorsed by Takara Tomy.

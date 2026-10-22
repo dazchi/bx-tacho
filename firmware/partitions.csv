@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Darren Chi
 # Name,   Type, SubType, Offset,   Size,   Flags
 # nvs and phy_init match ESP-IDF's single-app layout (same offsets), so settings
 # in "nvs" survive the switch to this table.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Small event log in RTC memory for power/sleep debugging. It survives deep
 // sleep and software/watchdog/brownout resets (not power-on), and uses the RTC
 // clock so the timeline continues across deep sleep.

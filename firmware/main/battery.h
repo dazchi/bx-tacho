@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Battery voltage, USB presence and charge state (HANDOVER.md 6.4).
 #pragma once
 

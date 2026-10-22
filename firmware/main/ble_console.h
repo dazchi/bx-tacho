@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // The console commands over BLE, for the web app. A GATT service of its own
 // beside the Battle Pass one. On each connection it is locked until the client
 // sends the 6-digit code shown on the display, so only someone who can see the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Launch state machine: EMPTY -> LOADED -> PULLING -> RESULT
 // (HANDOVER.md 6.3). Turns rising-edge timestamps into RPM figures.
 #pragma once

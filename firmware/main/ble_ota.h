@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Firmware updates over BLE, from the web app. A GATT service of its own; it
 // only works while the console (ble_console.h) is unlocked with the code on the
 // display. The image goes to the idle OTA slot and is checked (ESP-IDF image

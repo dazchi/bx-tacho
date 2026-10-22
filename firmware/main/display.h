@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // 128x64 SSD1315 OLED over I2C, drawn from a local framebuffer.
 #pragma once
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Translations. To add a language: create js/locales/<code>.js (copy en.js),
 // add it to LANGUAGES below, and, if its code needs it, a rule in matchTag().
 import en from './locales/en.js';

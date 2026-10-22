@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // BX Tacho's console over Bluetooth (firmware: main/ble_console.h), on the link
 // that BleLink opened. On each connection it starts locked: BX Tacho shows a
 // 6-digit code on its display, to be entered here. No Bluetooth pairing.

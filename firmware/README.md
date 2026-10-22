@@ -188,3 +188,8 @@ cal vbat stop
 The calibration lives in its own NVS partition (`fctry`, see
 `partitions.csv`). `cfg reset` and NVS recovery never touch it; only a new
 calibration or a full flash erase replaces it.
+
+## License
+
+GPL-3.0-or-later: see `LICENSE` and `NOTICE` in the repository root, which
+also lists the few parts under other terms.

@@ -128,3 +128,8 @@ font changes, run `python web/tools/gen-font.py` from the repository root.
 - [esptool-js](https://github.com/espressif/esptool-js) 0.7.0 (Apache-2.0): flashing
 - [Archivo](https://fonts.google.com/specimen/Archivo) and
   [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) (OFL), from Google Fonts
+
+## License
+
+GPL-3.0-or-later: see `LICENSE` and `NOTICE` in the repository root, which
+also lists the few parts under other terms.

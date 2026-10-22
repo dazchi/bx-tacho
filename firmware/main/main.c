@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // BX Tacho: Beyblade X launcher RPM meter, ESP32-C3 firmware.
 #include <limits.h>
 #include <stdio.h>

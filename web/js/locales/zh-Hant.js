@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // 繁體中文（台灣用語）
 export default {
   'meta.description': '在瀏覽器中連線 BX Tacho 發射器轉速計：主控台、韌體更新與發射數據。',

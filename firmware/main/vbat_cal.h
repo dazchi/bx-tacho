@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Production VBAT calibration: VBAT = gain * pin_mv + offset, fitted from points
 // measured against an external reference (power supply on J1 plus a multimeter).
 // Stored in the "fctry" NVS partition, which `cfg reset` and NVS recovery never

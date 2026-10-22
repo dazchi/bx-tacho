@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Darren Chi
 """Regenerates web/js/font5x7.js from the firmware's OLED font.
 
 Run from the repository root:  python web/tools/gen-font.py
@@ -11,6 +13,8 @@ body = src[src.index('s_font[][5] = {'):src.index('};')]
 rows = re.findall(r'\{(0x[0-9A-Fa-f]{2}(?:,\s*0x[0-9A-Fa-f]{2}){4})\}', body)
 
 out = [
+    '// SPDX-License-Identifier: GPL-3.0-or-later',
+    '// Copyright (C) 2026 Darren Chi',
     '// Generated from firmware/main/font5x7.c: the same 5x7 glyphs the OLED uses,',
     f'// ASCII 0x20 ("space") to 0x{0x1F + len(rows):02X} ("{chr(0x1F + len(rows))}"). Each glyph is 5 columns, bit 0 at the top.',
     '// Regenerate if the firmware font changes (see web/README.md).',

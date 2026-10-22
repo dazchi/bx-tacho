@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Darren Chi
 // Pin map for the BX Tacho v0.2 board (ESP32-C3-WROOM-02).
 // See HANDOVER.md section 3.9.
 #pragma once

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Darren Chi
 """Convert a stroked SVG icon (e.g. Tabler Icons) into a 1-bit C bitmap.
 
 Supports the path commands Tabler uses (M/m, L/l, H/h, V/v, A/a, Z/z) with
