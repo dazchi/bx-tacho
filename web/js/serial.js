@@ -80,6 +80,13 @@ export class SerialLink {
       this.writer?.releaseLock();
     } catch { /* ignore */ }
     this.writer = null;
+    // The ESP32-C3's USB Serial/JTAG resets the chip while RTS is set and DTR
+    // isn't. Closing the port drops DTR first, which passes through that state
+    // and restarts BX Tacho, so drop RTS first, by itself.
+    try {
+      await this.port?.setSignals({ requestToSend: false });
+      await this.port?.setSignals({ dataTerminalReady: false });
+    } catch { /* not open, or already gone */ }
     try {
       await this.port?.close();
     } catch { /* already closed */ }
