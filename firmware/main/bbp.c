@@ -1,6 +1,7 @@
 #include "bbp.h"
 
 #include <string.h>
+#include "ble_console.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_mac.h"
@@ -351,6 +352,7 @@ static const struct ble_gatt_svc_def s_services[] = {
 
 static int gap_event(struct ble_gap_event *event, void *arg)
 {
+    ble_console_gap_event(event);
     switch (event->type) {
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
@@ -454,6 +456,7 @@ static esp_err_t radio_start(void)
     ble_svc_gatt_init();
     ESP_RETURN_ON_FALSE(ble_gatts_count_cfg(s_services) == 0, ESP_FAIL, TAG, "gatt count");
     ESP_RETURN_ON_FALSE(ble_gatts_add_svcs(s_services) == 0, ESP_FAIL, TAG, "gatt add");
+    ESP_RETURN_ON_FALSE(ble_console_init() == 0, ESP_FAIL, TAG, "console");
     ESP_RETURN_ON_FALSE(ble_svc_gap_device_name_set(BBP_DEVICE_NAME) == 0, ESP_FAIL, TAG, "name");
 
     nimble_port_freertos_init(host_task);

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "app.h"
 #include "bbp.h"
+#include "ble_console.h"
 #include "board.h"
 #include "cli.h"
 #include "display.h"
@@ -766,6 +767,23 @@ static void draw_ble_gesture(bool on)
     display_flush();
 }
 
+// The console over BLE is locked: the code to type into the web app
+static void draw_console_code(uint32_t value)
+{
+    static const char *title = "BLUETOOTH CONSOLE";
+    static const char *hint = "ENTER THIS CODE";
+    char code[12];
+
+    snprintf(code, sizeof(code), "%03lu %03lu", (unsigned long)(value / 1000),
+             (unsigned long)(value % 1000));
+    display_clear();
+    display_text((DISPLAY_W - display_text_width(title, 1)) / 2, 0, title, 1);
+    display_hline(0, DISPLAY_W - 1, 10);
+    display_text((DISPLAY_W - display_text_width(code, 3)) / 2, 22, code, 3);
+    display_text((DISPLAY_W - display_text_width(hint, 1)) / 2, 56, hint, 1);
+    display_flush();
+}
+
 // Boot screen: icon, project name and firmware version
 static void draw_splash(void)
 {
@@ -813,6 +831,21 @@ static void ui_task(void *arg)
                 dim = false;
             }
             draw_ble_gesture(gesture == 2);
+            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
+            continue;
+        }
+
+        uint32_t code;
+        if (ble_console_code(&code)) {
+            if (!on) {
+                display_power(true);
+                on = true;
+            }
+            if (dim) {
+                display_set_contrast(CONTRAST_NORMAL);
+                dim = false;
+            }
+            draw_console_code(code);
             vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
             continue;
         }

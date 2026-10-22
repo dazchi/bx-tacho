@@ -33,9 +33,10 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `main/settings.c` | Calibration stored in NVS |
 | `main/bbp.c` | Battle Pass (BX-09) emulation over BLE and the shot history, see below |
 | `main/cli.c` | Bring-up and calibration console |
+| `main/ble_console.c` | The console over BLE (unlocked with a code on the display), see below |
 | `main/main.c` | Tasks, light sleep, display dimming, deep sleep |
 
-## Console (USB Serial/JTAG)
+## Console (USB Serial/JTAG, or Bluetooth)
 
 | Command | What it does |
 |---|---|
@@ -56,12 +57,31 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `events` / `events clear` | Power/sleep event log: boots and reset reasons, load changes, state changes, USB, display on/off, deep sleep. Kept in RTC memory, so it survives deep sleep and resets (not power-on) |
 | `launch [n]` | Last launch edge by edge (first `n` edges, default 60): time, interval, RPM, with the release seen by the load sensor and any edges the chatter filter dropped |
 | `ble` | Battle Pass link state |
-| `ble on\|off` | Battle Pass emulation over BLE (default on); saves and restarts |
+| `ble on\|off` | Battle Pass emulation and the BLE console (default on); saves and restarts |
 | `history` / `history clear` | Shot history sent to Battle Pass apps; `clear` wipes the last 50 shots, the total count, the max and the latest curve |
 | `sleep` | Deep sleep now |
 
-The console is only reachable while USB is plugged in; light sleep is
-disabled then so the USB link stays up.
+Over USB, light sleep is disabled while a host is connected so the link
+stays up. Ctrl-C stops `meter log`, `rpm scan`, `rpm sense` and `load`
+(on USB, other keys typed while a command runs are dropped).
+
+### Over Bluetooth
+
+The same commands also run over BLE, from the web app's Bluetooth tab
+(`web/`), without a cable: this is how the VBAT calibration runs with no USB
+power. It is a GATT service of its own (`main/ble_console.h` has the UUIDs and
+the protocol), next to the Battle Pass one.
+
+- **Code:** on every connection, opening the console shows
+  `BLUETOOTH CONSOLE` and a 6-digit code on the display, to type into the web
+  app. Until then the console runs nothing, so only someone who can see the
+  display can use it. A wrong code gets a new one after a second's delay, and a
+  code expires after 2 minutes. There is no Bluetooth pairing: nothing is
+  stored on either side, and the link isn't encrypted (someone nearby with a
+  Bluetooth sniffer could read the console traffic, but can't run commands
+  without the code). The Battle Pass service is unaffected.
+- One command runs at a time: while USB runs one, Bluetooth gets a "busy" note,
+  and the other way round.
 
 ## Bring-up order
 
@@ -108,9 +128,10 @@ straight-line fit. Run once per board.
 **Setup**
 - Power the board **only** from a bench supply on **J1** (pad 1 VBAT+,
   pad 2 GND), power switch ON, current limit about 300 mA, no battery.
-- Connect USB **data-only** (VBUS cut, e.g. a USB power blocker). With VBUS
-  present the TP4054 charger pushes current into J1 and spoils the reading;
-  the firmware refuses to calibrate then.
+- Run the console **over Bluetooth** (web app, Bluetooth tab) with USB
+  unplugged, or connect USB **data-only** (VBUS cut, e.g. a USB power
+  blocker). With VBUS present the TP4054 charger pushes current into J1 and
+  spoils the reading; the firmware refuses to calibrate then.
 - Read the voltage **at the J1 pads** with a multimeter, not on the supply.
 - Stay within 3.2-4.4 V (the board runs from the supply; the ADC sees VBAT/2).
 

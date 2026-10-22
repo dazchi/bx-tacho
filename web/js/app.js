@@ -3,6 +3,7 @@ import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.11.0/l
 import { LANGUAGES, browserLanguage, choice, fmt, setAttr, setLanguage, setPlain, setText, t } from './i18n.js';
 import { curveToPoints, peakOf } from './bbp.js';
 import { BleLink, bleSupported } from './ble.js';
+import { BleConsole } from './bleconsole.js';
 import { drawCurve, drawHistory } from './chart.js';
 import { analyzeImage, flashFirmware, loadBootFiles } from './flasher.js';
 import { drawPixelText, pixelWidth, revealPixelText } from './pixelfont.js';
@@ -16,6 +17,8 @@ const state = {
   axis: 'laps',
   set: null,             // last shot set from BX Tacho
   status: null,          // last status packet
+  consoleOpening: false, // console over Bluetooth: starting
+  consoleUsed: false,    // ...opened before: its output stays on screen
   fw: null,              // { bytes, info, name }
 };
 
@@ -36,7 +39,10 @@ function selectTab(tab) {
     $(each.getAttribute('aria-controls')).hidden = !on;
   }
   if (tab.id === 'tab-usb') fitTerminal();
-  else drawReadout(false);
+  else {
+    drawReadout(false);
+    fitBleTerminal();
+  }
   history.replaceState(null, '', location.pathname + location.search + (tab.id === 'tab-ble' ? '#bluetooth' : '#usb'));
 }
 
@@ -76,6 +82,7 @@ function setLink(kind) {
   bleBtn.classList.toggle('btn--primary', kind !== 'ble');
   bleBtn.disabled = !bleSupported() || kind === 'usb';
   $('ble-refresh').disabled = kind !== 'ble';
+  renderConsole();
 
   for (const c of document.querySelectorAll('.quick .chip[data-cmd]')) c.disabled = kind !== 'usb';
   $('term-empty').hidden = kind === 'usb';
@@ -101,36 +108,32 @@ const isDemo = () => new URLSearchParams(location.search).has('demo');
 
 // ---------------------------------------------------------------- terminal
 
-const term = new Terminal({
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-  fontSize: 14,
-  lineHeight: 1.25,
-  cursorBlink: true,
-  scrollback: 5000,
-  theme: {
-    background: '#000000',
-    foreground: '#cfe8ff',
-    cursor: '#cfe8ff',
-    cursorAccent: '#000000',
-    selectionBackground: '#2b54e088',
-    black: '#000000',
-    red: '#ff7a70',
-    green: '#86e3a8',
-    yellow: '#f2c96b',
-    blue: '#8fb3ff',
-    magenta: '#d9a6ff',
-    cyan: '#8fe0e8',
-    white: '#cfe8ff',
-    brightBlack: '#7d97b0',
-    brightRed: '#ff9b93',
-    brightGreen: '#a8efc1',
-    brightYellow: '#f7dc95',
-    brightBlue: '#b5ccff',
-    brightMagenta: '#e7c4ff',
-    brightCyan: '#b4eef2',
-    brightWhite: '#ffffff',
-  },
-});
+const TERM_THEME = {
+  background: '#000000',
+  foreground: '#cfe8ff',
+  cursor: '#cfe8ff',
+  cursorAccent: '#000000',
+  selectionBackground: '#2b54e088',
+  black: '#000000',
+  red: '#ff7a70',
+  green: '#86e3a8',
+  yellow: '#f2c96b',
+  blue: '#8fb3ff',
+  magenta: '#d9a6ff',
+  cyan: '#8fe0e8',
+  white: '#cfe8ff',
+  brightBlack: '#7d97b0',
+  brightRed: '#ff9b93',
+  brightGreen: '#a8efc1',
+  brightYellow: '#f7dc95',
+  brightBlue: '#b5ccff',
+  brightMagenta: '#e7c4ff',
+  brightCyan: '#b4eef2',
+  brightWhite: '#ffffff',
+};
+const TERM_FONT = { fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 14, lineHeight: 1.25 };
+
+const term = new Terminal({ ...TERM_FONT, cursorBlink: true, scrollback: 5000, theme: TERM_THEME });
 const fit = new FitAddon();
 term.loadAddon(fit);
 term.open($('terminal'));
@@ -346,7 +349,13 @@ const ble = new BleLink({
     renderSet(isNew);
   },
   onError: (key) => note('ble-note', key, {}, 'bad'),
-  onDisconnect: () => setLink(null),
+  onDisconnect: () => {
+    if (bcon.open) bleTerm.write(`\r\n\x1b[90m${t('term.disconnected')}\x1b[0m\r\n`);
+    bcon.reset();
+    closeCodeDialog();
+    state.consoleOpening = false;
+    setLink(null);
+  },
 });
 
 async function connectBle() {
@@ -424,6 +433,186 @@ for (const b of document.querySelectorAll('.seg__btn')) {
 }
 
 new ResizeObserver(() => drawReadout(false)).observe($('readout').parentElement);
+
+// ---------------------------------------------------------------- console over Bluetooth
+
+// Output only: commands are typed in the line below it, which suits phones too
+const bleTerm = new Terminal({
+  ...TERM_FONT,
+  convertEol: true,
+  disableStdin: true,
+  cursorBlink: false,
+  cursorInactiveStyle: 'none',
+  scrollback: 5000,
+  theme: { ...TERM_THEME, cursor: '#000000' },
+});
+const bleFit = new FitAddon();
+bleTerm.loadAddon(bleFit);
+bleTerm.open($('ble-terminal'));
+
+function fitBleTerminal() {
+  if (!$('panel-ble').hidden) {
+    try {
+      bleFit.fit();
+    } catch { /* not laid out yet */ }
+  }
+}
+new ResizeObserver(fitBleTerminal).observe($('ble-terminal'));
+
+const bcon = new BleConsole({
+  onText: (text) => bleTerm.write(text),
+  onReady: () => {
+    renderConsole();
+    if (codeDialog.open) {
+      closeCodeDialog();
+      $('bcon-input').focus();
+    }
+  },
+  onCode: () => {
+    renderConsole();
+    askCode();
+  },
+});
+
+const cmdHistory = [];
+let historyAt = 0;
+
+function renderConsole() {
+  const linked = state.link === 'ble';
+  const open = bcon.open;
+  const openBtn = $('bcon-open');
+  setText(openBtn, state.consoleOpening ? 'bcon.opening' : open ? 'bcon.close' : 'bcon.open');
+  openBtn.disabled = !linked || state.consoleOpening;
+  openBtn.classList.toggle('btn--primary', linked && !open);
+  // Locked until the code from BX Tacho's display is entered (askCode)
+  const ready = open && !bcon.locked;
+  $('bcon-input').disabled = !ready;
+  $('bcon-run').disabled = !ready || bcon.busy;
+  $('bcon-stop').disabled = !ready || !bcon.busy;
+  for (const c of document.querySelectorAll('.quick .chip[data-bcmd]')) c.disabled = !ready || bcon.busy;
+  $('bcon-empty').hidden = open || state.consoleUsed;
+}
+
+// ---- the code dialog
+
+const codeDialog = $('code-dialog');
+let codeSent = false;   // a code went out: asked again means it didn't work
+
+function askCode() {
+  const input = $('code-input');
+  note('code-error', codeSent ? 'bcon.codeWrong' : null, {}, 'bad');
+  codeSent = false;
+  input.value = '';
+  updateCodeButton();
+  if (!codeDialog.open) codeDialog.showModal();
+  input.focus();
+}
+
+function closeCodeDialog() {
+  if (codeDialog.open) codeDialog.close();
+}
+
+const codeDigits = () => $('code-input').value.replace(/\D/g, '');
+
+function updateCodeButton() {
+  $('code-unlock').disabled = codeDigits().length !== 6 || bcon.busy;
+}
+
+$('code-input').addEventListener('input', updateCodeButton);
+
+$('code-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (codeDigits().length !== 6 || bcon.busy) return;
+  try {
+    codeSent = await bcon.run(codeDigits());
+  } catch (err) {
+    codeSent = false;
+    note('code-error', 'bcon.openFailed', { msg: err.message }, 'bad');
+  }
+  updateCodeButton();
+});
+
+// Cancel, or Esc: no console then
+codeDialog.addEventListener('cancel', (e) => {
+  e.preventDefault();
+  closeCodeDialog();
+  if (bcon.open) toggleConsole();
+});
+$('code-cancel').addEventListener('click', () => {
+  closeCodeDialog();
+  if (bcon.open) toggleConsole();
+});
+
+async function toggleConsole() {
+  if (bcon.open) {
+    await bcon.close();
+    bleTerm.write(`\x1b[90m${t('bcon.closedLine')}\x1b[0m\r\n`);
+    renderConsole();
+    return;
+  }
+  const server = ble.server;
+  if (!server) return;
+  state.consoleOpening = true;
+  note('bcon-note', null);
+  renderConsole();
+  try {
+    await bcon.start(server);
+    state.consoleUsed = true;
+  } catch (e) {
+    bcon.reset();
+    if (e.code === 'noConsole') note('bcon-note', 'bcon.noConsole', {}, 'bad');
+    else if (state.link === 'ble') note('bcon-note', 'bcon.openFailed', { msg: e.message }, 'bad');
+  }
+  state.consoleOpening = false;
+  renderConsole();
+}
+
+$('bcon-open').addEventListener('click', toggleConsole);
+
+async function runCommand(line) {
+  if (!bcon.open || bcon.busy || bcon.locked) return;
+  bleTerm.write(`\x1b[94mbxt>\x1b[0m ${line}\r\n`);
+  try {
+    await bcon.run(line);
+  } catch (e) {
+    bleTerm.write(`\x1b[91m${e.message}\x1b[0m\r\n`);
+  }
+  renderConsole();
+}
+
+$('bcon-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = $('bcon-input');
+  const line = input.value.trim();
+  if (!line || bcon.busy) return;
+  if (cmdHistory.at(-1) !== line) cmdHistory.push(line);
+  historyAt = cmdHistory.length;
+  input.value = '';
+  runCommand(line);
+});
+
+$('bcon-input').addEventListener('keydown', (e) => {
+  const input = e.target;
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    if (!cmdHistory.length) return;
+    e.preventDefault();
+    historyAt = Math.max(0, Math.min(cmdHistory.length, historyAt + (e.key === 'ArrowUp' ? -1 : 1)));
+    input.value = cmdHistory[historyAt] ?? '';
+  } else if (e.key === 'c' && e.ctrlKey && bcon.busy && input.selectionStart === input.selectionEnd) {
+    e.preventDefault();   // Ctrl-C stops the command, as in a terminal (unless copying)
+    bcon.stop().catch(() => {});
+  }
+});
+
+$('bcon-stop').addEventListener('click', () => bcon.stop().catch(() => {}));
+
+for (const c of document.querySelectorAll('.quick .chip[data-bcmd]')) {
+  c.addEventListener('click', () => runCommand(c.dataset.bcmd));
+}
+$('bcon-clear').addEventListener('click', () => {
+  bleTerm.clear();
+  renderConsole();
+});
 
 // ---------------------------------------------------------------- demo data
 

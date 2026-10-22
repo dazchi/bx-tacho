@@ -1,5 +1,6 @@
 // Web Bluetooth link to BX Tacho's Battle Pass service.
 import { Assembler, CMD_HISTORY, CMD_STATUS, CMD_UUID, DATA_UUID, DEVICE_NAME, SERVICE_UUID } from './bbp.js';
+import { CONSOLE_SERVICE } from './bleconsole.js';
 
 export const bleSupported = () => 'bluetooth' in navigator;
 
@@ -18,10 +19,15 @@ export class BleLink {
     return !!(this.device && this.device.gatt.connected);
   }
 
+  // For the console (bleconsole.js), which runs on the same link
+  get server() {
+    return this.connected ? this.device.gatt : null;
+  }
+
   async connect() {
     this.device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: DEVICE_NAME }],
-      optionalServices: [SERVICE_UUID],
+      optionalServices: [SERVICE_UUID, CONSOLE_SERVICE],
     });
     this.device.addEventListener('gattserverdisconnected', this.onGone);
     const server = await this.device.gatt.connect();

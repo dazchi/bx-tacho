@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "app.h"
+#include "cli.h"
 #include "esp_attr.h"
 #include "esp_rtc_time.h"
 #include "esp_sleep.h"
@@ -126,45 +127,45 @@ static void print_entry(const ev_entry_t *e)
 {
     char vbuf[16];
     uint32_t s = e->t_ms / 1000;
-    printf("%4u  %3lu:%02lu:%02lu.%01lu  ", e->boot, (unsigned long)(s / 3600),
-           (unsigned long)(s / 60 % 60), (unsigned long)(s % 60), (unsigned long)(e->t_ms % 1000 / 100));
+    cli_printf("%4u  %3lu:%02lu:%02lu.%01lu  ", e->boot, (unsigned long)(s / 3600),
+               (unsigned long)(s / 60 % 60), (unsigned long)(s % 60), (unsigned long)(e->t_ms % 1000 / 100));
 
     switch (e->type) {
     case EV_BOOT:
-        printf("BOOT         reset=%s, wake-up causes=0x%x\n", eventlog_reset_reason_name(e->a), e->b);
+        cli_printf("BOOT         reset=%s, wake-up causes=0x%x\n", eventlog_reset_reason_name(e->a), e->b);
         break;
     case EV_LOAD_ON:
     case EV_LOAD_OFF:
-        printf("%-12s LOAD_SENSE %d mV (%d%%), ON %d OFF %d mV, %s\n",
-               e->type == EV_LOAD_ON ? "LOAD ON" : "LOAD OFF", e->a, e->b, e->c, e->d,
-               (e->flags & EV_FLAG_LOAD_FLASH) ? "flash" : "poll");
+        cli_printf("%-12s LOAD_SENSE %d mV (%d%%), ON %d OFF %d mV, %s\n",
+                   e->type == EV_LOAD_ON ? "LOAD ON" : "LOAD OFF", e->a, e->b, e->c, e->d,
+                   (e->flags & EV_FLAG_LOAD_FLASH) ? "flash" : "poll");
         break;
     case EV_STATE:
-        printf("STATE        %s -> %s\n", launch_state_name(e->b), launch_state_name(e->a));
+        cli_printf("STATE        %s -> %s\n", launch_state_name(e->b), launch_state_name(e->a));
         break;
     case EV_USB_ON:
     case EV_USB_OFF:
-        printf("%-12s VBAT %s\n", e->type == EV_USB_ON ? "USB ON" : "USB OFF",
-               vbat_text(e->a, vbuf, sizeof(vbuf)));
+        cli_printf("%-12s VBAT %s\n", e->type == EV_USB_ON ? "USB ON" : "USB OFF",
+                   vbat_text(e->a, vbuf, sizeof(vbuf)));
         break;
     case EV_DISPLAY_ON:
-        printf("DISPLAY ON   after %d s off\n", e->a);
+        cli_printf("DISPLAY ON   after %d s off\n", e->a);
         break;
     case EV_DISPLAY_OFF:
-        printf("DISPLAY OFF\n");
+        cli_printf("DISPLAY OFF\n");
         break;
     case EV_DEEP_SLEEP:
-        printf("DEEP SLEEP   reason=%s, VBAT %s\n", sleep_reason_name(e->a),
-               vbat_text(e->b, vbuf, sizeof(vbuf)));
+        cli_printf("DEEP SLEEP   reason=%s, VBAT %s\n", sleep_reason_name(e->a),
+                   vbat_text(e->b, vbuf, sizeof(vbuf)));
         break;
     case EV_MODE:
-        printf("MODE         %s\n", app_mode_name(e->a));
+        cli_printf("MODE         %s\n", app_mode_name(e->a));
         break;
     case EV_BLE_GESTURE:
-        printf("BLE GESTURE  BLE switched %s, restarting\n", e->a ? "on" : "off");
+        cli_printf("BLE GESTURE  BLE switched %s, restarting\n", e->a ? "on" : "off");
         break;
     default:
-        printf("?            %d %d\n", e->a, e->b);
+        cli_printf("?            %d %d\n", e->a, e->b);
         break;
     }
 }
@@ -177,11 +178,11 @@ void eventlog_print(void)
     taskEXIT_CRITICAL(&s_lock);
 
     uint32_t count = copy.next < EV_LEN ? copy.next : EV_LEN;
-    printf("boot  time (h:m:s, RTC)  event\n");
+    cli_printf("boot  time (h:m:s, RTC)  event\n");
     for (uint32_t i = copy.next - count; i < copy.next; i++) {
         print_entry(&copy.ev[i % EV_LEN]);
     }
     if (copy.next > EV_LEN) {
-        printf("(%lu older events overwritten)\n", (unsigned long)(copy.next - EV_LEN));
+        cli_printf("(%lu older events overwritten)\n", (unsigned long)(copy.next - EV_LEN));
     }
 }

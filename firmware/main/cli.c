@@ -1,6 +1,7 @@
 #include "cli.h"
 
 #include <limits.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,11 +9,13 @@
 #include "bbp.h"
 #include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
+#include "esp_check.h"
 #include "esp_console.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "eventlog.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "linenoise/linenoise.h"
 #include "load.h"
@@ -20,15 +23,90 @@
 #include "settings.h"
 #include "vbat_cal.h"
 
+#define CLI_MAX_ARGS   8
+#define CLI_PRINT_BUF  256     // on the stack; longer output is formatted on the heap
+
 static void print_vbat_cal(const vbat_cal_t *c);
 
 static bool s_have_empty;
 static bool s_have_loaded;
 
+// ---- Consoles -----------------------------------------------------------------
+
+// The console running a command in this task; NULL in the USB REPL task
+static __thread cli_console_t *t_console;
+static SemaphoreHandle_t s_cmd_lock;    // one command at a time, over all consoles
+static volatile bool s_usb_stop;
+
+int cli_printf(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    cli_console_t *console = t_console;
+    int n;
+    if (console == NULL) {
+        n = vprintf(fmt, ap);
+    } else {
+        char buf[CLI_PRINT_BUF];
+        va_list again;
+        va_copy(again, ap);
+        n = vsnprintf(buf, sizeof(buf), fmt, ap);
+        if (n >= (int)sizeof(buf)) {
+            char *big = malloc(n + 1);
+            if (big != NULL) {
+                vsnprintf(big, n + 1, fmt, again);
+                console->write(big, n);
+                free(big);
+            } else {
+                console->write(buf, sizeof(buf) - 1);
+            }
+        } else if (n > 0) {
+            console->write(buf, n);
+        }
+        va_end(again);
+    }
+    va_end(ap);
+    return n;
+}
+
+bool cli_stop_requested(void)
+{
+    cli_console_t *console = t_console;
+    if (console != NULL) {
+        return console->stop;
+    }
+    // USB: nothing reads the console while a command runs, so look for Ctrl-C
+    // here. Anything else typed meanwhile is dropped.
+    uint8_t buf[16];
+    int n;
+    while (!s_usb_stop && usb_serial_jtag_is_driver_installed() &&
+           (n = usb_serial_jtag_read_bytes(buf, sizeof(buf), 0)) > 0) {
+        if (memchr(buf, 0x03, n) != NULL) {
+            s_usb_stop = true;
+        }
+    }
+    return s_usb_stop;
+}
+
+bool cli_wait_ms(int ms)
+{
+    while (ms > 0 && !cli_stop_requested()) {
+        int step = ms < 20 ? ms : 20;
+        vTaskDelay(pdMS_TO_TICKS(step));
+        ms -= step;
+    }
+    return !cli_stop_requested();
+}
+
+static void print_stopped(void)
+{
+    cli_printf("^C stopped\n");
+}
+
 static bool require_diag(void)
 {
     if (app_get_mode() != APP_MODE_DIAG) {
-        printf("Run 'diag on' first (pauses the launch state machine).\n");
+        cli_printf("Run 'diag on' first (pauses the launch state machine).\n");
         return false;
     }
     return true;
@@ -50,62 +128,62 @@ static int cmd_status(int argc, char **argv)
     const settings_t *cfg = settings_get();
 
     const esp_app_desc_t *app = esp_app_get_description();
-    printf("firmware    : %s v%s, ESP-IDF %s\n", app->project_name, app->version, app->idf_ver);
-    printf("mode        : %s\n", app_mode_name(s.mode));
-    printf("boot        : #%lu, reset reason %s, light sleep on battery %s\n",
-           (unsigned long)eventlog_boot_count(), eventlog_reset_reason_name(esp_reset_reason()),
-           settings_light_sleep() ? "on" : "off");
-    printf("state       : %s\n", launch_state_name(s.state));
-    printf("power       : %s, VBAT %d mV (%s), %d%%\n", src_name(s.batt.src), s.batt.vbat_mv,
-           s.batt.vbat_valid ? "valid" : "not trusted while charging", s.batt.percent);
-    printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
-           usb_serial_jtag_is_connected() ? "connected" : "none");
-    printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped, %lu masked by load flashes\n",
-           rpm_is_powered() ? "on" : "off", rpm_get_threshold_mv(), cfg->edges_per_rev,
-           (unsigned long)rpm_overflow_count(), (unsigned long)rpm_masked_count());
+    cli_printf("firmware    : %s v%s, ESP-IDF %s\n", app->project_name, app->version, app->idf_ver);
+    cli_printf("mode        : %s\n", app_mode_name(s.mode));
+    cli_printf("boot        : #%lu, reset reason %s, light sleep on battery %s\n",
+               (unsigned long)eventlog_boot_count(), eventlog_reset_reason_name(esp_reset_reason()),
+               settings_light_sleep() ? "on" : "off");
+    cli_printf("state       : %s\n", launch_state_name(s.state));
+    cli_printf("power       : %s, VBAT %d mV (%s), %d%%\n", src_name(s.batt.src), s.batt.vbat_mv,
+               s.batt.vbat_valid ? "valid" : "not trusted while charging", s.batt.percent);
+    cli_printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
+               usb_serial_jtag_is_connected() ? "connected" : "none");
+    cli_printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped, %lu masked by load flashes\n",
+               rpm_is_powered() ? "on" : "off", rpm_get_threshold_mv(), cfg->edges_per_rev,
+               (unsigned long)rpm_overflow_count(), (unsigned long)rpm_masked_count());
     if (cfg->load_cal_valid) {
-        printf("load        : %s, %d mV (%d%%), empty %d mV, loaded %d mV\n",
-               s.loaded ? "LOADED" : "empty", s.load_diff_mv, s.load_pct,
-               cfg->load_empty, cfg->load_loaded);
+        cli_printf("load        : %s, %d mV (%d%%), empty %d mV, loaded %d mV\n",
+                   s.loaded ? "LOADED" : "empty", s.load_diff_mv, s.load_pct,
+                   cfg->load_empty, cfg->load_loaded);
     } else {
-        printf("load        : not calibrated (RPM stays armed). See 'cal load'.\n");
+        cli_printf("load        : not calibrated (RPM stays armed). See 'cal load'.\n");
     }
     if (s.have_result) {
-        printf("last launch : peak %d rpm, max %d rpm, %d revs, %d ms\n",
-               s.result.peak_rpm, s.result.max_rpm, s.result.revolutions, s.result.duration_ms);
-        printf("rejected    : %d edges (max-rpm %d, relative %d)\n",
-               s.result.rejected_max_rpm + s.result.rejected_relative,
-               s.result.rejected_max_rpm, s.result.rejected_relative);
+        cli_printf("last launch : peak %d rpm, max %d rpm, %d revs, %d ms\n",
+                   s.result.peak_rpm, s.result.max_rpm, s.result.revolutions, s.result.duration_ms);
+        cli_printf("rejected    : %d edges (max-rpm %d, relative %d)\n",
+                   s.result.rejected_max_rpm + s.result.rejected_relative,
+                   s.result.rejected_max_rpm, s.result.rejected_relative);
     }
     if (s.mode == APP_MODE_METER) {
-        printf("meter       : avg %d rpm, inst %d, min %d, max %d, %d revs in the last 1 s\n",
-               s.meter.avg_rpm, s.meter.inst_rpm, s.meter.min_rpm, s.meter.max_rpm, s.meter.revs);
+        cli_printf("meter       : avg %d rpm, inst %d, min %d, max %d, %d revs in the last 1 s\n",
+                   s.meter.avg_rpm, s.meter.inst_rpm, s.meter.min_rpm, s.meter.max_rpm, s.meter.revs);
     }
     if (vbat_cal_valid()) {
-        printf("vbat cal    : ");
+        cli_printf("vbat cal    : ");
         print_vbat_cal(vbat_cal_get());
     } else {
-        printf("vbat cal    : none (nominal divider ratio). See 'cal vbat start'.\n");
+        cli_printf("vbat cal    : none (nominal divider ratio). See 'cal vbat start'.\n");
     }
     bbp_info_t b;
     bbp_get_info(&b);
-    printf("battle pass : BLE %s, %d shots in history, %lu total, max %u\n",
-           !b.radio_on ? "off" : (b.subscribed ? "app listening" : (b.connected ? "connected" : "advertising")),
-           b.count, (unsigned long)b.total, b.max_sp);
-    printf("idle        : %lu ms\n", (unsigned long)s.idle_ms);
+    cli_printf("battle pass : BLE %s, %d shots in history, %lu total, max %u\n",
+               !b.radio_on ? "off" : (b.subscribed ? "app listening" : (b.connected ? "connected" : "advertising")),
+               b.count, (unsigned long)b.total, b.max_sp);
+    cli_printf("idle        : %lu ms\n", (unsigned long)s.idle_ms);
     return 0;
 }
 
 static int cmd_diag(int argc, char **argv)
 {
     if (argc != 2 || (strcmp(argv[1], "on") && strcmp(argv[1], "off"))) {
-        printf("usage: diag on|off\n");
+        cli_printf("usage: diag on|off\n");
         return 1;
     }
     app_set_mode(strcmp(argv[1], "on") == 0 ? APP_MODE_DIAG : APP_MODE_RUN);
     // Let the sensor task release the hardware before returning
     vTaskDelay(pdMS_TO_TICKS(50));
-    printf("diag %s\n", argv[1]);
+    cli_printf("diag %s\n", argv[1]);
     return 0;
 }
 
@@ -114,9 +192,9 @@ static void print_meter_line(int64_t t0_us)
     app_snapshot_t s;
     app_get_snapshot(&s);
     const meter_stats_t *m = &s.meter;
-    printf("%lld,%d,%d,%d,%d,%d,%lu,%d,%d\n", (esp_timer_get_time() - t0_us) / 1000,
-           m->avg_rpm, m->inst_rpm, m->min_rpm, m->max_rpm, m->revs,
-           (unsigned long)m->edges, m->rejected_max_rpm, m->rejected_relative);
+    cli_printf("%lld,%d,%d,%d,%d,%d,%lu,%d,%d\n", (esp_timer_get_time() - t0_us) / 1000,
+               m->avg_rpm, m->inst_rpm, m->min_rpm, m->max_rpm, m->revs,
+               (unsigned long)m->edges, m->rejected_max_rpm, m->rejected_relative);
 }
 
 static int cmd_meter(int argc, char **argv)
@@ -125,33 +203,36 @@ static int cmd_meter(int argc, char **argv)
         bool on = !strcmp(argv[1], "on");
         app_set_mode(on ? APP_MODE_METER : APP_MODE_RUN);
         vTaskDelay(pdMS_TO_TICKS(50));
-        printf("meter %s%s\n", argv[1], on ? " (RPM channel on, display shows live RPM)" : "");
+        cli_printf("meter %s%s\n", argv[1], on ? " (RPM channel on, display shows live RPM)" : "");
         return 0;
     }
     if (app_get_mode() != APP_MODE_METER) {
-        printf("Run 'meter on' first.\n");
+        cli_printf("Run 'meter on' first.\n");
         return 1;
     }
 
-    printf("t_ms,avg_rpm,inst_rpm,min_rpm,max_rpm,revs,edges,rej_max_rpm,rej_relative\n");
+    cli_printf("t_ms,avg_rpm,inst_rpm,min_rpm,max_rpm,revs,edges,rej_max_rpm,rej_relative\n");
     int64_t t0 = esp_timer_get_time();
     if (argc == 1) {
         print_meter_line(t0);
         return 0;
     }
     if (strcmp(argv[1], "log") || argc > 4) {
-        printf("usage: meter on|off | meter | meter log [seconds] [interval_ms]\n");
+        cli_printf("usage: meter on|off | meter | meter log [seconds] [interval_ms]\n");
         return 1;
     }
     int seconds = argc >= 3 ? atoi(argv[2]) : 10;
     int interval_ms = argc >= 4 ? atoi(argv[3]) : 500;
     if (seconds < 1 || seconds > 3600 || interval_ms < 50) {
-        printf("seconds 1-3600, interval_ms >= 50\n");
+        cli_printf("seconds 1-3600, interval_ms >= 50\n");
         return 1;
     }
     for (int64_t end = t0 + seconds * 1000000LL; esp_timer_get_time() < end;) {
         print_meter_line(t0);
-        vTaskDelay(pdMS_TO_TICKS(interval_ms));
+        if (!cli_wait_ms(interval_ms)) {
+            print_stopped();
+            break;
+        }
     }
     return 0;
 }
@@ -161,39 +242,45 @@ static int rpm_scan(int seconds, bool apply)
     bool was_on = rpm_is_powered();
     rpm_power(true);
 
-    printf("Sampling RPM_SENSE for %d s. Turn the launcher slowly so the sensor sees black and white...\n",
-           seconds);
+    cli_printf("Sampling RPM_SENSE for %d s. Turn the launcher slowly so the sensor sees black and white...\n",
+               seconds);
     int lo = INT_MAX;
     int hi = INT_MIN;
-    for (int i = 0; i < seconds * 1000; i++) {
+    bool stopped = false;
+    for (int i = 0; i < seconds * 1000 && !stopped; i++) {
         int mv = rpm_read_sense_mv(1);
         if (mv >= 0) {
             lo = mv < lo ? mv : lo;
             hi = mv > hi ? mv : hi;
         }
         vTaskDelay(1);
+        stopped = i % 50 == 49 && cli_stop_requested();
     }
     if (!was_on) {
         rpm_power(false);
     }
+    if (stopped) {
+        print_stopped();
+        return 1;   // nothing applied
+    }
 
     if (lo > hi) {
-        printf("ADC read failed\n");
+        cli_printf("ADC read failed\n");
         return 1;
     }
     int mid = (lo + hi) / 2;
-    printf("min %d mV, max %d mV, contrast %d mV, midpoint %d mV\n", lo, hi, hi - lo, mid);
+    cli_printf("min %d mV, max %d mV, contrast %d mV, midpoint %d mV\n", lo, hi, hi - lo, mid);
     if (hi - lo < 200) {
-        printf("WARNING: contrast below 200 mV. Move the sensor closer or adjust R13/R15.\n");
+        cli_printf("WARNING: contrast below 200 mV. Move the sensor closer or adjust R13/R15.\n");
     }
     if (mid > RPM_THR_MAX_MV) {
-        printf("Midpoint is above the comparator's %d mV limit; it will be capped.\n", RPM_THR_MAX_MV);
+        cli_printf("Midpoint is above the comparator's %d mV limit; it will be capped.\n", RPM_THR_MAX_MV);
     }
     if (apply) {
         rpm_set_threshold_mv(mid);
         settings_get()->rpm_thr_mv = (uint16_t)rpm_get_threshold_mv();
         settings_save();
-        printf("threshold set to %d mV and saved\n", rpm_get_threshold_mv());
+        cli_printf("threshold set to %d mV and saved\n", rpm_get_threshold_mv());
     }
     return 0;
 }
@@ -208,7 +295,7 @@ static int cmd_rpm(int argc, char **argv)
             return 1;
         }
         rpm_power(!strcmp(argv[1], "on"));
-        printf("rpm channel %s\n", argv[1]);
+        cli_printf("rpm channel %s\n", argv[1]);
         return 0;
     }
     if (!strcmp(argv[1], "thr")) {
@@ -217,18 +304,21 @@ static int cmd_rpm(int argc, char **argv)
             settings_get()->rpm_thr_mv = (uint16_t)rpm_get_threshold_mv();
             settings_save();
         }
-        printf("threshold %d mV\n", rpm_get_threshold_mv());
+        cli_printf("threshold %d mV\n", rpm_get_threshold_mv());
         return 0;
     }
     if (!strcmp(argv[1], "sense")) {
         if (!rpm_is_powered()) {
-            printf("RPM channel is off; RPM_SENSE is only valid while powered ('rpm on' in diag mode)\n");
+            cli_printf("RPM channel is off; RPM_SENSE is only valid while powered ('rpm on' in diag mode)\n");
             return 1;
         }
         int n = argc == 3 ? atoi(argv[2]) : 10;
         for (int i = 0; i < n; i++) {
-            printf("RPM_SENSE %d mV\n", rpm_read_sense_mv(16));
-            vTaskDelay(pdMS_TO_TICKS(100));
+            cli_printf("RPM_SENSE %d mV\n", rpm_read_sense_mv(16));
+            if (!cli_wait_ms(100)) {
+                print_stopped();
+                break;
+            }
         }
         return 0;
     }
@@ -251,7 +341,7 @@ static int cmd_rpm(int argc, char **argv)
         return rpm_scan(seconds, apply);
     }
 usage:
-    printf("usage: rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]\n");
+    cli_printf("usage: rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]\n");
     return 1;
 }
 
@@ -276,18 +366,21 @@ static int cmd_load(int argc, char **argv)
         // Diag, or meter mode (which never drives the load LED) to test it at speed
         app_mode_t mode = app_get_mode();
         if (mode != APP_MODE_DIAG && mode != APP_MODE_METER) {
-            printf("Run 'diag on' or 'meter on' first.\n");
+            cli_printf("Run 'diag on' or 'meter on' first.\n");
             return 1;
         }
         load_led_force(!strcmp(argv[2], "on"));
-        printf("load IR LED held %s%s\n", argv[2],
-               !strcmp(argv[2], "on") ? " (as while a top is loaded); load readings paused" : "");
+        cli_printf("load IR LED held %s%s\n", argv[2],
+                   !strcmp(argv[2], "on") ? " (as while a top is loaded); load readings paused" : "");
         return 0;
     }
     int n = argc == 2 ? atoi(argv[1]) : 10;
     for (int i = 0; i < n; i++) {
-        printf("LOAD_SENSE (LED on - off) %d mV\n", load_measure(8));
-        vTaskDelay(pdMS_TO_TICKS(200));
+        cli_printf("LOAD_SENSE (LED on - off) %d mV\n", load_measure(8));
+        if (!cli_wait_ms(200)) {
+            print_stopped();
+            break;
+        }
     }
     return 0;
 }
@@ -301,26 +394,28 @@ static int cmd_load(int argc, char **argv)
 
 static void print_vbat_cal_procedure(void)
 {
-    printf("VBAT calibration. Setup:\n"
-           "  - Power the board ONLY from the supply on J1 (+ to pad 1 VBAT+, - to pad 2 GND),\n"
-           "    power switch ON, current limit about 300 mA. No battery connected.\n"
-           "  - Connect USB data-only (VBUS cut), otherwise the charger drives VBAT.\n"
-           "  - Measure the voltage at the J1 pads with a multimeter (not the supply display).\n"
-           "  - Stay within %d-%d mV.\n"
-           "Steps:\n"
-           "  1. For each point: set the supply, read the multimeter, enter 'cal vbat point <mV>'.\n"
-           "     Suggested points: 3300, 3700, 4000, 4300 mV (at least 2, spanning >= 500 mV).\n"
-           "  2. 'cal vbat save' fits and stores the calibration.\n"
-           "  3. 'cal vbat verify <mV>' at a different voltage (e.g. 3600) checks it (+-%d mV).\n"
-           "  4. 'cal vbat stop' returns to normal operation.\n",
-           VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV, VBAT_CAL_VERIFY_TOL_MV);
+    cli_printf("VBAT calibration. Setup:\n"
+               "  - Power the board ONLY from the supply on J1 (+ to pad 1 VBAT+, - to pad 2 GND),\n"
+               "    power switch ON, current limit about 300 mA. No battery connected.\n"
+               "  - Run the console over Bluetooth (web app), or over USB data-only (VBUS cut):\n"
+           "    with USB power the charger drives VBAT.\n"
+               "  - Measure the voltage at the J1 pads with a multimeter (not the supply display).\n"
+               "  - Stay within %d-%d mV.\n"
+               "Steps:\n"
+               "  1. For each point: set the supply, read the multimeter, enter 'cal vbat point <mV>'.\n"
+               "     Suggested points: 3300, 3700, 4000, 4300 mV (at least 2, spanning >= 500 mV).\n"
+               "  2. 'cal vbat save' fits and stores the calibration.\n"
+               "  3. 'cal vbat verify <mV>' at a different voltage (e.g. 3600) checks it (+-%d mV).\n"
+               "  4. 'cal vbat stop' returns to normal operation.\n",
+               VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV, VBAT_CAL_VERIFY_TOL_MV);
 }
 
 static bool vbat_cal_usb_power_check(void)
 {
     if (battery_usb_present()) {
-        printf("USB power (VBUS) detected: the charger would drive VBAT and spoil the reading.\n"
-               "Use a data-only USB connection and power the board from the supply on J1.\n");
+        cli_printf("USB power (VBUS) detected: the charger would drive VBAT and spoil the reading.\n"
+                   "Unplug USB and use the console over Bluetooth (or a data-only USB connection),\n"
+                   "with the board powered from the supply on J1.\n");
         return false;
     }
     return true;
@@ -349,9 +444,9 @@ static int measure_vbat_pin(int *spread)
 
 static void print_vbat_cal(const vbat_cal_t *c)
 {
-    printf("gain %ld.%06ld, offset %ld mV, %u points over %d-%d mV, max fit error %d mV\n",
-           (long)(c->gain_ppm / 1000000), (long)(c->gain_ppm % 1000000), (long)c->offset_mv,
-           c->points, c->min_mv, c->max_mv, c->max_err_mv);
+    cli_printf("gain %ld.%06ld, offset %ld mV, %u points over %d-%d mV, max fit error %d mV\n",
+               (long)(c->gain_ppm / 1000000), (long)(c->gain_ppm % 1000000), (long)c->offset_mv,
+               c->points, c->min_mv, c->max_mv, c->max_err_mv);
 }
 
 static int cmd_cal_vbat(int argc, char **argv)
@@ -360,15 +455,15 @@ static int cmd_cal_vbat(int argc, char **argv)
 
     if (!strcmp(sub, "show") && argc == 2) {
         if (vbat_cal_valid()) {
-            printf("stored VBAT calibration: ");
+            cli_printf("stored VBAT calibration: ");
             print_vbat_cal(vbat_cal_get());
         } else {
-            printf("no VBAT calibration stored (readings use the nominal divider ratio x2)\n");
+            cli_printf("no VBAT calibration stored (readings use the nominal divider ratio x2)\n");
         }
         for (int i = 0; i < vbat_cal_session_points(); i++) {
             int pin, vbat;
             vbat_cal_session_point(i, &pin, &vbat);
-            printf("  session point %d: VBAT %d mV, pin %d mV\n", i + 1, vbat, pin);
+            cli_printf("  session point %d: VBAT %d mV, pin %d mV\n", i + 1, vbat, pin);
         }
         return 0;
     }
@@ -384,17 +479,17 @@ static int cmd_cal_vbat(int argc, char **argv)
     }
     if (!strcmp(sub, "stop") && argc == 2) {
         if (app_get_mode() != APP_MODE_VBATCAL) {
-            printf("Not in VBAT calibration mode.\n");
+            cli_printf("Not in VBAT calibration mode.\n");
             return 1;
         }
         app_set_mode(APP_MODE_RUN);
         vTaskDelay(pdMS_TO_TICKS(50));
-        printf("VBAT calibration mode ended\n");
+        cli_printf("VBAT calibration mode ended\n");
         return 0;
     }
 
     if (app_get_mode() != APP_MODE_VBATCAL) {
-        printf("Run 'cal vbat start' first.\n");
+        cli_printf("Run 'cal vbat start' first.\n");
         return 1;
     }
     if (!vbat_cal_usb_power_check()) {
@@ -404,41 +499,41 @@ static int cmd_cal_vbat(int argc, char **argv)
     if (!strcmp(sub, "point") && argc == 3) {
         int vbat = atoi(argv[2]);
         if (vbat < VBAT_CAL_MIN_MV || vbat > VBAT_CAL_MAX_MV) {
-            printf("Enter the measured voltage in mV, %d-%d.\n", VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV);
+            cli_printf("Enter the measured voltage in mV, %d-%d.\n", VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV);
             return 1;
         }
         for (int i = 0; i < vbat_cal_session_points(); i++) {
             int pin, have;
             vbat_cal_session_point(i, &pin, &have);
             if (abs(have - vbat) < VBAT_POINT_MIN_GAP) {
-                printf("Already have a point at %d mV; use points at least %d mV apart "
-                       "('cal vbat start' starts over).\n", have, VBAT_POINT_MIN_GAP);
+                cli_printf("Already have a point at %d mV; use points at least %d mV apart "
+                           "('cal vbat start' starts over).\n", have, VBAT_POINT_MIN_GAP);
                 return 1;
             }
         }
         int spread;
         int pin = measure_vbat_pin(&spread);
         if (pin < 0) {
-            printf("ADC read failed\n");
+            cli_printf("ADC read failed\n");
             return 1;
         }
         if (spread > VBAT_POINT_MAX_SPREAD) {
-            printf("Reading unstable (%d mV spread at the pin). Check the supply and connections.\n", spread);
+            cli_printf("Reading unstable (%d mV spread at the pin). Check the supply and connections.\n", spread);
             return 1;
         }
         int nominal = vbat_cal_nominal(pin);
         if (abs(nominal - vbat) > VBAT_POINT_PLAUSIBLE) {
-            printf("Measured %d mV nominal vs %d mV entered: too far apart. Check the value and wiring.\n",
-                   nominal, vbat);
+            cli_printf("Measured %d mV nominal vs %d mV entered: too far apart. Check the value and wiring.\n",
+                       nominal, vbat);
             return 1;
         }
         if (vbat_cal_session_add(pin, vbat) != ESP_OK) {
-            printf("Maximum of %d points reached. 'cal vbat save' or 'cal vbat start' to start over.\n",
-                   VBAT_CAL_MAX_POINTS);
+            cli_printf("Maximum of %d points reached. 'cal vbat save' or 'cal vbat start' to start over.\n",
+                       VBAT_CAL_MAX_POINTS);
             return 1;
         }
-        printf("point %d: VBAT %d mV, pin %d mV (nominal reading %d mV, %+d mV)\n",
-               vbat_cal_session_points(), vbat, pin, nominal, nominal - vbat);
+        cli_printf("point %d: VBAT %d mV, pin %d mV (nominal reading %d mV, %+d mV)\n",
+                   vbat_cal_session_points(), vbat, pin, nominal, nominal - vbat);
         return 0;
     }
     if (!strcmp(sub, "save") && argc == 2) {
@@ -447,52 +542,52 @@ static int cmd_cal_vbat(int argc, char **argv)
         const char *why = vbat_cal_session_fit(&cal, resid);
         // cal.points is set whenever a line was fitted, also if it was then rejected
         if (cal.points > 0) {
-            printf("  VBAT mV   pin mV   fit error\n");
+            cli_printf("  VBAT mV   pin mV   fit error\n");
             for (int i = 0; i < vbat_cal_session_points(); i++) {
                 int pin, vbat;
                 vbat_cal_session_point(i, &pin, &vbat);
-                printf("  %7d  %7d  %+6d mV\n", vbat, pin, resid[i]);
+                cli_printf("  %7d  %7d  %+6d mV\n", vbat, pin, resid[i]);
             }
         }
         if (why) {
-            printf("Not saved: %s.\n", why);
+            cli_printf("Not saved: %s.\n", why);
             return 1;
         }
         if (vbat_cal_save(&cal) != ESP_OK) {
-            printf("Saving failed (factory partition unavailable?).\n");
+            cli_printf("Saving failed (factory partition unavailable?).\n");
             return 1;
         }
-        printf("Saved: ");
+        cli_printf("Saved: ");
         print_vbat_cal(&cal);
-        printf("Now check it: set another voltage and run 'cal vbat verify <mV>'.\n");
+        cli_printf("Now check it: set another voltage and run 'cal vbat verify <mV>'.\n");
         return 0;
     }
     if (!strcmp(sub, "verify") && argc == 3) {
         if (!vbat_cal_valid()) {
-            printf("No calibration stored yet ('cal vbat save').\n");
+            cli_printf("No calibration stored yet ('cal vbat save').\n");
             return 1;
         }
         int actual = atoi(argv[2]);
         if (actual < VBAT_CAL_MIN_MV || actual > VBAT_CAL_MAX_MV) {
-            printf("Enter the measured voltage in mV, %d-%d.\n", VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV);
+            cli_printf("Enter the measured voltage in mV, %d-%d.\n", VBAT_CAL_MIN_MV, VBAT_CAL_MAX_MV);
             return 1;
         }
         int spread;
         int pin = measure_vbat_pin(&spread);
         if (pin < 0) {
-            printf("ADC read failed\n");
+            cli_printf("ADC read failed\n");
             return 1;
         }
         int measured = vbat_cal_apply(pin);
         int err = measured - actual;
         bool pass = abs(err) <= VBAT_CAL_VERIFY_TOL_MV && spread <= VBAT_POINT_MAX_SPREAD;
-        printf("VBAT %d mV measured vs %d mV actual: %+d mV (nominal would be %+d mV)%s -> %s\n",
-               measured, actual, err, vbat_cal_nominal(pin) - actual,
-               spread > VBAT_POINT_MAX_SPREAD ? ", reading unstable" : "", pass ? "PASS" : "FAIL");
+        cli_printf("VBAT %d mV measured vs %d mV actual: %+d mV (nominal would be %+d mV)%s -> %s\n",
+                   measured, actual, err, vbat_cal_nominal(pin) - actual,
+                   spread > VBAT_POINT_MAX_SPREAD ? ", reading unstable" : "", pass ? "PASS" : "FAIL");
         return pass ? 0 : 1;
     }
 
-    printf("usage: cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
+    cli_printf("usage: cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
     return 1;
 }
 
@@ -509,7 +604,7 @@ static int cmd_cal(int argc, char **argv)
             cfg->load_cal_valid = false;
             s_have_empty = s_have_loaded = false;
             settings_save();
-            printf("load calibration cleared\n");
+            cli_printf("load calibration cleared\n");
             return 0;
         }
         bool empty = !strcmp(argv[2], "empty");
@@ -518,7 +613,7 @@ static int cmd_cal(int argc, char **argv)
         }
         int level = average_load();
         if (level == INT_MIN) {
-            printf("ADC read failed\n");
+            cli_printf("ADC read failed\n");
             return 1;
         }
         if (empty) {
@@ -528,26 +623,26 @@ static int cmd_cal(int argc, char **argv)
             cfg->load_loaded = (int16_t)level;
             s_have_loaded = true;
         }
-        printf("%s level %d mV\n", argv[2], level);
+        cli_printf("%s level %d mV\n", argv[2], level);
 
         if ((s_have_empty && s_have_loaded) || cfg->load_cal_valid) {
             int span = abs(cfg->load_loaded - cfg->load_empty);
             if (span < LOAD_MIN_CONTRAST_MV) {
-                printf("Contrast only %d mV (need %d). Not saved as valid.\n", span, LOAD_MIN_CONTRAST_MV);
+                cli_printf("Contrast only %d mV (need %d). Not saved as valid.\n", span, LOAD_MIN_CONTRAST_MV);
                 cfg->load_cal_valid = false;
             } else {
                 cfg->load_cal_valid = true;
-                printf("Calibration valid, contrast %d mV.\n", span);
+                cli_printf("Calibration valid, contrast %d mV.\n", span);
             }
         } else {
-            printf("Now run 'cal load %s'.\n", empty ? "loaded" : "empty");
+            cli_printf("Now run 'cal load %s'.\n", empty ? "loaded" : "empty");
         }
         settings_save();
         return 0;
     }
 usage:
-    printf("usage: cal load empty|loaded|clear\n"
-           "       cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
+    cli_printf("usage: cal load empty|loaded|clear\n"
+               "       cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
     return 1;
 }
 
@@ -558,12 +653,12 @@ static int cmd_cfg(int argc, char **argv)
     if (argc == 3 && !strcmp(argv[1], "edges")) {
         int n = atoi(argv[2]);
         if (n < 1 || n > 16) {
-            printf("edges must be 1-16\n");
+            cli_printf("edges must be 1-16\n");
             return 1;
         }
         cfg->edges_per_rev = (uint8_t)n;
         settings_save();
-        printf("edges per revolution: %d\n", n);
+        cli_printf("edges per revolution: %d\n", n);
         return 0;
     }
     if (argc == 2 && !strcmp(argv[1], "reset")) {
@@ -571,17 +666,17 @@ static int cmd_cfg(int argc, char **argv)
         settings_save();
         rpm_set_threshold_mv(cfg->rpm_thr_mv);
         s_have_empty = s_have_loaded = false;
-        printf("settings reset to defaults\n");
+        cli_printf("settings reset to defaults\n");
         return 0;
     }
     if (argc == 3 && !strcmp(argv[1], "lightsleep") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
         bool on = !strcmp(argv[2], "on");
         settings_set_light_sleep(on);
         app_set_light_sleep(on);
-        printf("light sleep on battery: %s (saved)\n", argv[2]);
+        cli_printf("light sleep on battery: %s (saved)\n", argv[2]);
         return 0;
     }
-    printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg reset\n");
+    cli_printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg reset\n");
     return 1;
 }
 
@@ -590,7 +685,7 @@ static void print_ms(uint32_t us)
 {
     char buf[16];
     snprintf(buf, sizeof(buf), "%lu.%lu", (unsigned long)(us / 1000), (unsigned long)(us % 1000 / 100));
-    printf("%7s", buf);
+    cli_printf("%7s", buf);
 }
 
 // Last launch, edge by edge: interval, RPM over one revolution, the release
@@ -601,55 +696,55 @@ static int cmd_launch(int argc, char **argv)
     static launch_trace_t info;
     int max = argc > 1 ? atoi(argv[1]) : 60;
     if (argc > 2 || max < 2 || max > (int)(sizeof(edges) / sizeof(edges[0]))) {
-        printf("usage: launch [edges 2-200, default 60]\n");
+        cli_printf("usage: launch [edges 2-200, default 60]\n");
         return 1;
     }
     if (!launch_get_trace(edges, max, &info)) {
-        printf("No finished launch yet.\n");
+        cli_printf("No finished launch yet.\n");
         return 1;
     }
     int epr = settings_get()->edges_per_rev;
     int n = info.num_edges < max ? info.num_edges : max;
     uint32_t t0 = edges[0];
 
-    printf("%d edges (showing %d), %d edge(s)/rev, release %s", info.num_edges, n, epr,
-           info.release_seen ? "at " : "not seen by the load sensor");
+    cli_printf("%d edges (showing %d), %d edge(s)/rev, release %s", info.num_edges, n, epr,
+               info.release_seen ? "at " : "not seen by the load sensor");
     if (info.release_seen) {
         uint32_t rel = info.release_us - t0;
-        printf("+%lu.%lu ms", (unsigned long)(rel / 1000), (unsigned long)(rel % 1000 / 100));
+        cli_printf("+%lu.%lu ms", (unsigned long)(rel / 1000), (unsigned long)(rel % 1000 / 100));
     }
-    printf(", %d edge(s) dropped by the filter", info.num_rejected);
+    cli_printf(", %d edge(s) dropped by the filter", info.num_rejected);
     if (info.lock_recoveries > 0) {
-        printf(", filter lock recovered %d time(s)", info.lock_recoveries);
+        cli_printf(", filter lock recovered %d time(s)", info.lock_recoveries);
     }
-    printf("\n");
-    printf("  #   t (ms)  interval (us)  rpm (1 rev)\n");
+    cli_printf("\n");
+    cli_printf("  #   t (ms)  interval (us)  rpm (1 rev)\n");
 
     int r = 0;   // next dropped edge to print
     bool release_printed = !info.release_seen;
     for (int i = 0; i < n; i++) {
         // Dropped edges and the release, in time order before this edge
         while (r < info.num_rejected && (int32_t)(info.rejected_us[r] - edges[i]) < 0) {
-            printf("     ");
+            cli_printf("     ");
             print_ms(info.rejected_us[r] - t0);
-            printf("   -- dropped (%s)\n", info.rejected_max_rpm[r] ? "max rpm" : "too soon");
+            cli_printf("   -- dropped (%s)\n", info.rejected_max_rpm[r] ? "max rpm" : "too soon");
             r++;
         }
         if (!release_printed && (int32_t)(info.release_us - edges[i]) < 0) {
-            printf("     ");
+            cli_printf("     ");
             print_ms(info.release_us - t0);
-            printf("   -- release (load sensor)\n");
+            cli_printf("   -- release (load sensor)\n");
             release_printed = true;
         }
-        printf("%3d  ", i);
+        cli_printf("%3d  ", i);
         print_ms(edges[i] - t0);
         if (i > 0) {
-            printf("  %13lu", (unsigned long)(edges[i] - edges[i - 1]));
+            cli_printf("  %13lu", (unsigned long)(edges[i] - edges[i - 1]));
         }
         if (i >= epr) {
-            printf("  %11lu", (unsigned long)(60000000ULL / (edges[i] - edges[i - epr])));
+            cli_printf("  %11lu", (unsigned long)(60000000ULL / (edges[i] - edges[i - epr])));
         }
-        printf("\n");
+        cli_printf("\n");
     }
     return 0;
 }
@@ -659,26 +754,26 @@ static int cmd_ble(int argc, char **argv)
     if (argc == 2 && (!strcmp(argv[1], "on") || !strcmp(argv[1], "off"))) {
         bool on = !strcmp(argv[1], "on");
         if (on == settings_ble()) {
-            printf("BLE is already %s\n", argv[1]);
+            cli_printf("BLE is already %s\n", argv[1]);
             return 0;
         }
         settings_set_ble(on);
-        printf("BLE %s (saved). Restarting to apply...\n", argv[1]);
+        cli_printf("BLE %s (saved). Restarting to apply...\n", argv[1]);
         vTaskDelay(pdMS_TO_TICKS(200));
         esp_restart();
     }
     if (argc != 1) {
-        printf("usage: ble | ble on|off\n");
+        cli_printf("usage: ble | ble on|off\n");
         return 1;
     }
 
     bbp_info_t b;
     bbp_get_info(&b);
-    printf("BLE: %s", b.radio_on ? "on, " BBP_DEVICE_NAME : "off");
+    cli_printf("BLE: %s", b.radio_on ? "on, " BBP_DEVICE_NAME : "off");
     if (b.radio_on) {
-        printf(", %s", b.subscribed ? "app listening" : (b.connected ? "connected" : "advertising"));
+        cli_printf(", %s", b.subscribed ? "app listening" : (b.connected ? "connected" : "advertising"));
     }
-    printf("\n");
+    cli_printf("\n");
     return 0;
 }
 
@@ -687,34 +782,34 @@ static int cmd_history(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "clear")) {
         bbp_clear_history();
-        printf("Shot history cleared: last %d shots, total count, max and latest curve\n",
-               BBP_HISTORY_LEN);
+        cli_printf("Shot history cleared: last %d shots, total count, max and latest curve\n",
+                   BBP_HISTORY_LEN);
         return 0;
     }
     if (argc != 1) {
-        printf("usage: history | history clear\n");
+        cli_printf("usage: history | history clear\n");
         return 1;
     }
 
     bbp_info_t b;
     bbp_get_info(&b);
-    printf("shots   : %d in history, %lu total, max %u\n", b.count, (unsigned long)b.total, b.max_sp);
+    cli_printf("shots   : %d in history, %lu total, max %u\n", b.count, (unsigned long)b.total, b.max_sp);
     for (int i = 0; i < b.count; i++) {
         // Ten per line, oldest first
-        printf("%s%5u", i % 10 ? " " : (i ? "\n          " : "history : "), b.sp[i]);
+        cli_printf("%s%5u", i % 10 ? " " : (i ? "\n          " : "history : "), b.sp[i]);
     }
     if (b.count > 0) {
-        printf("\n");
+        cli_printf("\n");
     }
     return 0;
 }
 
 static int cmd_sleep(int argc, char **argv)
 {
-    printf("Deep sleep in %d s. Unplug USB now, otherwise sleep is cancelled.\n"
-           "Wake up later by plugging in USB or cycling the power switch.\n", APP_SLEEP_COUNTDOWN_S);
+    cli_printf("Deep sleep in %d s. Unplug USB now, otherwise sleep is cancelled.\n"
+               "Wake up later by plugging in USB or cycling the power switch.\n", APP_SLEEP_COUNTDOWN_S);
     if (!app_enter_deep_sleep(APP_SLEEP_COMMAND)) {
-        printf("USB still connected: deep sleep cancelled.\n");
+        cli_printf("USB still connected: deep sleep cancelled.\n");
         return 1;
     }
     return 0;
@@ -724,33 +819,108 @@ static int cmd_events(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "clear")) {
         eventlog_clear();
-        printf("event log cleared\n");
+        cli_printf("event log cleared\n");
         return 0;
     }
     if (argc != 1) {
-        printf("usage: events | events clear\n");
+        cli_printf("usage: events | events clear\n");
         return 1;
     }
     eventlog_print();
     return 0;
 }
 
+static int cmd_help(int argc, char **argv);
+
+typedef struct {
+    const char *name;
+    const char *help;
+    esp_console_cmd_func_t func;
+} cli_cmd_t;
+
+static const cli_cmd_t s_cmds[] = {
+    {"help", "help [command]: list the commands, or explain one", cmd_help},
+    {"status", "Show sensors, battery, calibration and the last launch", cmd_status},
+    {"diag", "diag on|off: pause the state machine for manual sensor control", cmd_diag},
+    {"meter", "meter on|off | meter | meter log [seconds] [interval_ms]: continuous RPM (CSV); Ctrl-C stops the log", cmd_meter},
+    {"rpm", "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", cmd_rpm},
+    {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load led on|off: hold the load LED (diag or meter mode)", cmd_load},
+    {"cal", "cal load empty|loaded|clear: load sensor; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
+    {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg reset", cmd_cfg},
+    {"launch", "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", cmd_launch},
+    {"ble", "ble | ble on|off: Battle Pass emulation and the console over BLE (on|off restarts)", cmd_ble},
+    {"history", "history | history clear: shot history sent to Battle Pass apps (last 50, total, max, latest curve)", cmd_history},
+    {"sleep", "Enter deep sleep now", cmd_sleep},
+    {"events", "events | events clear: power/sleep event log (survives deep sleep and resets)", cmd_events},
+};
+#define NUM_CMDS (sizeof(s_cmds) / sizeof(s_cmds[0]))
+
+// Same output on every console (esp_console's help prints to stdout)
+static int cmd_help(int argc, char **argv)
+{
+    bool found = false;
+    for (int i = 0; i < NUM_CMDS; i++) {
+        if (argc < 2 || !strcmp(argv[1], s_cmds[i].name)) {
+            cli_printf("%s\n  %s\n\n", s_cmds[i].name, s_cmds[i].help);
+            found = true;
+        }
+    }
+    if (!found) {
+        cli_printf("No command '%s'. Type 'help' for the list.\n", argv[1]);
+        return 1;
+    }
+    return 0;
+}
+
+// Every command runs through here, from any console
+static int run_cmd(void *context, int argc, char **argv)
+{
+    const cli_cmd_t *cmd = context;
+    if (xSemaphoreTake(s_cmd_lock, 0) != pdTRUE) {
+        cli_printf("Busy: the other console (USB or Bluetooth) is running a command. "
+                   "Try again when it ends.\n");
+        return 1;
+    }
+    if (t_console == NULL) {
+        s_usb_stop = false;
+    }
+    app_note_activity();
+    int ret = cmd->func(argc, argv);
+    xSemaphoreGive(s_cmd_lock);
+    return ret;
+}
+
+void cli_bind_console(cli_console_t *console)
+{
+    t_console = console;
+}
+
+void cli_run_line(char *line)
+{
+    char *argv[CLI_MAX_ARGS];
+    if (t_console != NULL) {
+        t_console->stop = false;
+    }
+    size_t argc = esp_console_split_argv(line, argv, CLI_MAX_ARGS);
+    if (s_cmd_lock == NULL) {
+        cli_printf("The console is still starting. Try again in a moment.\n");
+    } else if (argc > 0) {
+        const cli_cmd_t *cmd = NULL;
+        for (int i = 0; i < NUM_CMDS && cmd == NULL; i++) {
+            cmd = !strcmp(argv[0], s_cmds[i].name) ? &s_cmds[i] : NULL;
+        }
+        if (cmd != NULL) {
+            run_cmd((void *)cmd, argc, argv);
+        } else {
+            cli_printf("Unknown command '%s'. Type 'help' for the list.\n", argv[0]);
+        }
+    }
+}
+
 esp_err_t cli_start(void)
 {
-    const esp_console_cmd_t cmds[] = {
-        {.command = "status", .help = "Show sensors, battery, calibration and the last launch", .func = cmd_status},
-        {.command = "diag", .help = "diag on|off: pause the state machine for manual sensor control", .func = cmd_diag},
-        {.command = "meter", .help = "meter on|off | meter | meter log [seconds] [interval_ms]: continuous RPM (CSV)", .func = cmd_meter},
-        {.command = "rpm", .help = "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", .func = cmd_rpm},
-        {.command = "load", .help = "load [count]: print ambient-cancelled LOAD_SENSE readings; load led on|off: hold the load LED (diag or meter mode)", .func = cmd_load},
-        {.command = "cal", .help = "cal load empty|loaded|clear: load sensor; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", .func = cmd_cal},
-        {.command = "cfg", .help = "cfg edges <n> | cfg lightsleep on|off | cfg reset", .func = cmd_cfg},
-        {.command = "launch", .help = "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", .func = cmd_launch},
-        {.command = "ble", .help = "ble | ble on|off: Battle Pass emulation over BLE (on|off restarts)", .func = cmd_ble},
-        {.command = "history", .help = "history | history clear: shot history sent to Battle Pass apps (last 50, total, max, latest curve)", .func = cmd_history},
-        {.command = "sleep", .help = "Enter deep sleep now", .func = cmd_sleep},
-        {.command = "events", .help = "events | events clear: power/sleep event log (survives deep sleep and resets)", .func = cmd_events},
-    };
+    s_cmd_lock = xSemaphoreCreateMutex();
+    ESP_RETURN_ON_FALSE(s_cmd_lock != NULL, ESP_ERR_NO_MEM, "cli", "lock");
 
     esp_console_repl_t *repl = NULL;
     esp_console_repl_config_t repl_cfg = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
@@ -762,9 +932,14 @@ esp_err_t cli_start(void)
     // PuTTY connect later and all handle them), so keep line editing and history.
     linenoiseSetDumbMode(0);
 
-    esp_console_register_help_command();
-    for (int i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
-        ESP_ERROR_CHECK(esp_console_cmd_register(&cmds[i]));
+    for (int i = 0; i < NUM_CMDS; i++) {
+        const esp_console_cmd_t cmd = {
+            .command = s_cmds[i].name,
+            .help = s_cmds[i].help,
+            .func_w_context = run_cmd,
+            .context = (void *)&s_cmds[i],
+        };
+        ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
     }
     return esp_console_start_repl(repl);
 }

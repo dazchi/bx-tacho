@@ -14,6 +14,7 @@ idf_component_register(
         "icons.c"
         "vbat_cal.c"
         "bbp.c"
+        "ble_console.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES
         esp_driver_gpio

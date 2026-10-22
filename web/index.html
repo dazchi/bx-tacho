@@ -87,7 +87,7 @@
       </div>
     </section>
 
-    <!-- Bluetooth: Battle Pass data -->
+    <!-- Bluetooth: Battle Pass data, and the console -->
     <section class="panel" id="panel-ble" role="tabpanel" aria-labelledby="tab-ble" hidden>
       <div class="bar-row">
         <h1 class="title" data-i18n="ble.title">Shots</h1>
@@ -150,8 +150,50 @@
         <ol class="history" id="history" aria-label="Shoot power of recent shots, oldest first" data-empty="No shots in the history yet." data-i18n-attr="aria-label:hist.aria;data-empty:hist.empty"></ol>
         <p class="aside-text" data-i18n="hist.caption">Oldest on the left, newest on the right. Kept on BX Tacho, so it survives power cycles.</p>
       </section>
+
+      <section class="block" aria-labelledby="bcon-title">
+        <div class="bar-row">
+          <h2 class="title title--small" id="bcon-title" data-i18n="bcon.title">Console</h2>
+          <button class="btn" id="bcon-open" disabled data-i18n="bcon.open">Open console</button>
+        </div>
+        <p class="body" data-i18n="bcon.intro">The same commands as over USB, without the cable: the way to run the battery calibration, which needs BX Tacho off USB power. Each time you connect, you enter the 6-digit code BX Tacho shows on its display.</p>
+        <p class="note" id="bcon-note" hidden></p>
+        <div class="screen screen--term screen--bterm">
+          <div id="ble-terminal" class="term" aria-label="BX Tacho console" data-i18n-attr="aria-label:term.aria"></div>
+          <p class="term__empty" id="bcon-empty" data-i18n="bcon.empty">Connect over Bluetooth and open the console to run commands.</p>
+        </div>
+        <form class="cmdline" id="bcon-form" autocomplete="off">
+          <label class="cmdline__prompt" for="bcon-input">bxt&gt;</label>
+          <input class="cmdline__input" id="bcon-input" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="send" disabled placeholder="Type a command, e.g. status" data-i18n-attr="placeholder:bcon.placeholder">
+          <button class="btn btn--primary" id="bcon-run" type="submit" disabled data-i18n="bcon.run">Run</button>
+          <button class="btn" id="bcon-stop" type="button" disabled data-i18n="bcon.stop">Stop</button>
+        </form>
+        <div class="quick" aria-label="Common commands" data-i18n-attr="aria-label:term.quick">
+          <button class="chip" data-bcmd="status" disabled>status</button>
+          <button class="chip" data-bcmd="launch" disabled>launch</button>
+          <button class="chip" data-bcmd="history" disabled>history</button>
+          <button class="chip" data-bcmd="events" disabled>events</button>
+          <button class="chip" data-bcmd="ble" disabled>ble</button>
+          <button class="chip" data-bcmd="help" disabled>help</button>
+          <button class="chip chip--quiet" id="bcon-clear" data-i18n="term.clear">Clear screen</button>
+        </div>
+      </section>
     </section>
   </main>
+
+  <!-- The code BX Tacho shows on its display, to unlock the console over Bluetooth -->
+  <dialog class="dialog" id="code-dialog" aria-labelledby="code-title">
+    <form class="dialog__body" id="code-form" autocomplete="off">
+      <h2 class="title title--small" id="code-title" data-i18n="bcon.codeTitle">Enter the code</h2>
+      <p class="body" data-i18n="bcon.codeHint">Enter the 6-digit code shown on BX Tacho's display to unlock the console.</p>
+      <input class="code-input" id="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="7" spellcheck="false" placeholder="000 000" aria-label="Code" data-i18n-attr="aria-label:bcon.codeLabel">
+      <p class="note" id="code-error" hidden></p>
+      <div class="dialog__actions">
+        <button class="btn" id="code-cancel" type="button" data-i18n="bcon.cancel">Cancel</button>
+        <button class="btn btn--primary" id="code-unlock" type="submit" disabled data-i18n="bcon.unlock">Unlock</button>
+      </div>
+    </form>
+  </dialog>
 
   <footer class="foot">
     <div class="foot__inner">

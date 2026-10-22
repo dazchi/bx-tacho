@@ -4,7 +4,10 @@ A static web page for BX Tacho, run in the browser:
 
 - **USB:** the console in a terminal, and firmware updates.
 - **Bluetooth:** shot data from the Battle Pass service: latest and best shoot
-  power, shot count, battery, the launch curve and the last 50 shots.
+  power, shot count, battery, the launch curve and the last 50 shots. Below
+  it, the same console without a cable (for the VBAT calibration, which needs
+  BX Tacho off USB power). Opening it asks for the 6-digit code BX Tacho
+  shows on its display, on every connection; the shot data needs no code.
 
 Only one connection at a time. Plain HTML, CSS and JavaScript modules, no build
 step.
@@ -100,6 +103,7 @@ ticked.
 | `js/serial.js` | Web Serial link to the USB console |
 | `js/flasher.js` | Image check and flashing with esptool-js |
 | `js/ble.js` | Web Bluetooth link |
+| `js/bleconsole.js` | The console over Bluetooth, on that link (see `firmware/main/ble_console.h`) |
 | `js/bbp.js` | Battle Pass packet parser (see `firmware/docs/bbp-protocol.md`) |
 | `js/chart.js` | Launch curve and history strip (SVG) |
 | `js/i18n.js`, `js/locales/*.js` | Language detection, translation lookup, the strings per language |
