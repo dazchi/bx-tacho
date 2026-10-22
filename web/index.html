@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BX Tacho</title>
+  <meta name="description" content="Connect to your BX Tacho launcher RPM meter: console, firmware updates and shot data, in the browser.">
+  <link rel="icon" href="img/icon-64.png" sizes="64x64" type="image/png">
+  <link rel="icon" href="img/icon-512.png" sizes="512x512" type="image/png">
+  <link rel="apple-touch-icon" href="img/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@6.0.0/css/xterm.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./" aria-label="BX Tacho home" data-i18n-attr="aria-label:brand.home">
+      <img class="brand__icon" src="img/icon-96.png" width="44" height="44" alt="">
+      <span class="brand__plate"><canvas id="wordmark" class="brand__mark" aria-hidden="true"></canvas></span>
+    </a>
+    <div class="switch" role="tablist" aria-label="Connection" data-i18n-attr="aria-label:nav.label">
+      <button class="switch__tab" role="tab" id="tab-usb" aria-controls="panel-usb" aria-selected="true" data-i18n="tab.usb">USB</button>
+      <button class="switch__tab" role="tab" id="tab-ble" aria-controls="panel-ble" aria-selected="false" tabindex="-1" data-i18n="tab.ble">Bluetooth</button>
+    </div>
+    <p class="link" id="link-state" aria-live="polite">Not connected</p>
+  </header>
+
+  <main>
+    <!-- USB: console and firmware -->
+    <section class="panel" id="panel-usb" role="tabpanel" aria-labelledby="tab-usb">
+      <div class="usb">
+        <div class="console">
+          <div class="bar-row">
+            <h1 class="title" data-i18n="usb.title">Console</h1>
+            <button class="btn btn--primary" id="usb-connect">Connect over USB</button>
+          </div>
+          <p class="note" id="usb-note" hidden></p>
+          <div class="screen screen--term">
+            <div id="terminal" class="term" aria-label="BX Tacho console" data-i18n-attr="aria-label:term.aria"></div>
+            <p class="term__empty" id="term-empty" data-i18n="term.empty">Connect over USB, then type a command, or pick one below.</p>
+          </div>
+          <div class="quick" aria-label="Common commands" data-i18n-attr="aria-label:term.quick">
+            <button class="chip" data-cmd="status">status</button>
+            <button class="chip" data-cmd="launch">launch</button>
+            <button class="chip" data-cmd="history">history</button>
+            <button class="chip" data-cmd="events">events</button>
+            <button class="chip" data-cmd="ble">ble</button>
+            <button class="chip" data-cmd="help">help</button>
+            <button class="chip chip--quiet" id="term-clear" data-i18n="term.clear">Clear screen</button>
+          </div>
+        </div>
+
+        <aside class="flash" aria-labelledby="flash-title">
+          <div class="flash__intro">
+            <h2 class="title title--small" id="flash-title" data-i18n="fw.title">Update firmware</h2>
+            <p class="body" data-i18n-html="fw.intro">Choose <code>bx-tacho.bin</code> from a firmware build. Your shot history and settings are kept.</p>
+          </div>
+          <div class="flash__controls">
+            <label class="drop" id="drop">
+              <input type="file" id="fw-file" accept=".bin,application/octet-stream">
+              <span class="drop__label" data-i18n="fw.choose">Choose firmware file</span>
+              <span class="drop__hint" data-i18n="fw.drop">or drop it here</span>
+            </label>
+            <div class="fw" id="fw-info" hidden>
+              <p class="fw__name" id="fw-name"></p>
+              <p class="fw__detail" id="fw-detail"></p>
+            </div>
+            <details class="adv">
+              <summary class="adv__summary" data-i18n="fw.advanced">Advanced</summary>
+              <label class="check">
+                <input type="checkbox" id="fw-erase">
+                <span data-i18n="fw.erase">Erase the whole chip first</span>
+              </label>
+              <p class="adv__warn" data-i18n="fw.eraseHelp">Warning: everything on BX Tacho is cleared, including the battery calibration data. Only for a chip that won't start, or a blank one; the bootloader and partition table are written again.</p>
+            </details>
+            <button class="btn btn--primary btn--wide" id="fw-flash" disabled data-i18n="fw.update">Update firmware</button>
+            <div class="progress" id="fw-progress" hidden>
+              <div class="progress__track"><div class="progress__fill" id="fw-fill"></div></div>
+              <p class="progress__text" id="fw-text"></p>
+            </div>
+            <pre class="fw-log" id="fw-log" hidden></pre>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Bluetooth: Battle Pass data -->
+    <section class="panel" id="panel-ble" role="tabpanel" aria-labelledby="tab-ble" hidden>
+      <div class="bar-row">
+        <h1 class="title" data-i18n="ble.title">Shots</h1>
+        <div class="bar-row__end">
+          <button class="btn" id="ble-refresh" disabled data-i18n="ble.refresh">Refresh</button>
+          <button class="btn btn--primary" id="ble-connect">Connect over Bluetooth</button>
+        </div>
+      </div>
+      <p class="note" id="ble-note" hidden></p>
+
+      <div class="hero">
+        <div class="screen screen--readout">
+          <p class="screen__label" data-i18n="readout.label">Latest shoot power</p>
+          <div class="readout">
+            <canvas id="readout" class="readout__digits" role="img" aria-label="No shot yet"></canvas>
+            <span class="readout__unit" data-i18n="readout.unit">rpm</span>
+          </div>
+          <p class="screen__foot" id="readout-foot">Launch a top to see it here</p>
+        </div>
+
+        <dl class="stats">
+          <div class="stat">
+            <dt data-i18n="stat.total">Shots</dt>
+            <dd id="stat-total">–</dd>
+          </div>
+          <div class="stat">
+            <dt data-i18n="stat.max">Best</dt>
+            <dd id="stat-max">–</dd>
+          </div>
+          <div class="stat">
+            <dt data-i18n="stat.batt">Battery</dt>
+            <dd id="stat-batt">–</dd>
+          </div>
+          <div class="stat">
+            <dt data-i18n="stat.top">Top</dt>
+            <dd id="stat-top">–</dd>
+          </div>
+        </dl>
+      </div>
+
+      <section class="block" aria-labelledby="curve-title">
+        <div class="bar-row">
+          <h2 class="title title--small" id="curve-title" data-i18n="curve.title">Launch curve</h2>
+          <div class="seg" role="group" aria-label="Curve axis" data-i18n-attr="aria-label:curve.axis">
+            <button class="seg__btn" data-axis="laps" aria-pressed="true" data-i18n="curve.laps">Laps</button>
+            <button class="seg__btn" data-axis="time" aria-pressed="false" data-i18n="curve.time">Time</button>
+          </div>
+        </div>
+        <figure class="curve">
+          <svg id="curve" class="curve__svg" role="img" aria-label="Launch curve" data-i18n-attr="aria-label:curve.aria"></svg>
+          <figcaption class="curve__caption" id="curve-caption" data-i18n="curve.caption">Each point is one revolution of the launcher. The ring marks the fastest.</figcaption>
+        </figure>
+      </section>
+
+      <section class="block" aria-labelledby="hist-title">
+        <div class="bar-row">
+          <h2 class="title title--small" id="hist-title" data-i18n="hist.title">Last 50 shots</h2>
+          <p class="aside-text" id="hist-range"></p>
+        </div>
+        <ol class="history" id="history" aria-label="Shoot power of recent shots, oldest first" data-empty="No shots in the history yet." data-i18n-attr="aria-label:hist.aria;data-empty:hist.empty"></ol>
+        <p class="aside-text" data-i18n="hist.caption">Oldest on the left, newest on the right. Kept on BX Tacho, so it survives power cycles.</p>
+      </section>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot__inner">
+      <p class="foot__text" data-i18n="foot.text">Runs in Chrome or Edge. USB needs a computer; Bluetooth also works in Chrome on Android. One connection at a time.</p>
+      <label class="lang">
+        <span data-i18n="lang.label">Language</span>
+        <select id="lang-select" class="lang__select"></select>
+      </label>
+    </div>
+  </footer>
+</body>
+</html>
