@@ -14,6 +14,7 @@
 #include "eventlog.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "linenoise/linenoise.h"
 #include "load.h"
 #include "rpm.h"
 #include "settings.h"
@@ -755,6 +756,11 @@ esp_err_t cli_start(void)
     esp_console_repl_config_t repl_cfg = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
     repl_cfg.prompt = "bxt>";
     ESP_ERROR_CHECK(esp_console_new_repl_stdio(&repl_cfg, &repl));
+    // The console asks the terminal once, at boot, whether it handles escape
+    // sequences, and falls back to plain line mode for good if nothing answers.
+    // Over USB nothing is attached that early (the web app, idf.py monitor and
+    // PuTTY connect later and all handle them), so keep line editing and history.
+    linenoiseSetDumbMode(0);
 
     esp_console_register_help_command();
     for (int i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
