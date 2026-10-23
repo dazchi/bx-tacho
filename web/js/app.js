@@ -139,10 +139,47 @@ const TERM_THEME = {
 };
 const TERM_FONT = { fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 14, lineHeight: 1.25 };
 
+// xterm.js scrolls with the mouse wheel but not with a finger: on a phone a
+// drag over the terminal moved the page instead. A vertical drag scrolls the
+// output while there's more of it that way; past the top or bottom (or with
+// nothing to scroll) it moves the page as usual.
+function touchScroll(t, el) {
+  let lastY = null;
+  let capture = null;   // decided on the first move of each drag
+  let rest = 0;         // fraction of a row not scrolled yet
+  el.addEventListener('touchstart', (e) => {
+    lastY = e.touches.length === 1 ? e.touches[0].clientY : null;
+    capture = null;
+    rest = 0;
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if (lastY === null || e.touches.length !== 1) return;
+    const y = e.touches[0].clientY;
+    const dy = lastY - y;   // > 0: finger up, later output
+    lastY = y;
+    const buf = t.buffer.active;
+    if (capture === null) {
+      capture = dy > 0 ? buf.viewportY < buf.baseY : buf.viewportY > 0;
+    }
+    if (!capture) return;
+    e.preventDefault();
+    rest += dy / (el.clientHeight / t.rows);
+    const n = Math.trunc(rest);
+    if (n) {
+      t.scrollLines(n);
+      rest -= n;
+    }
+  }, { passive: false });
+  el.addEventListener('touchend', () => {
+    lastY = null;
+  });
+}
+
 const term = new Terminal({ ...TERM_FONT, cursorBlink: true, scrollback: 5000, theme: TERM_THEME });
 const fit = new FitAddon();
 term.loadAddon(fit);
 term.open($('terminal'));
+touchScroll(term, $('terminal'));
 
 function fitTerminal() {
   if (!$('panel-usb').hidden) {
@@ -462,6 +499,7 @@ const bleTerm = new Terminal({
 const bleFit = new FitAddon();
 bleTerm.loadAddon(bleFit);
 bleTerm.open($('ble-terminal'));
+touchScroll(bleTerm, $('ble-terminal'));
 
 function fitBleTerminal() {
   if (!$('panel-ble').hidden) {
