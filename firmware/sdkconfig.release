@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Darren Chi
+# Release build, on top of sdkconfig.defaults (README "Release build"): optimised
+# for speed (-O2) instead of debugging (-Og). Assertions stay on, so a broken
+# invariant restarts BX Tacho rather than running on in a bad state.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y

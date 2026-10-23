@@ -30,6 +30,29 @@ python -m esptool --chip esp32c3 -p COMx -b 460800 write-flash 0x10000 build/bx-
 A board that still has the older single-app partition table needs the full set
 once (`idf.py flash`, or the web app's USB update, which always writes it).
 
+## Release build
+
+The normal build is for debugging (`-Og`). A release is optimised for speed
+(`-O2`, `sdkconfig.release` on top of `sdkconfig.defaults`) and built in its
+own folder with its own sdkconfig, so the development build is untouched:
+
+```
+idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" build
+idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" merge-bin -o bx-tacho-merged.bin
+```
+
+- `build/release/bx-tacho.bin`: the file to publish, for updates from the web
+  app (USB or Bluetooth) or `write-flash 0x10000` (with `otadata`, see above).
+- `build/release/bx-tacho-merged.bin`: everything from 0x0, for a blank board
+  (`write-flash 0x0`). It overwrites NVS (settings and shot history) but ends
+  below `fctry`, so the battery calibration stays.
+
+Options set by hand with `idf.py menuconfig` go into `firmware/sdkconfig`
+only; for a release they belong in `sdkconfig.defaults` (or
+`sdkconfig.release`). The release bootloader is the same as the development
+one (only its build date differs), so `web/firmware/bootloader.bin` needn't
+change for a release.
+
 Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`).
 
 ## Layout
