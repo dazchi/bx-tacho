@@ -5,7 +5,7 @@ import { FitAddon } from 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.11.0/l
 import { LANGUAGES, browserLanguage, choice, fmt, setAttr, setLanguage, setPlain, setText, t } from './i18n.js';
 import { curveToPoints, peakOf } from './bbp.js';
 import { BleLink, bleSupported } from './ble.js';
-import { BleConsole, readVersion } from './bleconsole.js';
+import { BleConsole, readInfo } from './bleconsole.js';
 import { BleUpdater, OtaError } from './bleota.js';
 import { drawCurve, drawHistory } from './chart.js';
 import { analyzeImage, flashFirmware, loadBootFiles } from './flasher.js';
@@ -23,6 +23,7 @@ const state = {
   consoleOpening: false, // console over Bluetooth: starting
   consoleUsed: false,    // ...opened before: its output stays on screen
   usbUsed: false,        // the USB console was connected before (same)
+  flip: null,            // display turned (cfg flip): true/false, null while not known
   bfw: null,             // firmware to send over Bluetooth: { bytes, info }
   updating: false,       // ...being sent
   fw: null,              // { bytes, info, name }
@@ -96,6 +97,8 @@ function setLink(kind) {
   $('term-empty').hidden = state.usbUsed;   // once used, the output stays readable
   updateFlashButton();
   updateBleUpdateButton();
+  if (!kind) state.flip = null;   // not known for the next connection
+  renderFlip();
 
   if (!serialSupported()) {
     note('usb-note', 'note.noSerial', {}, 'bad');
@@ -449,8 +452,12 @@ async function connectBle() {
     await ble.connect();
     setLink('ble');
     // What's on BX Tacho now, for the firmware update
-    const version = (await readVersion(ble.server))?.split(' ')[1];
-    if (version && state.link === 'ble') setText($('bota-current'), 'bota.current', { v: version });
+    const info = await readInfo(ble.server);
+    if (info && state.link === 'ble') {
+      setText($('bota-current'), 'bota.current', { v: info.version });
+      state.flip = info.flip;
+      renderFlip();
+    }
   } catch (e) {
     await ble.disconnect().catch(() => {});
     if (e.name !== 'NotFoundError') {
@@ -577,6 +584,7 @@ function renderConsole() {
   $('bcon-stop').disabled = !ready || !bcon.busy;
   for (const c of document.querySelectorAll('.quick .chip[data-bcmd]')) c.disabled = !ready || bcon.busy;
   $('bcon-empty').hidden = open || state.consoleUsed;
+  renderFlip();
 }
 
 // ---- the code dialog
@@ -701,6 +709,42 @@ $('bcon-clear').addEventListener('click', () => {
   bleTerm.clear();
   renderConsole();
 });
+
+// ---------------------------------------------------------------- display orientation
+
+// The Display switch under each console: cfg flip on|off, through that console.
+// Over Bluetooth BX Tacho reports the setting on connecting (readInfo); over
+// USB it's known once chosen here.
+function renderFlip() {
+  for (const [id, kind] of [['usb-flip', 'usb'], ['ble-flip', 'ble']]) {
+    for (const b of $(id).querySelectorAll('.seg__btn')) {
+      b.setAttribute('aria-pressed', String(state.flip !== null && state.flip === (b.dataset.flip === 'on')));
+      b.disabled = state.link !== kind || (kind === 'ble' && (bcon.busy || state.updating));
+    }
+  }
+}
+
+for (const b of $('usb-flip').querySelectorAll('.seg__btn')) {
+  b.addEventListener('click', () => {
+    if (state.link !== 'usb') return;
+    serial.write(`cfg flip ${b.dataset.flip}\r`);
+    state.flip = b.dataset.flip === 'on';
+    renderFlip();
+  });
+}
+
+for (const b of $('ble-flip').querySelectorAll('.seg__btn')) {
+  b.addEventListener('click', async () => {
+    try {
+      await unlockConsole();   // the code on the display, if the console is locked
+    } catch {
+      return;
+    }
+    await runCommand(`cfg flip ${b.dataset.flip}`);
+    state.flip = b.dataset.flip === 'on';
+    renderFlip();
+  });
+}
 
 // ---------------------------------------------------------------- firmware over Bluetooth
 

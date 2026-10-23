@@ -989,6 +989,7 @@ void app_main(void)
 
     if (display_init() == ESP_OK) {
         display_set_contrast(CONTRAST_NORMAL);
+        display_set_flipped(settings_flip());
         s_ui_running = true;
         xTaskCreate(ui_task, "ui", 3072, NULL, 3, NULL);
     }

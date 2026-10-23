@@ -132,6 +132,10 @@ export default {
   'bota.err.cancelled': '已取消更新：需要输入 BX Tacho 屏幕上的代码。',
   'bota.err.other': '更新失败：{msg}。BX Tacho 会保留当前固件。',
 
+  'disp.label': '屏幕方向',
+  'disp.normal': '正常',
+  'disp.flipped': '左手（旋转 180°）',
+
   'note.noSerial': '此浏览器无法打开 USB 串口。请在电脑上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.noBle': '此浏览器无法使用蓝牙。请在电脑上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.usbBlocked': '请先断开蓝牙连接才能使用 USB，一次只能使用一种连接。',

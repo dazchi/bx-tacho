@@ -133,6 +133,10 @@ export default {
   'bota.err.cancelled': "Update cancelled: it needs the code from BX Tacho's display.",
   'bota.err.other': 'Update failed: {msg}. BX Tacho keeps its current firmware.',
 
+  'disp.label': 'Display',
+  'disp.normal': 'Normal',
+  'disp.flipped': 'Left-handed (turned 180°)',
+
   'note.noSerial': "This browser can't open USB serial ports. Use Chrome or Edge on a computer, or Chrome on Android.",
   'note.noBle': "This browser can't use Bluetooth. Use Chrome or Edge on a computer, or Chrome on Android.",
   'note.usbBlocked': 'Disconnect Bluetooth to use USB. One connection at a time.',

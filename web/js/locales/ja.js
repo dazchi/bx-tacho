@@ -132,6 +132,10 @@ export default {
   'bota.err.cancelled': '更新をキャンセルしました：BX Tacho の画面に表示されるコードが必要です。',
   'bota.err.other': '更新に失敗しました：{msg}。BX Tacho は今のファームウェアのままです。',
 
+  'disp.label': '画面の向き',
+  'disp.normal': '標準',
+  'disp.flipped': '左手用（180° 回転）',
+
   'note.noSerial': 'このブラウザは USB シリアルポートを開けません。パソコンの Chrome または Edge か、Android の Chrome を使ってください。',
   'note.noBle': 'このブラウザは Bluetooth を使えません。パソコンの Chrome または Edge か、Android の Chrome を使ってください。',
   'note.usbBlocked': 'USB を使うには Bluetooth を切断してください。同時に使える接続は 1 つだけです。',

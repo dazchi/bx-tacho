@@ -667,6 +667,25 @@ button {
   color: #fff;
 }
 
+.seg__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* A setting under a console: label, then its choices */
+.setting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.setting__label {
+  font-size: var(--t-small);
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .curve {
   margin: 0;
   background: var(--surface);

@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
+#include "settings.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
@@ -233,6 +234,9 @@ static int chr_access(uint16_t conn_handle, uint16_t attr_handle,
         int rc = os_mbuf_append(ctxt->om, app->project_name, strlen(app->project_name));
         rc = rc ? rc : os_mbuf_append(ctxt->om, " ", 1);
         rc = rc ? rc : os_mbuf_append(ctxt->om, app->version, strlen(app->version));
+        if (settings_flip()) {
+            rc = rc ? rc : os_mbuf_append(ctxt->om, " flip", 5);
+        }
         return rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
     }
     if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {

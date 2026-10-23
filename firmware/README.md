@@ -67,6 +67,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `cal vbat start` … `stop` | Production VBAT calibration, see below |
 | `cfg edges <n>` | Rising edges per launcher revolution |
 | `cfg lightsleep on\|off` | Automatic light sleep on battery (default on), for power debugging |
+| `cfg flip on\|off` | Turn the display 180 degrees, for holding the launcher in the other hand (default off; applies at once, kept by `cfg reset`) |
 | `events` / `events clear` | Power/sleep event log: boots and reset reasons, load changes, state changes, USB, display on/off, deep sleep. Kept in RTC memory, so it survives deep sleep and resets (not power-on) |
 | `launch [n]` | Last launch edge by edge (first `n` edges, default 60): time, interval, RPM, with the release seen by the load sensor and any edges the chatter filter dropped |
 | `ble` | Battle Pass link state |

@@ -9,6 +9,7 @@
 #include <string.h>
 #include "app.h"
 #include "bbp.h"
+#include "display.h"
 #include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
 #include "esp_check.h"
@@ -135,6 +136,7 @@ static int cmd_status(int argc, char **argv)
     cli_printf("boot        : #%lu, reset reason %s, light sleep on battery %s\n",
                (unsigned long)eventlog_boot_count(), eventlog_reset_reason_name(esp_reset_reason()),
                settings_light_sleep() ? "on" : "off");
+    cli_printf("display     : %s\n", settings_flip() ? "turned 180 degrees ('cfg flip off')" : "normal ('cfg flip on' turns it)");
     cli_printf("state       : %s\n", launch_state_name(s.state));
     cli_printf("power       : %s, VBAT %d mV (%s), %d%%\n", src_name(s.batt.src), s.batt.vbat_mv,
                s.batt.vbat_valid ? "valid" : "not trusted while charging", s.batt.percent);
@@ -671,6 +673,13 @@ static int cmd_cfg(int argc, char **argv)
         cli_printf("settings reset to defaults\n");
         return 0;
     }
+    if (argc == 3 && !strcmp(argv[1], "flip") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
+        bool on = !strcmp(argv[2], "on");
+        settings_set_flip(on);
+        display_set_flipped(on);
+        cli_printf("display %s (saved)\n", on ? "turned 180 degrees" : "the normal way up");
+        return 0;
+    }
     if (argc == 3 && !strcmp(argv[1], "lightsleep") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
         bool on = !strcmp(argv[2], "on");
         settings_set_light_sleep(on);
@@ -678,7 +687,7 @@ static int cmd_cfg(int argc, char **argv)
         cli_printf("light sleep on battery: %s (saved)\n", argv[2]);
         return 0;
     }
-    cli_printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg reset\n");
+    cli_printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg flip on|off | cfg reset\n");
     return 1;
 }
 
@@ -848,7 +857,7 @@ static const cli_cmd_t s_cmds[] = {
     {"rpm", "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", cmd_rpm},
     {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load led on|off: hold the load LED (diag or meter mode)", cmd_load},
     {"cal", "cal load empty|loaded|clear: load sensor; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
-    {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg reset", cmd_cfg},
+    {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg flip on|off (display turned 180 degrees, for the other hand) | cfg reset", cmd_cfg},
     {"launch", "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", cmd_launch},
     {"ble", "ble | ble on|off: Battle Pass emulation and the console over BLE (on|off restarts)", cmd_ble},
     {"history", "history | history clear: shot history sent to Battle Pass apps (last 50, total, max, latest curve)", cmd_history},

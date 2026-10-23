@@ -29,3 +29,8 @@ esp_err_t settings_set_light_sleep(bool enable);
 // Battle Pass emulation over BLE (default on); saved immediately, applied at boot
 bool settings_ble(void);
 esp_err_t settings_set_ble(bool enable);
+
+// Display turned 180 degrees, for holding the launcher in the other hand
+// (default off); saved immediately
+bool settings_flip(void);
+esp_err_t settings_set_flip(bool flip);

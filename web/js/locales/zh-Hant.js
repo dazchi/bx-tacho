@@ -132,6 +132,10 @@ export default {
   'bota.err.cancelled': '已取消更新：需要輸入 BX Tacho 螢幕上的代碼。',
   'bota.err.other': '更新失敗：{msg}。BX Tacho 會保留目前的韌體。',
 
+  'disp.label': '螢幕方向',
+  'disp.normal': '正常',
+  'disp.flipped': '左手（旋轉 180°）',
+
   'note.noSerial': '此瀏覽器無法開啟 USB 序列埠。請在電腦上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.noBle': '此瀏覽器無法使用藍牙。請在電腦上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.usbBlocked': '請先中斷藍牙連線才能使用 USB，一次只能使用一種連線。',

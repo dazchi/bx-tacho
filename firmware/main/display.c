@@ -143,6 +143,13 @@ esp_err_t display_flush(void)
     return esp_lcd_panel_draw_bitmap(s_panel, 0, 0, DISPLAY_W, DISPLAY_H, s_fb);
 }
 
+void display_set_flipped(bool flipped)
+{
+    if (s_present) {
+        esp_lcd_panel_mirror(s_panel, flipped, flipped);
+    }
+}
+
 void display_set_contrast(uint8_t level)
 {
     if (s_present) {

@@ -25,5 +25,7 @@ int display_text_width(const char *s, int scale);
 esp_err_t display_flush(void);
 
 void display_set_contrast(uint8_t level);
+// Turned 180 degrees (both axes mirrored in the controller): takes effect at once
+void display_set_flipped(bool flipped);
 // Off = display off and charge pump off (lowest current)
 void display_power(bool on);

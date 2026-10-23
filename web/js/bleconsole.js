@@ -13,12 +13,14 @@ const READY = 0x04;    // unlocked, and ready for the next command
 const HELLO = 0x05;    // asks for the banner, or for the code
 const CODE = 0x15;     // enter the code shown on the display
 
-// "bx-tacho 0.7.1" (reading needs no code), or null for firmware without the console
-export async function readVersion(server) {
+// { version: '0.9.0', flip: false } (reading needs no code), or null for
+// firmware without the console. flip: the display is turned (cfg flip).
+export async function readInfo(server) {
   try {
     const service = await server.getPrimaryService(CONSOLE_SERVICE);
     const value = await (await service.getCharacteristic(TX_UUID)).readValue();
-    return new TextDecoder().decode(value);
+    const words = new TextDecoder().decode(value).split(' ');   // "bx-tacho 0.9.0 [flip]"
+    return { version: words[1], flip: words.includes('flip') };
   } catch {
     return null;
   }
