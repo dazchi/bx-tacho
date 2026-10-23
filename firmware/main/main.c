@@ -13,6 +13,7 @@
 #include "display.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_ota_ops.h"
 #include "esp_pm.h"
 #include "esp_sleep.h"
@@ -687,6 +688,20 @@ static void draw_vbatcal_screen(const app_snapshot_t *s)
     display_flush();
 }
 
+// "64:E8:33:A1:B2:C5", the Bluetooth address phones see, for the idle screen
+static const char *ble_address_text(void)
+{
+    static char text[18];
+    if (text[0] == '\0') {
+        uint8_t mac[6];
+        if (esp_read_mac(mac, ESP_MAC_BT) == ESP_OK) {
+            snprintf(text, sizeof(text), "%02X:%02X:%02X:%02X:%02X:%02X",
+                     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        }
+    }
+    return text;
+}
+
 static void draw_screen(const app_snapshot_t *s)
 {
     char big[8];
@@ -716,6 +731,11 @@ static void draw_screen(const app_snapshot_t *s)
     } else {
         snprintf(big, sizeof(big), "----");
         label = "RPM";
+        // Nothing measured yet: room for the address, to find this one among
+        // others in an app's device list
+        if (bbp_link_state() != BBP_LINK_OFF) {
+            note = ble_address_text();
+        }
     }
 
     display_clear();

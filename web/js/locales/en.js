@@ -58,6 +58,8 @@ export default {
   'ble.refresh': 'Refresh',
   'ble.connect': 'Connect over Bluetooth',
   'ble.disconnect': 'Disconnect',
+  'ble.device': 'BX Tacho {addr} · firmware v{v}',
+  'ble.deviceNoAddr': 'BX Tacho · firmware v{v}',
   'ble.checksum': 'The shot data failed its checksum. Request it again.',
   'readout.label': 'Latest shoot power',
   'readout.unit': 'rpm',

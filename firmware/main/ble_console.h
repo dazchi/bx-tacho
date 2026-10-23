@@ -14,8 +14,8 @@
 // - TX fcf60003 (notify): the output, '\n' line ends. Then one control byte:
 //   0x04 after the banner and after each command (ready for the next line), or
 //   0x15 after a request for the code (a wrong or expired code gets a new one).
-//   Reading it gives "bx-tacho <version>", plus " flip" when the display is
-//   turned 180 degrees (cfg flip).
+//   Reading it gives "bx-tacho <version> <Bluetooth address>", plus " flip"
+//   when the display is turned 180 degrees (cfg flip).
 #pragma once
 
 #include <stdbool.h>

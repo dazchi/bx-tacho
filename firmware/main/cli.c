@@ -13,6 +13,10 @@
 #include "driver/usb_serial_jtag.h"
 #include "esp_app_desc.h"
 #include "esp_check.h"
+#include "esp_chip_info.h"
+#include "esp_efuse.h"
+#include "esp_efuse_table.h"
+#include "esp_mac.h"
 #include "esp_console.h"
 #include "esp_system.h"
 #include "esp_timer.h"
@@ -826,6 +830,44 @@ static int cmd_sleep(int argc, char **argv)
     return 0;
 }
 
+// Chip identity from eFuse. The factory MAC is unique per chip (it's what
+// Espressif uses as the chip ID), so it serves as the serial number.
+static int cmd_id(int argc, char **argv)
+{
+    uint8_t mac[6];
+    uint8_t bt[6];
+    if (esp_efuse_mac_get_default(mac) != ESP_OK || esp_read_mac(bt, ESP_MAC_BT) != ESP_OK) {
+        cli_printf("Reading the MAC from eFuse failed.\n");
+        return 1;
+    }
+    cli_printf("serial      : %02X%02X%02X%02X%02X%02X (factory MAC, unique per chip)\n",
+               mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    cli_printf("bluetooth   : %02X:%02X:%02X:%02X:%02X:%02X\n", bt[0], bt[1], bt[2], bt[3], bt[4], bt[5]);
+
+    // Written at the factory on some chips only; blank (all zero) on others
+    uint8_t uid[16] = {0};
+    bool have_uid = false;
+    if (esp_efuse_read_field_blob(ESP_EFUSE_OPTIONAL_UNIQUE_ID, uid, sizeof(uid) * 8) == ESP_OK) {
+        for (int i = 0; i < sizeof(uid); i++) {
+            have_uid |= uid[i] != 0;
+        }
+    }
+    cli_printf("unique id   : ");
+    if (have_uid) {
+        for (int i = 0; i < sizeof(uid); i++) {
+            cli_printf("%02X", uid[i]);
+        }
+        cli_printf(" (eFuse, 128 bits)\n");
+    } else {
+        cli_printf("not programmed on this chip\n");
+    }
+
+    esp_chip_info_t chip;
+    esp_chip_info(&chip);
+    cli_printf("chip        : ESP32-C3 revision v%d.%d\n", chip.revision / 100, chip.revision % 100);
+    return 0;
+}
+
 static int cmd_events(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "clear")) {
@@ -863,6 +905,7 @@ static const cli_cmd_t s_cmds[] = {
     {"history", "history | history clear: shot history sent to Battle Pass apps (last 50, total, max, latest curve)", cmd_history},
     {"sleep", "Enter deep sleep now", cmd_sleep},
     {"events", "events | events clear: power/sleep event log (survives deep sleep and resets)", cmd_events},
+    {"id", "Serial number (factory MAC), Bluetooth address, eFuse unique ID and chip revision", cmd_id},
 };
 #define NUM_CMDS (sizeof(s_cmds) / sizeof(s_cmds[0]))
 

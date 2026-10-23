@@ -57,6 +57,8 @@ export default {
   'ble.refresh': '重新整理',
   'ble.connect': '透過藍牙連線',
   'ble.disconnect': '中斷連線',
+  'ble.device': 'BX Tacho {addr} · 韌體 v{v}',
+  'ble.deviceNoAddr': 'BX Tacho · 韌體 v{v}',
   'ble.checksum': '發射數據的檢查碼錯誤，請重新取得。',
   'readout.label': '最新發射轉速',
   'readout.unit': 'rpm',

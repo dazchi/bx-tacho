@@ -57,6 +57,8 @@ export default {
   'ble.refresh': '更新',
   'ble.connect': 'Bluetooth で接続',
   'ble.disconnect': '切断',
+  'ble.device': 'BX Tacho {addr} · ファームウェア v{v}',
+  'ble.deviceNoAddr': 'BX Tacho · ファームウェア v{v}',
   'ble.checksum': 'シュートデータのチェックサムが一致しません。もう一度取得してください。',
   'readout.label': '最新のシュートパワー',
   'readout.unit': 'rpm',

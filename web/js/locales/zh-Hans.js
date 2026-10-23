@@ -57,6 +57,8 @@ export default {
   'ble.refresh': '刷新',
   'ble.connect': '通过蓝牙连接',
   'ble.disconnect': '断开连接',
+  'ble.device': 'BX Tacho {addr} · 固件 v{v}',
+  'ble.deviceNoAddr': 'BX Tacho · 固件 v{v}',
   'ble.checksum': '发射数据校验失败，请重新获取。',
   'readout.label': '最新发射转速',
   'readout.unit': 'rpm',

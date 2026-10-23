@@ -8,6 +8,7 @@
 #include "cli.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
+#include "esp_mac.h"
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "settings.h"
@@ -234,6 +235,14 @@ static int chr_access(uint16_t conn_handle, uint16_t attr_handle,
         int rc = os_mbuf_append(ctxt->om, app->project_name, strlen(app->project_name));
         rc = rc ? rc : os_mbuf_append(ctxt->om, " ", 1);
         rc = rc ? rc : os_mbuf_append(ctxt->om, app->version, strlen(app->version));
+        // The address too: macOS never tells apps a device's real one
+        uint8_t mac[6];
+        char addr[20];
+        if (esp_read_mac(mac, ESP_MAC_BT) == ESP_OK) {
+            int n = snprintf(addr, sizeof(addr), " %02X:%02X:%02X:%02X:%02X:%02X",
+                             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            rc = rc ? rc : os_mbuf_append(ctxt->om, addr, n);
+        }
         if (settings_flip()) {
             rc = rc ? rc : os_mbuf_append(ctxt->om, " flip", 5);
         }

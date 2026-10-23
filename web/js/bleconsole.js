@@ -13,14 +13,20 @@ const READY = 0x04;    // unlocked, and ready for the next command
 const HELLO = 0x05;    // asks for the banner, or for the code
 const CODE = 0x15;     // enter the code shown on the display
 
-// { version: '0.9.0', flip: false } (reading needs no code), or null for
-// firmware without the console. flip: the display is turned (cfg flip).
+// { version: '1.1.0', address: '64:E8:33:A1:B2:C5', flip: false } (reading
+// needs no code), or null for firmware without the console. address: the
+// Bluetooth address (null from firmware before 1.1), which browsers on macOS
+// can't see otherwise. flip: the display is turned (cfg flip).
 export async function readInfo(server) {
   try {
     const service = await server.getPrimaryService(CONSOLE_SERVICE);
     const value = await (await service.getCharacteristic(TX_UUID)).readValue();
-    const words = new TextDecoder().decode(value).split(' ');   // "bx-tacho 0.9.0 [flip]"
-    return { version: words[1], flip: words.includes('flip') };
+    const words = new TextDecoder().decode(value).split(' ');   // "bx-tacho 1.1.0 64:E8:… [flip]"
+    return {
+      version: words[1],
+      address: words.find((w) => /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(w)) ?? null,
+      flip: words.includes('flip'),
+    };
   } catch {
     return null;
   }

@@ -208,6 +208,12 @@ button {
   max-width: 60ch;
 }
 
+/* Which BX Tacho is connected: under the Bluetooth tab's heading */
+.device-line {
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
 .body--wide {
   max-width: none;
 }

@@ -97,6 +97,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `ble on\|off` | Battle Pass emulation and the BLE console (default on); saves and restarts |
 | `history` / `history clear` | Shot history sent to Battle Pass apps; `clear` wipes the last 50 shots, the total count, the max and the latest curve |
 | `sleep` | Deep sleep now |
+| `id` | Serial number (the factory MAC from eFuse, unique per chip), Bluetooth address, the optional 128-bit eFuse unique ID (blank on some chips) and the chip revision |
 
 Over USB, light sleep is disabled while a host is connected so the link
 stays up. Ctrl-C stops `meter log`, `rpm scan`, `rpm sense` and `load`

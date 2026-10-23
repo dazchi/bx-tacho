@@ -437,6 +437,7 @@ const ble = new BleLink({
     settleUnlock(new OtaError('bota.err.disconnected'));
     updater.close();
     setPlain($('bota-current'), '');
+    $('ble-device').hidden = true;
     state.consoleOpening = false;
     setLink(null);
   },
@@ -455,6 +456,9 @@ async function connectBle() {
     const info = await readInfo(ble.server);
     if (info && state.link === 'ble') {
       setText($('bota-current'), 'bota.current', { v: info.version });
+      const line = $('ble-device');
+      setText(line, info.address ? 'ble.device' : 'ble.deviceNoAddr', { addr: info.address, v: info.version });
+      line.hidden = false;
       state.flip = info.flip;
       renderFlip();
     }
