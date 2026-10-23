@@ -10,7 +10,7 @@ import { BleUpdater, OtaError } from './bleota.js';
 import { drawCurve, drawHistory } from './chart.js';
 import { analyzeImage, flashFirmware, loadBootFiles } from './flasher.js';
 import { drawPixelText, pixelWidth, revealPixelText } from './pixelfont.js';
-import { ESPRESSIF_VID, SerialLink, serialSupported } from './serial.js';
+import { ESPRESSIF_VID, SerialLink, requestBxPort, serialApi, serialSupported } from './serial.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,6 +22,7 @@ const state = {
   status: null,          // last status packet
   consoleOpening: false, // console over Bluetooth: starting
   consoleUsed: false,    // ...opened before: its output stays on screen
+  usbUsed: false,        // the USB console was connected before (same)
   bfw: null,             // firmware to send over Bluetooth: { bytes, info }
   updating: false,       // ...being sent
   fw: null,              // { bytes, info, name }
@@ -90,7 +91,9 @@ function setLink(kind) {
   renderConsole();
 
   for (const c of document.querySelectorAll('.quick .chip[data-cmd]')) c.disabled = kind !== 'usb';
-  $('term-empty').hidden = kind === 'usb';
+  for (const id of ['usb-input', 'usb-run', 'usb-stop']) $(id).disabled = kind !== 'usb';
+  if (kind === 'usb') state.usbUsed = true;
+  $('term-empty').hidden = state.usbUsed;   // once used, the output stays readable
   updateFlashButton();
   updateBleUpdateButton();
 
@@ -192,10 +195,10 @@ new ResizeObserver(fitTerminal).observe($('terminal'));
 
 const serial = new SerialLink({
   onData: (bytes) => term.write(bytes),
-  onClose: (reason) => {
+  onClose: (reason, why) => {
     if (state.flashing) return;
     setLink(null);
-    if (reason === 'lost') term.write(`\r\n\x1b[90m${t('term.disconnected')}\x1b[0m\r\n`);
+    if (reason === 'lost') term.write(`\r\n\x1b[90m${t('term.disconnected')}${why ? ` (${why})` : ''}\x1b[0m\r\n`);
   },
 });
 
@@ -227,6 +230,37 @@ for (const c of document.querySelectorAll('.quick .chip[data-cmd]')) {
     term.focus();
   });
 }
+// A command line under the terminal as well: typing into the terminal itself
+// works on a computer, but a phone's keyboard doesn't reliably come up for it.
+// BX Tacho echoes what it gets, so nothing is echoed here.
+const usbHistory = [];
+let usbHistoryAt = 0;
+
+$('usb-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = $('usb-input');
+  const line = input.value.trim();
+  if (!line || state.link !== 'usb') return;
+  if (usbHistory.at(-1) !== line) usbHistory.push(line);
+  usbHistoryAt = usbHistory.length;
+  input.value = '';
+  serial.write(`${line}\r`);
+});
+
+$('usb-input').addEventListener('keydown', (e) => {
+  const input = e.target;
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && usbHistory.length) {
+    e.preventDefault();
+    usbHistoryAt = Math.max(0, Math.min(usbHistory.length, usbHistoryAt + (e.key === 'ArrowUp' ? -1 : 1)));
+    input.value = usbHistory[usbHistoryAt] ?? '';
+  } else if (e.key === 'c' && e.ctrlKey && input.selectionStart === input.selectionEnd) {
+    e.preventDefault();   // Ctrl-C stops the running command (unless copying)
+    serial.write('\x03');
+  }
+});
+
+$('usb-stop').addEventListener('click', () => serial.write('\x03'));
+
 $('term-clear').addEventListener('click', () => {
   term.clear();
   term.focus();
@@ -315,7 +349,7 @@ const fwProgress = (...args) => progress('fw', ...args);
 async function reconnectAfterFlash() {
   for (let i = 0; i < 20; i++) {
     await new Promise((r) => setTimeout(r, 500));
-    const ports = await navigator.serial.getPorts();
+    const ports = await serialApi().getPorts();
     for (const p of ports.filter((x) => x.getInfo().usbVendorId === ESPRESSIF_VID)) {
       try {
         await serial.connect(p);
@@ -342,7 +376,7 @@ async function flash() {
   let port;
   try {
     port = state.link === 'usb' ? await serial.release()
-      : await navigator.serial.requestPort({ filters: [{ usbVendorId: ESPRESSIF_VID }] });
+      : await requestBxPort();
   } catch (e) {
     if (e.name !== 'NotFoundError') note('usb-note', 'err.portOpenShort', { msg: e.message }, 'bad');
     return;

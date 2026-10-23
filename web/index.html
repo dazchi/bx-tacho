@@ -44,6 +44,12 @@
             <div id="terminal" class="term" aria-label="BX Tacho console" data-i18n-attr="aria-label:term.aria"></div>
             <p class="term__empty" id="term-empty" data-i18n="term.empty">Connect over USB, then type a command, or pick one below.</p>
           </div>
+          <form class="cmdline" id="usb-form" autocomplete="off">
+            <label class="cmdline__prompt" for="usb-input">bxt&gt;</label>
+            <input class="cmdline__input" id="usb-input" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="send" disabled placeholder="Type a command, e.g. status" data-i18n-attr="placeholder:bcon.placeholder">
+            <button class="btn btn--primary" id="usb-run" type="submit" disabled data-i18n="bcon.run">Run</button>
+            <button class="btn" id="usb-stop" type="button" disabled data-i18n="bcon.stop">Stop</button>
+          </form>
           <div class="quick" aria-label="Common commands" data-i18n-attr="aria-label:term.quick">
             <button class="chip" data-cmd="status">status</button>
             <button class="chip" data-cmd="launch">launch</button>
@@ -224,7 +230,7 @@
 
   <footer class="foot">
     <div class="foot__inner">
-      <p class="foot__text" data-i18n="foot.text">Runs in Chrome or Edge. USB needs a computer; Bluetooth also works in Chrome on Android. One connection at a time.</p>
+      <p class="foot__text" data-i18n="foot.text">Runs in Chrome or Edge on a computer, and in Chrome on Android (USB with a USB-C cable to the phone). One connection at a time.</p>
       <label class="lang">
         <span data-i18n="lang.label">Language</span>
         <select id="lang-select" class="lang__select"></select>

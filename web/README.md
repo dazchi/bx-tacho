@@ -34,11 +34,16 @@ a recorded launch, without a device.
 
 ## Browsers
 
-| | USB (Web Serial) | Bluetooth (Web Bluetooth) |
+| | USB | Bluetooth (Web Bluetooth) |
 |---|---|---|
-| Chrome, Edge (Windows, macOS, Linux) | Yes | Yes |
-| Chrome on Android | No | Yes |
+| Chrome, Edge (Windows, macOS, Linux) | Yes (Web Serial) | Yes |
+| Chrome on Android | Yes (WebUSB), with a USB-C cable to the phone | Yes |
 | Firefox, Safari, iOS | No | No |
+
+Chrome on Android has Web Serial only for Bluetooth serial ports, so there
+the page reaches BX Tacho's USB Serial/JTAG (a USB CDC-ACM device) over
+WebUSB instead, with `js/usbserial.js`. It offers the same port interface, so
+the console and firmware updates work the same way through it.
 
 ## Languages
 
@@ -107,7 +112,8 @@ updates over Bluetooth" in `firmware/README.md`.
 |---|---|
 | `index.html`, `css/style.css` | Page and styles |
 | `js/app.js` | Tabs, connection rules, terminal, firmware and Bluetooth views |
-| `js/serial.js` | Web Serial link to the USB console |
+| `js/serial.js` | Link to the USB console: Web Serial, or WebUSB on Android |
+| `js/usbserial.js` | USB CDC-ACM serial port over WebUSB, for Chrome on Android |
 | `js/flasher.js` | Image check and flashing with esptool-js |
 | `js/ble.js` | Web Bluetooth link |
 | `js/bleconsole.js` | The console over Bluetooth, on that link (see `firmware/main/ble_console.h`) |

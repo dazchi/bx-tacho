@@ -1,10 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Darren Chi
-// Web Serial link to BX Tacho's USB console (USB Serial/JTAG, so the baud rate is nominal).
-
-export const serialSupported = () => 'serial' in navigator;
+// Link to BX Tacho's USB console (USB Serial/JTAG, so the baud rate is nominal):
+// Web Serial, or WebUSB on Android.
+import { usbSerial } from './usbserial.js';
 
 export const ESPRESSIF_VID = 0x303a;
+
+// Computers have Web Serial. Chrome on Android has it for Bluetooth serial ports
+// only, so there USB goes through WebUSB instead (usbserial.js).
+const isAndroid = navigator.userAgentData?.platform === 'Android' || /Android/i.test(navigator.userAgent);
+const viaWebUsb = isAndroid && 'usb' in navigator;
+
+export const serialSupported = () => viaWebUsb || (!isAndroid && 'serial' in navigator);
+
+// navigator.serial, or usbSerial on Android
+const api = viaWebUsb ? usbSerial : navigator.serial;
+export const serialApi = () => api;
+
+// Shows the browser's picker, for Espressif devices only
+export function requestBxPort() {
+  return api.requestPort({ filters: [{ usbVendorId: ESPRESSIF_VID }] });
+}
 
 export class SerialLink {
   constructor({ onData, onClose }) {
@@ -22,7 +38,7 @@ export class SerialLink {
 
   // Asks the browser for a port (shows the picker), unless one is given
   async connect(port) {
-    this.port = port || await navigator.serial.requestPort({ filters: [{ usbVendorId: ESPRESSIF_VID }] });
+    this.port = port || await requestBxPort();
     await this.open();
   }
 
@@ -41,8 +57,10 @@ export class SerialLink {
           if (done) break;
           if (value) this.cb.onData?.(value);
         }
-      } catch {
-        break;   // device unplugged or reset
+      } catch (e) {
+        this.lostReason = e?.message || String(e);   // device unplugged or reset, or a USB error
+        console.warn('USB console: read stopped:', e);
+        break;
       } finally {
         this.reader.releaseLock();
         this.reader = null;
@@ -51,7 +69,8 @@ export class SerialLink {
     }
     if (!this.closing) {
       await this.closePort();
-      this.cb.onClose?.('lost');
+      this.cb.onClose?.('lost', this.lostReason);
+      this.lostReason = null;
     }
   }
 
@@ -99,7 +118,7 @@ export class SerialLink {
 export async function findGrantedPort(timeoutMs = 8000) {
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
-    const ports = await navigator.serial.getPorts();
+    const ports = await api.getPorts();
     const port = ports.find((p) => p.getInfo().usbVendorId === ESPRESSIF_VID);
     if (port) return port;
     await new Promise((r) => setTimeout(r, 300));

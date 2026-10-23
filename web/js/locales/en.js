@@ -133,7 +133,7 @@ export default {
   'bota.err.cancelled': "Update cancelled: it needs the code from BX Tacho's display.",
   'bota.err.other': 'Update failed: {msg}. BX Tacho keeps its current firmware.',
 
-  'note.noSerial': "This browser can't open serial ports. Use Chrome or Edge on a computer.",
+  'note.noSerial': "This browser can't open USB serial ports. Use Chrome or Edge on a computer, or Chrome on Android.",
   'note.noBle': "This browser can't use Bluetooth. Use Chrome or Edge on a computer, or Chrome on Android.",
   'note.usbBlocked': 'Disconnect Bluetooth to use USB. One connection at a time.',
   'note.bleBlocked': 'Disconnect USB to use Bluetooth. One connection at a time.',
@@ -142,7 +142,7 @@ export default {
   'err.portOpenShort': "Couldn't open the port: {msg}",
   'err.bleConnect': "Couldn't connect: {msg}. Check that BX Tacho shows the Bluetooth icon and no other app is connected to it.",
 
-  'foot.text': 'Runs in Chrome or Edge. USB needs a computer; Bluetooth also works in Chrome on Android. One connection at a time.',
+  'foot.text': 'Runs in Chrome or Edge on a computer, and in Chrome on Android (USB with a USB-C cable to the phone). One connection at a time.',
   'lang.label': 'Language',
   'lang.auto': 'Automatic ({name})',
 };

@@ -132,7 +132,7 @@ export default {
   'bota.err.cancelled': '已取消更新：需要输入 BX Tacho 屏幕上的代码。',
   'bota.err.other': '更新失败：{msg}。BX Tacho 会保留当前固件。',
 
-  'note.noSerial': '此浏览器无法打开串口。请在电脑上使用 Chrome 或 Edge。',
+  'note.noSerial': '此浏览器无法打开 USB 串口。请在电脑上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.noBle': '此浏览器无法使用蓝牙。请在电脑上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.usbBlocked': '请先断开蓝牙连接才能使用 USB，一次只能使用一种连接。',
   'note.bleBlocked': '请先断开 USB 连接才能使用蓝牙，一次只能使用一种连接。',
@@ -141,7 +141,7 @@ export default {
   'err.portOpenShort': '无法打开串口：{msg}',
   'err.bleConnect': '无法连接：{msg}。请确认 BX Tacho 显示了蓝牙图标，并且没有其他 App 正在连接。',
 
-  'foot.text': '请使用 Chrome 或 Edge。USB 需要电脑；蓝牙也可以在 Android 版 Chrome 中使用。一次只能使用一种连接。',
+  'foot.text': '请在电脑上使用 Chrome 或 Edge，或在 Android 上使用 Chrome（USB 需用 USB-C 线连接手机）。一次只能使用一种连接。',
   'lang.label': '语言',
   'lang.auto': '自动（{name}）',
 };

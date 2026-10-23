@@ -132,7 +132,7 @@ export default {
   'bota.err.cancelled': '更新をキャンセルしました：BX Tacho の画面に表示されるコードが必要です。',
   'bota.err.other': '更新に失敗しました：{msg}。BX Tacho は今のファームウェアのままです。',
 
-  'note.noSerial': 'このブラウザはシリアルポートを開けません。パソコンの Chrome または Edge を使ってください。',
+  'note.noSerial': 'このブラウザは USB シリアルポートを開けません。パソコンの Chrome または Edge か、Android の Chrome を使ってください。',
   'note.noBle': 'このブラウザは Bluetooth を使えません。パソコンの Chrome または Edge か、Android の Chrome を使ってください。',
   'note.usbBlocked': 'USB を使うには Bluetooth を切断してください。同時に使える接続は 1 つだけです。',
   'note.bleBlocked': 'Bluetooth を使うには USB を切断してください。同時に使える接続は 1 つだけです。',
@@ -141,7 +141,7 @@ export default {
   'err.portOpenShort': 'ポートを開けませんでした：{msg}',
   'err.bleConnect': '接続できませんでした：{msg}。BX Tacho に Bluetooth アイコンが表示されていて、他のアプリが接続していないことを確認してください。',
 
-  'foot.text': 'Chrome または Edge で動作します。USB はパソコンが必要です。Bluetooth は Android の Chrome でも使えます。同時に使える接続は 1 つだけです。',
+  'foot.text': 'パソコンの Chrome または Edge、Android の Chrome で動作します（USB はスマートフォンと USB-C ケーブルでつなぎます）。同時に使える接続は 1 つだけです。',
   'lang.label': '言語',
   'lang.auto': '自動（{name}）',
 };

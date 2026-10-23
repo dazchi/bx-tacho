@@ -132,7 +132,7 @@ export default {
   'bota.err.cancelled': '已取消更新：需要輸入 BX Tacho 螢幕上的代碼。',
   'bota.err.other': '更新失敗：{msg}。BX Tacho 會保留目前的韌體。',
 
-  'note.noSerial': '此瀏覽器無法開啟序列埠。請在電腦上使用 Chrome 或 Edge。',
+  'note.noSerial': '此瀏覽器無法開啟 USB 序列埠。請在電腦上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.noBle': '此瀏覽器無法使用藍牙。請在電腦上使用 Chrome 或 Edge，或在 Android 上使用 Chrome。',
   'note.usbBlocked': '請先中斷藍牙連線才能使用 USB，一次只能使用一種連線。',
   'note.bleBlocked': '請先中斷 USB 連線才能使用藍牙，一次只能使用一種連線。',
@@ -141,7 +141,7 @@ export default {
   'err.portOpenShort': '無法開啟連接埠：{msg}',
   'err.bleConnect': '無法連線：{msg}。請確認 BX Tacho 有顯示藍牙圖示，且沒有其他 App 正在連線。',
 
-  'foot.text': '請使用 Chrome 或 Edge。USB 需要電腦；藍牙也可在 Android 版 Chrome 使用。一次只能使用一種連線。',
+  'foot.text': '請在電腦上使用 Chrome 或 Edge，或在 Android 上使用 Chrome（USB 需以 USB-C 線連接手機）。一次只能使用一種連線。',
   'lang.label': '語言',
   'lang.auto': '自動（{name}）',
 };
