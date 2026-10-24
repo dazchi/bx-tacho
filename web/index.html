@@ -71,7 +71,7 @@
         <aside class="flash" aria-labelledby="flash-title">
           <div class="flash__intro">
             <h2 class="title title--small" id="flash-title" data-i18n="fw.title">Update firmware</h2>
-            <p class="body body--wide" data-i18n-html="fw.intro">Choose <code>bx-tacho.bin</code> from a firmware build. Your shot history and settings are kept.</p>
+            <p class="body body--wide" data-i18n-html="fw.intro">Choose <code>bx-tacho-v….bin</code> from a firmware build. Your shot history and settings are kept.</p>
           </div>
           <div class="flash__controls">
             <label class="drop" id="drop">
@@ -79,9 +79,11 @@
               <span class="drop__label" data-i18n="fw.choose">Choose firmware file</span>
               <span class="drop__hint" data-i18n="fw.drop">or drop it here</span>
             </label>
+            <button class="btn btn--wide" id="fw-latest" hidden></button>
             <div class="fw" id="fw-info" hidden>
               <p class="fw__name" id="fw-name"></p>
               <p class="fw__detail" id="fw-detail"></p>
+              <p class="fw__sum" id="fw-sum" hidden></p>
             </div>
             <details class="adv">
               <summary class="adv__summary" data-i18n="fw.advanced">Advanced</summary>
@@ -207,16 +209,18 @@
           <h2 class="title title--small" id="bota-title" data-i18n="bota.title">Update firmware</h2>
           <p class="aside-text" id="bota-current"></p>
         </div>
-        <p class="body body--wide" data-i18n="bota.intro">Install a new bx-tacho.bin over Bluetooth, unlocked with the code on BX Tacho's display. It takes about a minute; then BX Tacho restarts into it. If anything goes wrong, it keeps its current firmware.</p>
+        <p class="body body--wide" data-i18n="bota.intro">Install a new bx-tacho-v….bin over Bluetooth, unlocked with the code on BX Tacho's display. It takes about a minute; then BX Tacho restarts into it. If anything goes wrong, it keeps its current firmware.</p>
         <div class="flash__controls">
           <label class="drop" id="bota-drop">
             <input type="file" id="bota-file" accept=".bin,application/octet-stream">
             <span class="drop__label" data-i18n="fw.choose">Choose firmware file</span>
             <span class="drop__hint" data-i18n="fw.drop">or drop it here</span>
           </label>
+          <button class="btn btn--wide" id="bota-latest" hidden></button>
           <div class="fw" id="bota-info" hidden>
             <p class="fw__name" id="bota-name"></p>
             <p class="fw__detail" id="bota-detail"></p>
+            <p class="fw__sum" id="bota-sum" hidden></p>
           </div>
           <button class="btn btn--primary btn--wide" id="bota-update" disabled data-i18n="bota.update">Update over Bluetooth</button>
           <p class="note" id="bota-warn" hidden></p>

@@ -32,7 +32,7 @@ function readApp(bytes, at) {
   return { chipId, hasDesc: true, version: cString(bytes, d + 16, 32), project: cString(bytes, d + 48, 32) };
 }
 
-// Checks that a .bin is a BX Tacho app image (bx-tacho.bin). kind: 'app' | 'invalid',
+// Checks that a .bin is a BX Tacho app image (bx-tacho-v<version>.bin, or bx-tacho.bin). kind: 'app' | 'invalid',
 // with `reason` a translation key (and `project` for 'fw.bad.project').
 // This guards against picking the wrong file, not against modified firmware: any
 // ESP-IDF build of this project (project name "bx-tacho") is accepted.

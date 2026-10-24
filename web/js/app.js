@@ -27,6 +27,7 @@ const state = {
   bfw: null,             // firmware to send over Bluetooth: { bytes, info }
   updating: false,       // ...being sent
   fw: null,              // { bytes, info, name }
+  latest: null,          // the latest release on this site (firmware/latest/latest.json)
 };
 
 // ---------------------------------------------------------------- brand
@@ -275,7 +276,95 @@ function kb(n) {
   return t('fw.kb', { n: fmt(Math.round(n / 1024)) });
 }
 
-async function loadFirmware(file) {
+async function sha256(bytes) {
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  return [...hash].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Shows the SHA-256 of a chosen firmware file in `el`, to compare with the
+// SHA256SUMS.txt of a release, or that it matches `release` (the latest one,
+// already checked). A newer file chosen meanwhile wins.
+async function showChecksum(el, bytes, release) {
+  el.hidden = true;
+  el.pending = bytes;
+  const sum = await sha256(bytes);
+  if (el.pending !== bytes) return;
+  setText(el, release ? 'fw.sha256Release' : 'fw.sha256', { sum, v: release?.version });
+  el.hidden = false;
+}
+
+// The firmware of the latest release, which the Pages workflow copies to this
+// site (GitHub's own downloads can't be read from another site), with
+// latest.json describing it. Without it (a local copy, no release yet) the
+// buttons stay hidden.
+async function findLatest() {
+  try {
+    const res = await fetch('firmware/latest/latest.json', { cache: 'no-cache' });
+    if (!res.ok) return;
+    const latest = await res.json();
+    latest.file ??= 'bx-tacho.bin';   // before releases named the file after the version
+    if (!latest.version || !/^[0-9a-f]{64}$/.test(latest.sha256) || !/^bx-tacho[\w.-]*\.bin$/.test(latest.file)) return;
+    state.latest = latest;
+  } catch {
+    return;
+  }
+  for (const id of ['fw-latest', 'bota-latest']) {
+    setText($(id), 'fw.latest', { v: state.latest.version });
+    $(id).hidden = false;
+  }
+}
+
+// Downloads the latest release's firmware and checks it against the
+// release's checksum, then loads it like a chosen file. `prefix` is 'fw' or
+// 'bota', the block whose button was used.
+async function useLatest(prefix, load) {
+  const btn = $(`${prefix}-latest`);
+  const { version, file, sha256: want } = state.latest;
+  btn.disabled = true;
+  setText(btn, 'fw.latestLoading', { v: version });
+  try {
+    let bytes;
+    try {
+      const res = await fetch(`firmware/latest/${file}?sha256=${want}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      bytes = new Uint8Array(await res.arrayBuffer());
+    } catch {
+      return latestFailed(prefix, 'fw.latestFailed');
+    }
+    if ((await sha256(bytes)) !== want) return latestFailed(prefix, 'fw.latestBad');
+    await load(new File([bytes], file), state.latest);
+  } finally {
+    btn.disabled = false;
+    setText(btn, 'fw.latest', { v: version });
+  }
+}
+
+// The latest release couldn't be used: says why in the file box, and drops
+// any file chosen before so it isn't sent by mistake
+function latestFailed(prefix, key) {
+  if (prefix === 'fw') state.fw = null;
+  else state.bfw = null;
+  const box = $(`${prefix}-info`);
+  box.hidden = false;
+  box.dataset.kind = 'invalid';
+  setPlain($(`${prefix}-name`), state.latest.file);
+  setText($(`${prefix}-detail`), key);
+  $(`${prefix}-sum`).hidden = true;
+  $(`${prefix}-sum`).pending = null;
+  $(`${prefix}-progress`).hidden = true;
+  if (prefix === 'fw') {
+    describeFirmware();
+    updateFlashButton();
+  } else {
+    updateBleUpdateButton();
+  }
+}
+
+$('fw-latest').addEventListener('click', () => useLatest('fw', loadFirmware));
+$('bota-latest').addEventListener('click', () => useLatest('bota', loadBleFirmware));
+findLatest();
+
+async function loadFirmware(file, release) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const info = analyzeImage(bytes);
   state.fw = info.kind === 'invalid' ? null : { bytes, info, name: file.name };
@@ -291,6 +380,7 @@ async function loadFirmware(file) {
   describeFirmware();
   $('fw-progress').hidden = true;
   updateFlashButton();
+  showChecksum($('fw-sum'), bytes, release);
 }
 
 // What the update will do, which depends on the erase option
@@ -776,7 +866,7 @@ function settleUnlock(err) {
 
 const botaProgress = (...args) => progress('bota', ...args);
 
-async function loadBleFirmware(file) {
+async function loadBleFirmware(file, release) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const info = analyzeImage(bytes);
   state.bfw = info.kind === 'invalid' ? null : { bytes, info };
@@ -792,6 +882,7 @@ async function loadBleFirmware(file) {
   }
   $('bota-progress').hidden = true;
   updateBleUpdateButton();
+  showChecksum($('bota-sum'), bytes, release);
 }
 
 function updateBleUpdateButton() {

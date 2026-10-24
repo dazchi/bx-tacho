@@ -38,12 +38,15 @@ own folder with its own sdkconfig, so the development build is untouched:
 
 ```
 idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" build
-idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" merge-bin -o bx-tacho-merged.bin
+idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" merge-bin -o bx-tacho-v1.2.0-merged.bin
 ```
 
-- `build/release/bx-tacho.bin`: the file to publish, for updates from the web
-  app (USB or Bluetooth) or `write-flash 0x10000` (with `otadata`, see above).
-- `build/release/bx-tacho-merged.bin`: everything from 0x0, for a blank board
+- `build/release/bx-tacho-v1.2.0.bin`: the file to publish, for updates from
+  the web app (USB or Bluetooth) or `write-flash 0x10000` (with `otadata`, see
+  above). Every build copies `bx-tacho.bin` to this name, from `PROJECT_VER`
+  in `CMakeLists.txt` (with `-bbp` for a build with the extension);
+  `idf.py flash` keeps using `bx-tacho.bin`.
+- `build/release/bx-tacho-v1.2.0-merged.bin`: everything from 0x0, for a blank board
   (`write-flash 0x0`). It overwrites NVS (settings and shot history) but ends
   below `fctry`, so the battery calibration stays.
 
@@ -188,7 +191,7 @@ only it is covered by the additional permission in `NOTICE`.
 
 ## Firmware updates over Bluetooth
 
-From the web app's Bluetooth tab: pick `bx-tacho.bin`, enter the code on the
+From the web app's Bluetooth tab: pick `bx-tacho-v<version>.bin` (or use the latest release), enter the code on the
 display (as for the console), and BX Tacho takes the image in about a minute,
 showing `FIRMWARE UPDATE` and the percentage, then restarts into it. Protocol:
 `main/ble_ota.h`.

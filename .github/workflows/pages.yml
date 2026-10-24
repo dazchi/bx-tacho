@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Darren Chi
-# Publishes web/ (the BX Tacho web app) to GitHub Pages.
+# Publishes web/ (the BX Tacho web app) to GitHub Pages, together with the
+# firmware of the latest release (web/firmware/latest/, for the web app's
+# "Use the latest release"), on every push that changes web/ and whenever a
+# release is published.
 # One-time setup: repository Settings > Pages > Build and deployment > Source: GitHub Actions.
 name: Deploy web app
 
@@ -10,25 +13,73 @@ on:
     paths:
       - 'web/**'
       - '.github/workflows/pages.yml'
+  release:
+    types: [published]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
-  deploy:
+  # A release event runs on its tag, which the github-pages environment doesn't
+  # accept, so it starts this workflow again on master instead
+  redeploy:
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref master
+
+  deploy:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      - name: Add the latest release's firmware
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The newest published release that has firmware (not a hardware-only
+          # one): bx-tacho-v<version>.bin, or bx-tacho.bin before v1.3.0
+          found=$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq '[.[] | select(.draft | not) | select(.prerelease | not) | {tag: .tag_name, bin: ([.assets[].name | select(test("^bx-tacho(-v[^/]+)?[.]bin$") and (test("merged") | not))][0])} | select(.bin)][0] // empty | "\(.tag) \(.bin)"')
+          if [ -z "$found" ]; then
+            echo "No release with firmware yet"
+            exit 0
+          fi
+          read -r tag bin <<< "$found"
+          dir=web/firmware/latest
+          mkdir -p "$dir"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "$dir" --pattern "$bin" --pattern SHA256SUMS.txt
+          (cd "$dir" && grep " $bin\$" SHA256SUMS.txt | sha256sum -c -)
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json tagName,url,publishedAt > "$dir/release.json"
+          python3 - "$dir" "$bin" <<'EOF'
+          import json, os, sys
+          d, name = sys.argv[1:]
+          rel = json.load(open(os.path.join(d, 'release.json')))
+          sums = dict(reversed(line.split()) for line in open(os.path.join(d, 'SHA256SUMS.txt')) if line.strip())
+          json.dump({
+              'tag': rel['tagName'],
+              'version': rel['tagName'].lstrip('v'),
+              'url': rel['url'],
+              'published': rel['publishedAt'],
+              'file': name,
+              'size': os.path.getsize(os.path.join(d, name)),
+              'sha256': sums[name],
+          }, open(os.path.join(d, 'latest.json'), 'w'), indent=2)
+          EOF
+          rm "$dir/release.json"
+          cat "$dir/latest.json"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

@@ -74,14 +74,25 @@ the language changes.
 
 ## Firmware updates
 
-Choose `bx-tacho.bin` from `firmware/build/`. It's written at `0x10000`, so
+Choose `bx-tacho-v<version>.bin` (or `bx-tacho.bin`) from `firmware/build/`,
+or **Use the latest release**: the Pages workflow
+(`.github/workflows/pages.yml`) copies the newest release's firmware
+(`bx-tacho-v<version>.bin`, or `bx-tacho.bin` in releases before v1.3.0) to
+`firmware/latest/` on the site, with `latest.json` (version, file name, size,
+SHA-256). The page downloads it from there, since GitHub's release
+downloads can't be read from another site, and checks it against the SHA-256
+from the release's `SHA256SUMS.txt`. The workflow runs again whenever a
+release is published. Without `latest.json` (a local copy, no release yet) the
+button is hidden. The page shows the SHA-256 of whichever file is chosen.
+
+The app image is written at `0x10000`, so
 the shot history, load calibration and settings in NVS are kept. Every update
 also writes the bootloader and partition table bundled in `firmware/`, and a
 blank `otadata` so the board boots the app just written rather than one in the
 other slot. That also moves a board that still has the older single-app table
 to the two slots that Bluetooth updates need. The page
 reads the file's header first and refuses anything else: the merged image
-(`bx-tacho-merged.bin`), images without an ESP-IDF app description (such as
+(`bx-tacho-v<version>-merged.bin`), images without an ESP-IDF app description (such as
 `bootloader.bin`), other projects, other chips. This prevents picking the
 wrong file by mistake; it doesn't lock the firmware: any build of this
 project (ESP-IDF project name `bx-tacho`), including your own changes, is
