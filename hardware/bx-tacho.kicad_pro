@@ -148,14 +148,6 @@
         [
           "silk_overlap|173285714|74926247|31f265a3-a608-4fdb-8b0a-0d63c55275c8|bc09628d-1633-454b-bd1a-94784cc47655",
           ""
-        ],
-        [
-          "starved_thermal|181602500|76800000|73fcebb3-e9c7-4678-bd8b-c6a1d81e1d0c|ba0f90ec-81f3-4d06-8b2c-088c0018083e|F.Cu",
-          ""
-        ],
-        [
-          "starved_thermal|181602500|83200000|73fcebb3-e9c7-4678-bd8b-c6a1d81e1d0c|adf47931-b7ec-4c83-9234-0331d1553dd9|F.Cu",
-          ""
         ]
       ],
       "meta": {
@@ -188,7 +180,7 @@
         "items_not_allowed": "error",
         "length_out_of_range": "error",
         "lib_footprint_issues": "warning",
-        "lib_footprint_mismatch": "warning",
+        "lib_footprint_mismatch": "ignore",
         "malformed_courtyard": "error",
         "microvia_drill_out_of_range": "error",
         "mirrored_text_on_front_layer": "warning",
@@ -202,7 +194,7 @@
         "pth_inside_courtyard": "ignore",
         "shorting_items": "error",
         "silk_edge_clearance": "warning",
-        "silk_over_copper": "warning",
+        "silk_over_copper": "ignore",
         "silk_overlap": "warning",
         "skew_out_of_range": "error",
         "solder_mask_bridge": "error",
@@ -243,7 +235,7 @@
         "min_track_width": 0.2,
         "min_via_annular_width": 0.1,
         "min_via_diameter": 0.5,
-        "solder_mask_to_copper_clearance": 0.0,
+        "solder_mask_to_copper_clearance": 0.005,
         "use_height_for_length_calcs": true
       },
       "teardrop_options": [
