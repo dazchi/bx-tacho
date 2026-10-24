@@ -28,3 +28,9 @@ managed_components/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Fabrication outputs: published in GitHub Releases, not tracked
+hardware/bx-tacho.csv
+hardware/gerber/
+hardware/interactive-bom/
+hardware/jlcpcb/
