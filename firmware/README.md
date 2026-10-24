@@ -91,6 +91,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `cfg edges <n>` | Rising edges per launcher revolution |
 | `cfg lightsleep on\|off` | Automatic light sleep on battery (default on), for power debugging |
 | `cfg flip on\|off` | Turn the display 180 degrees, for holding the launcher in the other hand (default off; applies at once, kept by `cfg reset`) |
+| `cfg ext on\|off` | Use the optional Battle Pass extension, in builds that have one (default off; saves and restarts), see "Optional extension" |
 | `events` / `events clear` | Power/sleep event log: boots and reset reasons, load changes, state changes, USB, display on/off, deep sleep. Kept in RTC memory, so it survives deep sleep and resets (not power-on) |
 | `launch [n]` | Last launch edge by edge (first `n` edges, default 60): time, interval, RPM, with the release seen by the load sensor and any edges the chatter filter dropped |
 | `ble` | Battle Pass link state |
@@ -157,6 +158,33 @@ sources and open questions: [docs/bbp-protocol.md](docs/bbp-protocol.md).
   `BLE ON` or `BLE OFF`, then BX Tacho restarts with the new setting (same as
   `ble on|off`; logged as `BLE GESTURE` in `events`). Flashing the merged
   binary resets it to on.
+- **Debug log:** connects, disconnects and subscriptions (with a session
+  number), every write from the app, each status packet with its reason, and
+  the start and end of each history/curve dump go to the USB log (tag `bbp`).
+  Data meant for one session never reaches the next: queued commands and
+  packets carry their session number.
+
+## Optional extension
+
+The Battle Pass emulation can take an extension: a component named `bbp_ext`
+kept outside this repository, which can change how BX Tacho presents itself
+and add to what it sends. The interface is
+`components/bbp_ext_api/include/bbp_ext.h`; linking an extension that uses
+only it is covered by the additional permission in `NOTICE`.
+
+- Without one (the normal build, and the releases), none of it is compiled in
+  and `cfg ext` says the build has none.
+- A build with one: point `EXTRA_COMPONENT_DIRS` at the folder that holds
+  `bbp_ext/`, in a build folder of its own:
+
+  ```
+  idf.py -B build/ext -D SDKCONFIG=build/ext/sdkconfig -D EXTRA_COMPONENT_DIRS=<folder with bbp_ext> build
+  ```
+
+  For a release build add `-D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release"`.
+- It's used only while `cfg ext on` (off by default, applied at boot) and only
+  if it was built for the same interface version (`BBP_EXT_API_VERSION`);
+  `ble` shows its name and whether it's in use.
 
 ## Firmware updates over Bluetooth
 

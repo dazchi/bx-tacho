@@ -17,6 +17,7 @@ static const char *TAG = "settings";
 #define NVS_KEY_LIGHT_SLEEP "lightsleep"
 #define NVS_KEY_BLE         "ble"
 #define NVS_KEY_FLIP        "flip"
+#define NVS_KEY_BBP_EXT     "bbpext"
 // Bump when settings_t changes layout; stale blobs are then ignored.
 #define SETTINGS_VERSION 1
 
@@ -29,6 +30,7 @@ static settings_t s_settings;
 static bool s_light_sleep = true;
 static bool s_ble = true;
 static bool s_flip;
+static bool s_bbp_ext;
 
 static esp_err_t save_u8(const char *key, uint8_t value)
 {
@@ -75,6 +77,17 @@ esp_err_t settings_set_flip(bool flip)
     return save_u8(NVS_KEY_FLIP, flip ? 1 : 0);
 }
 
+bool settings_bbp_ext(void)
+{
+    return s_bbp_ext;
+}
+
+esp_err_t settings_set_bbp_ext(bool on)
+{
+    s_bbp_ext = on;
+    return save_u8(NVS_KEY_BBP_EXT, on ? 1 : 0);
+}
+
 void settings_reset(void)
 {
     s_settings = (settings_t) {
@@ -113,6 +126,10 @@ esp_err_t settings_init(void)
     uint8_t flip;
     if (nvs_get_u8(h, NVS_KEY_FLIP, &flip) == ESP_OK) {
         s_flip = flip != 0;
+    }
+    uint8_t bbp_ext;
+    if (nvs_get_u8(h, NVS_KEY_BBP_EXT, &bbp_ext) == ESP_OK) {
+        s_bbp_ext = bbp_ext != 0;
     }
 
     settings_blob_t blob;

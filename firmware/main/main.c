@@ -840,7 +840,7 @@ static void draw_splash(void)
 {
     char ver[40];
 
-    snprintf(ver, sizeof(ver), "FW V%s", esp_app_get_description()->version);
+    snprintf(ver, sizeof(ver), "v%s", esp_app_get_description()->version);
     display_clear();
     // Logo lockup: icon on the left, name (two lines) and version on the right
     display_bitmap(6, (DISPLAY_H - ICON_BEYBLADE_H) / 2, ICON_BEYBLADE_W, ICON_BEYBLADE_H, icon_beyblade_40);

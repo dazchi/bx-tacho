@@ -684,6 +684,22 @@ static int cmd_cfg(int argc, char **argv)
         cli_printf("display %s (saved)\n", on ? "turned 180 degrees" : "the normal way up");
         return 0;
     }
+    if (argc == 3 && !strcmp(argv[1], "ext") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
+        const char *ext = bbp_ext_built_in();
+        if (ext == NULL) {
+            cli_printf("This build has no Battle Pass extension.\n");
+            return 1;
+        }
+        bool on = !strcmp(argv[2], "on");
+        if (on == settings_bbp_ext()) {
+            cli_printf("extension %s is already %s\n", ext, argv[2]);
+            return 0;
+        }
+        settings_set_bbp_ext(on);
+        cli_printf("extension %s %s (saved). Restarting to apply...\n", ext, argv[2]);
+        vTaskDelay(pdMS_TO_TICKS(300));
+        esp_restart();
+    }
     if (argc == 3 && !strcmp(argv[1], "lightsleep") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
         bool on = !strcmp(argv[2], "on");
         settings_set_light_sleep(on);
@@ -691,7 +707,7 @@ static int cmd_cfg(int argc, char **argv)
         cli_printf("light sleep on battery: %s (saved)\n", argv[2]);
         return 0;
     }
-    cli_printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg flip on|off | cfg reset\n");
+    cli_printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg flip on|off | cfg ext on|off | cfg reset\n");
     return 1;
 }
 
@@ -789,6 +805,11 @@ static int cmd_ble(int argc, char **argv)
         cli_printf(", %s", b.subscribed ? "app listening" : (b.connected ? "connected" : "advertising"));
     }
     cli_printf("\n");
+    const char *ext = bbp_ext_built_in();
+    if (ext != NULL) {
+        cli_printf("extension: %s, %s%s ('cfg ext on|off')\n", ext, settings_bbp_ext() ? "on" : "off",
+                   settings_bbp_ext() && b.radio_on && !bbp_ext_active() ? " but not in use (wrong version)" : "");
+    }
     return 0;
 }
 
@@ -899,7 +920,7 @@ static const cli_cmd_t s_cmds[] = {
     {"rpm", "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", cmd_rpm},
     {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load led on|off: hold the load LED (diag or meter mode)", cmd_load},
     {"cal", "cal load empty|loaded|clear: load sensor; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
-    {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg flip on|off (display turned 180 degrees, for the other hand) | cfg reset", cmd_cfg},
+    {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg flip on|off (display turned 180 degrees, for the other hand) | cfg ext on|off (optional Battle Pass extension, in builds that have one; restarts) | cfg reset", cmd_cfg},
     {"launch", "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", cmd_launch},
     {"ble", "ble | ble on|off: Battle Pass emulation and the console over BLE (on|off restarts)", cmd_ble},
     {"history", "history | history clear: shot history sent to Battle Pass apps (last 50, total, max, latest curve)", cmd_history},

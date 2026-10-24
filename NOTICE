@@ -16,6 +16,21 @@ You should have received a copy of the GNU General Public License along with
 BX Tacho, in the file LICENSE. If not, see <https://www.gnu.org/licenses/>.
 
 
+Additional permission (GPL version 3, section 7)
+------------------------------------------------
+
+As a special exception, the copyright holder of BX Tacho gives you permission
+to combine BX Tacho with an independent module that communicates with it only
+through the interface declared in
+firmware/components/bbp_ext_api/include/bbp_ext.h (a "BX Tacho extension"),
+and to convey the resulting combined work, regardless of the license terms of
+the extension. The extension module itself may be under terms of your choice;
+every other part of the combined work remains under the GNU General Public
+License, and its corresponding source has to be provided as the GPL requires.
+If you modify BX Tacho, you may extend this exception to your version, but you
+are not obliged to.
+
+
 Parts under other terms
 -----------------------
 

@@ -34,3 +34,8 @@ esp_err_t settings_set_ble(bool enable);
 // (default off); saved immediately
 bool settings_flip(void);
 esp_err_t settings_set_flip(bool flip);
+
+// Optional Battle Pass extension in use, in builds that have one (bbp_ext.h;
+// default off); saved immediately, applied at boot
+bool settings_bbp_ext(void);
+esp_err_t settings_set_bbp_ext(bool on);

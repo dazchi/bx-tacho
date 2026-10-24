@@ -8,6 +8,7 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -19,6 +20,10 @@
 #include "nvs.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
+#include "settings.h"
+#if BXT_HAVE_BBP_EXT
+#include "bbp_ext.h"
+#endif
 
 static const char *TAG = "bbp";
 
@@ -27,7 +32,9 @@ static const char *TAG = "bbp";
 #define SET_LEN             12      // B0..B7, 70..73
 #define NOTIFY_GAP_MS       10      // between the packets of a set
 #define SUBSCRIBE_SETTLE_MS 100     // before the first status after subscribing
-#define NOTIFY_RETRIES      20      // ...of NOTIFY_GAP_MS while the stack is out of buffers
+// While the stack is out of buffers, retry a packet this long (in NOTIFY_GAP_MS
+// steps); then the link is dropped, so the app starts a clean session
+#define NOTIFY_TIMEOUT_MS   1500
 #define ADV_ITVL_MIN_MS     300
 #define ADV_ITVL_MAX_MS     400
 
@@ -67,6 +74,7 @@ typedef struct {
     uint8_t type;
     uint8_t cmd;
     uint16_t sp;
+    uint32_t gen;             // link session it belongs to (s_gen when posted)
     uint16_t curve[CURVE_LEN];
 } bbp_event_t;
 
@@ -78,12 +86,20 @@ static uint8_t s_uid[6];
 static volatile bool s_attached;
 static volatile uint8_t s_batt_raw = 250;
 static bool s_radio_on;
+static bool s_ext;                  // optional extension in use (bbp_ext.h), from boot
+static int s_ext_next_ms = -1;      // when it wants to be polled again (worker)
 static volatile bool s_stopping;    // going to deep sleep: no more advertising
 
-// Link state, written by the NimBLE host task
+// Link state, written by the NimBLE host task. s_gen changes with every connect,
+// disconnect and subscription change, so nothing queued or being sent for one
+// session reaches the next: events and packets carry the generation they were
+// meant for.
 static volatile bool s_connected;
 static volatile bool s_subscribed;
 static volatile uint16_t s_conn = BLE_HS_CONN_HANDLE_NONE;
+static volatile uint32_t s_gen = 1;
+static volatile int64_t s_sub_us;   // when the app subscribed
+
 static uint16_t s_data_handle;
 static uint8_t s_own_addr_type;
 
@@ -159,6 +175,11 @@ static void build_status(uint8_t pkt[PKT_LEN], const bbp_store_t *st)
     put_u16(&pkt[7], st->max_sp);
     put_u16(&pkt[9], st->total);
     memcpy(&pkt[11], s_uid, sizeof(s_uid));
+#if BXT_HAVE_BBP_EXT
+    if (s_ext) {
+        bbp_ext_status(pkt, s_gen);
+    }
+#endif
 }
 
 // Entry i of a 16-bit table spread over packets of 8 entries each
@@ -201,10 +222,11 @@ static void build_set(uint8_t pkts[SET_LEN][PKT_LEN], const bbp_store_t *st)
 
 // ---------------------------------------------------------------- sending
 
-static bool notify(const uint8_t pkt[PKT_LEN])
+// Sends one packet to the session `gen`; false if that session is gone
+static bool notify(const uint8_t pkt[PKT_LEN], uint32_t gen)
 {
-    for (int attempt = 0; attempt < NOTIFY_RETRIES; attempt++) {
-        if (!s_connected || !s_subscribed) {
+    for (int attempt = 0; attempt < NOTIFY_TIMEOUT_MS / NOTIFY_GAP_MS; attempt++) {
+        if (!s_connected || !s_subscribed || s_gen != gen) {
             return false;
         }
         struct os_mbuf *om = ble_hs_mbuf_from_flat(pkt, PKT_LEN);
@@ -220,33 +242,48 @@ static bool notify(const uint8_t pkt[PKT_LEN])
         }
         vTaskDelay(pdMS_TO_TICKS(NOTIFY_GAP_MS));   // out of buffers: let the stack catch up
     }
-    ESP_LOGW(TAG, "notify gave up: no buffers");
+    ESP_LOGW(TAG, "notify gave up after %d ms without buffers: dropping the link", NOTIFY_TIMEOUT_MS);
+    ble_gap_terminate(s_conn, BLE_ERR_REM_USER_CONN_TERM);
     return false;
 }
 
-static void send_status(void)
+static void send_status(uint32_t gen, const char *reason)
 {
     bbp_store_t st;
     uint8_t pkt[PKT_LEN];
     snapshot(&st);
     build_status(pkt, &st);
-    notify(pkt);
+    if (notify(pkt, gen)) {
+        ESP_LOGI(TAG, "TX A0 state=0x%02x battery=%u max=%u total=%lu reason=%s", pkt[3], pkt[4],
+                 st.max_sp, (unsigned long)st.total, reason);
+    }
 }
 
-static void send_set(void)
+// The 12 packets from one snapshot, never interleaved with anything else (the
+// worker sends one thing at a time)
+static void send_set(uint32_t gen, const char *source)
 {
     bbp_store_t st;
     uint8_t pkts[SET_LEN][PKT_LEN];
     snapshot(&st);
     build_set(pkts, &st);
+    int points = 0;
+    while (points < CURVE_LEN && st.curve[points] != 0) {
+        points++;
+    }
+    ESP_LOGI(TAG, "dump start source=%s count=%u total=%lu max=%u curve_points=%d", source,
+             st.count, (unsigned long)st.total, st.max_sp, points);
     for (int i = 0; i < SET_LEN; i++) {
         if (i > 0) {
             vTaskDelay(pdMS_TO_TICKS(NOTIFY_GAP_MS));
         }
-        if (!notify(pkts[i])) {
+        if (!notify(pkts[i], gen)) {
+            ESP_LOGW(TAG, "dump stopped at page %02X: the session ended", pkts[i][0]);
             return;
         }
+        ESP_LOGD(TAG, "TX page=%02X index=%d", pkts[i][0], i);
     }
+    ESP_LOGI(TAG, "dump complete");
 }
 
 // ---------------------------------------------------------------- worker
@@ -267,32 +304,95 @@ static void add_shot(const bbp_event_t *ev)
     xSemaphoreGive(s_lock);
 }
 
+// The optional extension (bbp_ext.h) gets a look after every event, and again
+// when it asked to be polled; it may have a status packet sent
+static void ext_poll(void)
+{
+#if BXT_HAVE_BBP_EXT
+    if (!s_ext) {
+        return;
+    }
+    uint32_t gen = s_gen;
+    bbp_ext_action_t action = bbp_ext_poll(gen, s_subscribed, s_attached, esp_timer_get_time());
+    s_ext_next_ms = action.next_ms;
+    if (action.send_status && s_subscribed) {
+        send_status(gen, action.reason ? action.reason : "EXT");
+    }
+#endif
+}
+
+static TickType_t ext_wait(void)
+{
+    return s_ext_next_ms < 0 ? portMAX_DELAY : pdMS_TO_TICKS(s_ext_next_ms);
+}
+
+static void handle_command(const bbp_event_t *ev)
+{
+    switch (ev->cmd) {
+    case 0x51:
+        ESP_LOGI(TAG, "CMD 51 STATUS");
+        send_status(ev->gen, "CMD_51");
+        break;
+    case 0x74:
+        ESP_LOGI(TAG, "CMD 74 DUMP");
+        send_set(ev->gen, "CMD_74");
+        break;
+    case 0x75:
+        // "Clear history" in one emulator, "sensor test" in another: not
+        // confirmed, so the history isn't wiped on it
+        ESP_LOGI(TAG, "CMD 75 CLEAR? ignored (meaning unconfirmed)");
+        break;
+    case 0x61:
+        ESP_LOGI(TAG, "CMD 61 (meaning unknown) ignored");
+        break;
+    default:
+        ESP_LOGI(TAG, "CMD UNKNOWN %02x ignored", ev->cmd);
+        break;
+    }
+}
+
 static void worker_task(void *arg)
 {
     bbp_event_t ev;
     for (;;) {
-        xQueueReceive(s_queue, &ev, portMAX_DELAY);
+        if (xQueueReceive(s_queue, &ev, ext_wait()) != pdTRUE) {
+            ext_poll();
+            continue;
+        }
+        // Link events from a session that has ended since are dropped
+        bool stale = ev.gen != s_gen;
         switch (ev.type) {
         case EV_ATTACH:
-            send_status();
+            if (!stale) {
+                send_status(ev.gen, "LOAD_CHANGE");
+            }
             break;
         case EV_SUBSCRIBED:
+            if (stale) {
+                break;
+            }
+            ESP_LOGI(TAG, "session start gen=%lu", (unsigned long)ev.gen);
             vTaskDelay(pdMS_TO_TICKS(SUBSCRIBE_SETTLE_MS));
-            send_status();
+            send_status(ev.gen, "SUBSCRIBE_INITIAL");
+#if BXT_HAVE_BBP_EXT
+            if (s_ext) {
+                bbp_ext_session_start(ev.gen, s_sub_us);
+            }
+#endif
             break;
         case EV_SHOT:
             add_shot(&ev);
-            send_set();       // the app first, then the slower flash write
+            if (s_subscribed) {
+                send_set(s_gen, "AUTO");   // the app first, then the slower flash write
+            }
             store_save();
             break;
         case EV_CMD:
-            if (ev.cmd == 0x51) {
-                send_status();
-            } else if (ev.cmd == 0x74) {
-                send_set();
+            if (stale) {
+                ESP_LOGI(TAG, "CMD %02x from an ended session (gen %lu) dropped", ev.cmd,
+                         (unsigned long)ev.gen);
             } else {
-                // 0x75 (meaning unconfirmed: clear history or sensor test), 0x61, others
-                ESP_LOGI(TAG, "command 0x%02x ignored", ev.cmd);
+                handle_command(&ev);
             }
             break;
         case EV_CLEAR:
@@ -300,14 +400,18 @@ static void worker_task(void *arg)
             memset(&s_store, 0, sizeof(s_store));
             xSemaphoreGive(s_lock);
             store_save();
-            send_status();
+            if (s_subscribed) {
+                send_status(s_gen, "CLEAR");
+            }
             break;
         }
+        ext_poll();
     }
 }
 
-static void post(const bbp_event_t *ev)
+static void post(bbp_event_t *ev)
 {
+    ev->gen = s_gen;
     if (s_queue != NULL && xQueueSend(s_queue, ev, 0) != pdTRUE) {
         ESP_LOGW(TAG, "event queue full, event %d dropped", ev->type);
     }
@@ -323,32 +427,40 @@ static int chr_access(uint16_t conn_handle, uint16_t attr_handle,
     }
     // Commands are one byte; take the first byte of anything longer
     bbp_event_t ev = {.type = EV_CMD};
-    if (OS_MBUF_PKTLEN(ctxt->om) < 1 || os_mbuf_copydata(ctxt->om, 0, 1, &ev.cmd) != 0) {
+    uint16_t len = OS_MBUF_PKTLEN(ctxt->om);
+    if (len < 1 || os_mbuf_copydata(ctxt->om, 0, 1, &ev.cmd) != 0) {
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
+    ESP_LOGI(TAG, "RX gen=%lu handle=%u chr=%s len=%u data=%02x%s", (unsigned long)s_gen,
+             conn_handle, attr_handle == s_data_handle ? "f002" : "f001", len, ev.cmd,
+             len > 1 ? "..." : "");
     post(&ev);
     return 0;
 }
+
+static struct ble_gatt_chr_def s_chrs[] = {
+    {
+        .uuid = &CMD_UUID.u,
+        .access_cb = chr_access,
+        .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
+    },
+    {
+        // Writes accepted here too: some emulators put commands on this one
+        // (an extension may change the flags, radio_start)
+        .uuid = &DATA_UUID.u,
+        .access_cb = chr_access,
+        .val_handle = &s_data_handle,
+        .flags = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
+    },
+    {0},
+};
+#define DATA_CHR (s_chrs[1])
 
 static const struct ble_gatt_svc_def s_services[] = {
     {
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = &SVC_UUID.u,
-        .characteristics = (struct ble_gatt_chr_def[]) {
-            {
-                .uuid = &CMD_UUID.u,
-                .access_cb = chr_access,
-                .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
-            },
-            {
-                // Writes accepted here too: some emulators put commands on this one
-                .uuid = &DATA_UUID.u,
-                .access_cb = chr_access,
-                .val_handle = &s_data_handle,
-                .flags = BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
-            },
-            {0},
-        },
+        .characteristics = s_chrs,
     },
     {0},
 };
@@ -363,7 +475,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             s_conn = event->connect.conn_handle;
             s_subscribed = false;
             s_connected = true;
-            ESP_LOGI(TAG, "app connected");
+            s_gen++;
+            ESP_LOGI(TAG, "connect handle=%u gen=%lu", event->connect.conn_handle, (unsigned long)s_gen);
         } else {
             advertise();
         }
@@ -372,7 +485,9 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         s_connected = false;
         s_subscribed = false;
         s_conn = BLE_HS_CONN_HANDLE_NONE;
-        ESP_LOGI(TAG, "app disconnected (reason 0x%x)", event->disconnect.reason);
+        s_gen++;
+        ESP_LOGI(TAG, "disconnect handle=%u reason=0x%x gen=%lu", event->disconnect.conn.conn_handle,
+                 event->disconnect.reason, (unsigned long)s_gen);
         advertise();
         break;
     case BLE_GAP_EVENT_ADV_COMPLETE:
@@ -382,7 +497,13 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         if (event->subscribe.attr_handle == s_data_handle) {
             bool was = s_subscribed;
             s_subscribed = event->subscribe.cur_notify;
+            if (s_subscribed != was) {
+                s_gen++;
+                ESP_LOGI(TAG, "subscribe %s handle=%u gen=%lu", s_subscribed ? "on" : "off",
+                         event->subscribe.conn_handle, (unsigned long)s_gen);
+            }
             if (s_subscribed && !was) {
+                s_sub_us = esp_timer_get_time();
                 bbp_event_t ev = {.type = EV_SUBSCRIBED};
                 post(&ev);
             }
@@ -399,19 +520,26 @@ static void advertise(void)
     if (s_stopping) {
         return;
     }
-    // Name in the advertisement (what apps filter on), the 128-bit service
-    // UUID in the scan response: both together exceed 31 bytes
-    struct ble_hs_adv_fields adv = {
-        .flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP,
+    // Name and 128-bit service UUID together exceed the 31 bytes of an
+    // advertisement, so one goes in the scan response: the name stays in the
+    // advertisement (what apps filter on) unless an extension wants the UUID there
+    bool uuid_first = false;
+#if BXT_HAVE_BBP_EXT
+    uuid_first = s_ext && bbp_ext_uuid_in_advertisement();
+#endif
+    struct ble_hs_adv_fields name = {
         .name = (uint8_t *)BBP_DEVICE_NAME,
         .name_len = sizeof(BBP_DEVICE_NAME) - 1,
         .name_is_complete = 1,
     };
-    struct ble_hs_adv_fields rsp = {
+    struct ble_hs_adv_fields uuid = {
         .uuids128 = &SVC_UUID,
         .num_uuids128 = 1,
         .uuids128_is_complete = 1,
     };
+    struct ble_hs_adv_fields adv = uuid_first ? uuid : name;
+    struct ble_hs_adv_fields rsp = uuid_first ? name : uuid;
+    adv.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     struct ble_gap_adv_params params = {
         .conn_mode = BLE_GAP_CONN_MODE_UND,
         .disc_mode = BLE_GAP_DISC_MODE_GEN,
@@ -427,6 +555,8 @@ static void advertise(void)
     }
     if (rc != 0 && rc != BLE_HS_EALREADY) {
         ESP_LOGE(TAG, "advertising failed: %d", rc);
+    } else if (rc == 0) {
+        ESP_LOGI(TAG, "advertising%s", uuid_first ? " (service UUID first)" : "");
     }
 }
 
@@ -458,6 +588,11 @@ static esp_err_t radio_start(void)
 
     ble_svc_gap_init();
     ble_svc_gatt_init();
+#if BXT_HAVE_BBP_EXT
+    if (s_ext) {
+        DATA_CHR.flags = bbp_ext_data_flags(DATA_CHR.flags);
+    }
+#endif
     ESP_RETURN_ON_FALSE(ble_gatts_count_cfg(s_services) == 0, ESP_FAIL, TAG, "gatt count");
     ESP_RETURN_ON_FALSE(ble_gatts_add_svcs(s_services) == 0, ESP_FAIL, TAG, "gatt add");
     ESP_RETURN_ON_FALSE(ble_console_init() == 0, ESP_FAIL, TAG, "console");
@@ -476,6 +611,15 @@ esp_err_t bbp_init(bool radio)
     s_queue = xQueueCreate(8, sizeof(bbp_event_t));
     ESP_RETURN_ON_FALSE(s_lock && s_queue, ESP_ERR_NO_MEM, TAG, "alloc");
     esp_read_mac(s_uid, ESP_MAC_BT);
+#if BXT_HAVE_BBP_EXT
+    if (settings_bbp_ext()) {
+        s_ext = bbp_ext_api_version() == BBP_EXT_API_VERSION;
+        if (!s_ext) {
+            ESP_LOGE(TAG, "extension %s is for interface version %d, not %d: not used",
+                     bbp_ext_name(), bbp_ext_api_version(), BBP_EXT_API_VERSION);
+        }
+    }
+#endif
     store_load();
     ESP_LOGI(TAG, "history: %u shots, %lu total, max %u", s_store.count,
              (unsigned long)s_store.total, s_store.max_sp);
@@ -484,7 +628,8 @@ esp_err_t bbp_init(bool radio)
     if (radio) {
         ESP_RETURN_ON_ERROR(radio_start(), TAG, "ble");
         s_radio_on = true;
-        ESP_LOGI(TAG, "BLE on, advertising as %s", BBP_DEVICE_NAME);
+        ESP_LOGI(TAG, "BLE on, advertising as %s%s%s", BBP_DEVICE_NAME,
+                 s_ext ? ", extension " : "", s_ext ? bbp_ext_built_in() : "");
     }
     return ESP_OK;
 }
@@ -531,6 +676,20 @@ void bbp_get_info(bbp_info_t *out)
     out->radio_on = s_radio_on;
     out->connected = s_connected;
     out->subscribed = s_subscribed;
+}
+
+const char *bbp_ext_built_in(void)
+{
+#if BXT_HAVE_BBP_EXT
+    return bbp_ext_name();
+#else
+    return NULL;
+#endif
+}
+
+bool bbp_ext_active(void)
+{
+    return s_ext;
 }
 
 bbp_link_t bbp_link_state(void)

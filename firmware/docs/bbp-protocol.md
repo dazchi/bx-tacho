@@ -202,6 +202,11 @@ in the advertisement and the service UUID in the scan response; writes accepted
 on both characteristics; `0x75` and `0x61` ignored; the shot set is sent when
 the launch reaches RESULT (after the 250 ms end gap), then saved to NVS.
 
+Commands and packets carry a session number that changes on every
+connect, disconnect and subscription change, so a dump started for one session
+never continues into the next; a packet the stack can't take for 1.5 s drops
+the link so the app starts over.
+
 **Points that were open before implementing:**
 
 - **Power.** BLE advertising costs current and interacts with automatic light

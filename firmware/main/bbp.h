@@ -5,6 +5,9 @@
 //
 // The shot history (last 50 shoot powers, lifetime count and max, curve of the
 // latest shot) is kept in NVS whether or not BLE is on.
+//
+// An optional extension (components/bbp_ext_api/include/bbp_ext.h) can change
+// how BX Tacho presents itself, in builds that have one and while `cfg ext on`.
 #pragma once
 
 #include <stdbool.h>
@@ -35,6 +38,11 @@ void bbp_set_battery_percent(int percent);
 void bbp_record_shot(int sp_rpm, const uint32_t *periods_us, int n);
 
 void bbp_get_info(bbp_info_t *out);
+
+// Optional extension (bbp_ext.h): its name if this build has one, else NULL;
+// and whether it's in use (built in, `cfg ext on`, and the right version)
+const char *bbp_ext_built_in(void);
+bool bbp_ext_active(void);
 
 typedef enum {
     BBP_LINK_OFF,          // BLE not started
