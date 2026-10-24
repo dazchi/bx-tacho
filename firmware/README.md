@@ -38,17 +38,18 @@ own folder with its own sdkconfig, so the development build is untouched:
 
 ```
 idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" build
-idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.release" merge-bin -o bx-tacho-v1.2.0-merged.bin
 ```
 
-- `build/release/bx-tacho-v1.2.0.bin`: the file to publish, for updates from
-  the web app (USB or Bluetooth) or `write-flash 0x10000` (with `otadata`, see
-  above). Every build copies `bx-tacho.bin` to this name, from `PROJECT_VER`
-  in `CMakeLists.txt` (with `-bbp` for a build with the extension);
-  `idf.py flash` keeps using `bx-tacho.bin`.
-- `build/release/bx-tacho-v1.2.0-merged.bin`: everything from 0x0, for a blank board
-  (`write-flash 0x0`). It overwrites NVS (settings and shot history) but ends
-  below `fctry`, so the battery calibration stays.
+Every build also writes the files to publish, named after `PROJECT_VER` in
+`CMakeLists.txt` (with `-bbp` for a build with the extension):
+
+- `build/release/bx-tacho-v1.2.0.bin`: for updates from the web app (USB or
+  Bluetooth) or `write-flash 0x10000` (with `otadata`, see above). A copy of
+  `bx-tacho.bin`, which `idf.py flash` keeps using.
+- `build/release/bx-tacho-v1.2.0-merged.bin`: everything from 0x0 (what
+  `idf.py flash` writes), for a blank board (`write-flash 0x0`). It overwrites
+  NVS (settings and shot history) but ends below `fctry`, so the battery
+  calibration stays.
 
 Options set by hand with `idf.py menuconfig` go into `firmware/sdkconfig`
 only; for a release they belong in `sdkconfig.defaults` (or

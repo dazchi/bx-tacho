@@ -22,14 +22,23 @@ endforeach()
 
 project(bx-tacho)
 
-# A copy of the app image named after its version (bx-tacho-v1.2.0.bin), the
-# file to publish; idf.py flash keeps using bx-tacho.bin
+# The files to publish, named after the version: a copy of the app image
+# (bx-tacho-v1.2.0.bin; idf.py flash keeps using bx-tacho.bin) and everything
+# from 0x0 for a blank board (bx-tacho-v1.2.0-merged.bin, what idf.py flash writes)
 idf_build_get_property(project_ver PROJECT_VER)
+idf_build_get_property(python PYTHON)
 set(app_bin "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.bin")
 set(versioned_bin "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-v${project_ver}.bin")
+set(merged_bin "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-v${project_ver}-merged.bin")
 add_custom_command(OUTPUT "${versioned_bin}"
     COMMAND ${CMAKE_COMMAND} -E copy "${app_bin}" "${versioned_bin}"
     DEPENDS gen_project_binary "${app_bin}"
     COMMENT "Copying ${CMAKE_PROJECT_NAME}.bin to ${CMAKE_PROJECT_NAME}-v${project_ver}.bin"
     VERBATIM)
-add_custom_target(versioned_bin ALL DEPENDS "${versioned_bin}")
+add_custom_command(OUTPUT "${merged_bin}"
+    COMMAND ${python} -m esptool --chip ${IDF_TARGET} merge-bin -o "${merged_bin}" @flash_args
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+    DEPENDS gen_project_binary bootloader partition_table_bin blank_ota_data "${app_bin}"
+    COMMENT "Merging the images into ${CMAKE_PROJECT_NAME}-v${project_ver}-merged.bin"
+    VERBATIM)
+add_custom_target(versioned_bin ALL DEPENDS "${versioned_bin}" "${merged_bin}")
