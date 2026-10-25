@@ -7,18 +7,34 @@
 #include <stdint.h>
 #include "esp_err.h"
 
+// Launchers with a dark housing reflect little of the load LED's light, white
+// ones a lot: each kind gets its own calibration, and the load readings tell
+// which one BX Tacho is on (load_track_launcher())
+typedef enum {
+    LAUNCHER_BLACK,
+    LAUNCHER_WHITE,
+    LAUNCHER_COUNT,
+} launcher_t;
+
 typedef struct {
     uint16_t rpm_thr_mv;      // comparator threshold (RPM_REF), capped at RPM_THR_MAX_MV
-    uint8_t edges_per_rev;    // rising edges per launcher revolution
     bool load_cal_valid;      // false = no load sensor calibration, RPM stays armed
     int16_t load_empty;       // ambient-cancelled LOAD_SENSE level, launcher empty (mV)
     int16_t load_loaded;      // same, with a top attached (mV)
+} launcher_cal_t;
+
+typedef struct {
+    uint8_t edges_per_rev;    // rising edges per launcher revolution
+    launcher_cal_t cal[LAUNCHER_COUNT];
 } settings_t;
 
 esp_err_t settings_init(void);
 
 // Returns a pointer to the live settings. Writers must call settings_save().
 settings_t *settings_get(void);
+// The calibration of one kind of launcher, in the live settings
+launcher_cal_t *settings_cal(launcher_t launcher);
+const char *launcher_name(launcher_t launcher);   // "black", "white"
 esp_err_t settings_save(void);
 void settings_reset(void);
 

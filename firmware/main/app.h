@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "battery.h"
 #include "launch.h"
+#include "settings.h"
 
 typedef enum {
     APP_MODE_RUN,     // normal launch measurement
@@ -39,7 +40,8 @@ typedef struct {
     launch_result_t result;
 
     bool loaded;
-    bool load_cal_valid;
+    launcher_t launcher;      // black or white launcher, from the load reading
+    bool load_cal_valid;      // ...and whether its calibration is usable
     int load_diff_mv;         // last ambient-cancelled LOAD_SENSE reading
     int load_pct;             // position between empty (0) and loaded (100)
 

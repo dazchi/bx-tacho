@@ -54,6 +54,12 @@ void launch_meter_update(meter_stats_t *out);
 // Returns true when something user-visible changed (activity).
 bool launch_update(bool loaded, bool armed_always);
 
+// The launcher changed (load.h): the next update takes `loaded` as a new load,
+// as if it had just gone from empty to loaded. An empty white launcher reads
+// as loaded on the black launcher's settings, so a top put on it only shows
+// as the switch to white, not as a change of the load state.
+void launch_new_launcher(void);
+
 launch_state_t launch_get_state(void);
 int launch_live_rpm(void);
 // True from the release (seen by the load sensor) until the launch ends

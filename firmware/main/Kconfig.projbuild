@@ -29,9 +29,10 @@ menu "BX Tacho"
             while the disc cannot speed up by more than a few percent per
             interval. Assumes evenly spaced segments; lower it for discs
             with uneven segments. 0 disables this check (the
-            BXT_MAX_RPM floor still applies). The check only applies above
-            about 3000 rpm (RELATIVE_MIN_RPM in launch.c), where the speed
-            cannot change that much between revolutions.
+            BXT_MAX_RPM floor still applies). The check starts once the disc
+            passes about 3000 rpm (RELATIVE_MIN_RPM in launch.c), where the
+            speed cannot change that much between revolutions, and stays on
+            for the rest of the launch as the disc slows down again.
 
     config BXT_OLED_I2C_HZ
         int "OLED I2C clock (Hz)"

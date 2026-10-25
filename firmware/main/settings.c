@@ -19,7 +19,7 @@ static const char *TAG = "settings";
 #define NVS_KEY_FLIP        "flip"
 #define NVS_KEY_BBP_EXT     "bbpext"
 // Bump when settings_t changes layout; stale blobs are then ignored.
-#define SETTINGS_VERSION 1
+#define SETTINGS_VERSION 2
 
 typedef struct {
     uint32_t version;
@@ -90,13 +90,34 @@ esp_err_t settings_set_bbp_ext(bool on)
 
 void settings_reset(void)
 {
+    // Levels measured on the prototype
     s_settings = (settings_t) {
-        .rpm_thr_mv = RPM_THR_DEFAULT_MV,
         .edges_per_rev = CONFIG_BXT_EDGES_PER_REV,
-        .load_cal_valid = true,
-        .load_empty = 100,
-        .load_loaded = 300,
+        .cal = {
+            [LAUNCHER_BLACK] = {
+                .rpm_thr_mv = RPM_THR_DEFAULT_MV,
+                .load_cal_valid = true,
+                .load_empty = 100,
+                .load_loaded = 300,
+            },
+            [LAUNCHER_WHITE] = {
+                .rpm_thr_mv = RPM_THR_DEFAULT_MV + RPM_THR_OFFSET_MV,
+                .load_cal_valid = true,
+                .load_empty = 490,
+                .load_loaded = 700,
+            },
+        },
     };
+}
+
+launcher_cal_t *settings_cal(launcher_t launcher)
+{
+    return &s_settings.cal[launcher == LAUNCHER_WHITE ? LAUNCHER_WHITE : LAUNCHER_BLACK];
+}
+
+const char *launcher_name(launcher_t launcher)
+{
+    return launcher == LAUNCHER_WHITE ? "white" : "black";
 }
 
 esp_err_t settings_init(void)
@@ -139,9 +160,12 @@ esp_err_t settings_init(void)
 
     if (err == ESP_OK && len == sizeof(blob) && blob.version == SETTINGS_VERSION) {
         s_settings = blob.s;
-        ESP_LOGI(TAG, "loaded: thr=%u mV, edges/rev=%u, load cal=%s",
-                 s_settings.rpm_thr_mv, s_settings.edges_per_rev,
-                 s_settings.load_cal_valid ? "yes" : "no");
+        ESP_LOGI(TAG, "loaded: edges/rev=%u, black thr=%u mV load cal=%s, white thr=%u mV load cal=%s",
+                 s_settings.edges_per_rev,
+                 s_settings.cal[LAUNCHER_BLACK].rpm_thr_mv,
+                 s_settings.cal[LAUNCHER_BLACK].load_cal_valid ? "yes" : "no",
+                 s_settings.cal[LAUNCHER_WHITE].rpm_thr_mv,
+                 s_settings.cal[LAUNCHER_WHITE].load_cal_valid ? "yes" : "no");
     } else {
         ESP_LOGW(TAG, "saved settings missing or outdated, using defaults");
     }

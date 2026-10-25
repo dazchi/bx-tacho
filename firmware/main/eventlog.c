@@ -12,6 +12,7 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "launch.h"
+#include "settings.h"
 
 // Bump when ev_entry_t changes, so a log in the old layout is discarded
 #define EV_MAGIC  0xB7AC0E02u
@@ -165,6 +166,9 @@ static void print_entry(const ev_entry_t *e)
         break;
     case EV_BLE_GESTURE:
         cli_printf("BLE GESTURE  BLE switched %s, restarting\n", e->a ? "on" : "off");
+        break;
+    case EV_LAUNCHER:
+        cli_printf("LAUNCHER     %s, LOAD_SENSE %d mV\n", launcher_name(e->a), e->b);
         break;
     default:
         cli_printf("?            %d %d\n", e->a, e->b);

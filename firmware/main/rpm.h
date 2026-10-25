@@ -13,6 +13,7 @@
 // LMV331 input range ends about 0.7-1 V below its 3.3 V supply
 #define RPM_THR_MAX_MV      2000
 #define RPM_THR_DEFAULT_MV  70
+#define RPM_THR_OFFSET_MV   10
 
 esp_err_t rpm_init(void);
 

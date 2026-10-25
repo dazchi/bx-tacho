@@ -37,6 +37,10 @@ static const char *TAG = "launch";
 // 3000 rpm the speed changes far less than the CONFIG_BXT_CHATTER_RATIO_PCT
 // margin per revolution.
 #define RELATIVE_MIN_RPM    3000
+// Once a launch has been past it, the check stays on as the disc slows down
+// below it again: spinning down, the disc can't speed up either, and chatter
+// on the slow edges at the end of a launch otherwise got through (one edge a
+// few ms after a real one showed as about 20000 rpm on the live display).
 // Lock recovery. The relative check can still take real edges for chatter, e.g.
 // when edges the sensor missed early in a pull leave doubled intervals as the
 // reference: every other real edge then looks too soon, half-way through the
@@ -72,6 +76,7 @@ static uint32_t s_hist[HIST_LEN];   // recent accepted edge intervals (us)
 static int s_hist_len;
 static int s_hist_next;
 static int s_long_streak;           // consecutive gaps rejected as references
+static bool s_relative_on;          // this launch has passed RELATIVE_MIN_RPM: keep the check
 static int s_rejected_max_rpm;      // edges dropped in this launch: faster than CONFIG_BXT_MAX_RPM
 static int s_rejected_relative;     // ...or too soon for the recent interval
 
@@ -178,6 +183,7 @@ static void start_launch(void)
     }
     s_window_len = 0;
     s_release_seen = false;
+    s_relative_on = false;
     s_rejected_max_rpm = 0;
     s_rejected_relative = 0;
     s_num_rej = 0;
@@ -319,9 +325,14 @@ static bool accept_edge(uint32_t t, uint32_t min_gap_us)
         uint32_t gap = t - s_last_edge;
         if (gap > END_GAP_US) {
             filter_reset();   // the disc stopped; the old rhythm no longer applies
+            s_relative_on = false;
         }
         uint32_t ref = filter_reference();
-        uint32_t rel_limit = ref <= relative_max_ref_us()
+        bool fast = ref && ref <= relative_max_ref_us();
+        if (fast && s_state == LAUNCH_PULLING) {
+            s_relative_on = true;
+        }
+        uint32_t rel_limit = (fast || (s_relative_on && s_state == LAUNCH_PULLING))
             ? (uint32_t)((uint64_t)ref * CONFIG_BXT_CHATTER_RATIO_PCT / 100) : 0;
         // Faster than physically possible, or too soon after the last edge: chatter
         if (gap < min_gap_us || gap < rel_limit) {
@@ -392,6 +403,11 @@ static void handle_edge(uint32_t t, bool can_start, uint32_t min_gap_us)
     if (s_window_len == START_EDGES && (t - s_window[0]) <= START_WINDOW_US) {
         start_launch();
     }
+}
+
+void launch_new_launcher(void)
+{
+    s_was_loaded = false;
 }
 
 bool launch_update(bool loaded, bool armed_always)

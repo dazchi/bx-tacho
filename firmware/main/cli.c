@@ -35,8 +35,9 @@
 
 static void print_vbat_cal(const vbat_cal_t *c);
 
-static bool s_have_empty;
-static bool s_have_loaded;
+// 'cal load' levels measured since boot, per launcher
+static bool s_have_empty[LAUNCHER_COUNT];
+static bool s_have_loaded[LAUNCHER_COUNT];
 
 // ---- Consoles -----------------------------------------------------------------
 
@@ -133,6 +134,7 @@ static int cmd_status(int argc, char **argv)
     app_snapshot_t s;
     app_get_snapshot(&s);
     const settings_t *cfg = settings_get();
+    const launcher_cal_t *lcal = settings_cal(s.launcher);
 
     const esp_app_desc_t *app = esp_app_get_description();
     cli_printf("firmware    : %s v%s, ESP-IDF %s\n", app->project_name, app->version, app->idf_ver);
@@ -146,15 +148,23 @@ static int cmd_status(int argc, char **argv)
                s.batt.vbat_valid ? "valid" : "not trusted while charging", s.batt.percent);
     cli_printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
                usb_serial_jtag_is_connected() ? "connected" : "none");
+    cli_printf("launcher    : %s\n", launcher_name(s.launcher));
     cli_printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped, %lu masked by load flashes\n",
                rpm_is_powered() ? "on" : "off", rpm_get_threshold_mv(), cfg->edges_per_rev,
                (unsigned long)rpm_overflow_count(), (unsigned long)rpm_masked_count());
-    if (cfg->load_cal_valid) {
-        cli_printf("load        : %s, %d mV (%d%%), empty %d mV, loaded %d mV\n",
-                   s.loaded ? "LOADED" : "empty", s.load_diff_mv, s.load_pct,
-                   cfg->load_empty, cfg->load_loaded);
+    if (lcal->load_cal_valid) {
+        cli_printf("load        : %s, %d mV (%d%%)\n", s.loaded ? "LOADED" : "empty", s.load_diff_mv, s.load_pct);
     } else {
-        cli_printf("load        : not calibrated (RPM stays armed). See 'cal load'.\n");
+        cli_printf("load        : not calibrated for this launcher (RPM stays armed). See 'cal load'.\n");
+    }
+    for (int l = 0; l < LAUNCHER_COUNT; l++) {
+        const launcher_cal_t *c = settings_cal(l);
+        if (c->load_cal_valid) {
+            cli_printf("cal %-7s : load empty %d mV, loaded %d mV; rpm threshold %u mV\n", launcher_name(l),
+                       c->load_empty, c->load_loaded, c->rpm_thr_mv);
+        } else {
+            cli_printf("cal %-7s : load not calibrated; rpm threshold %u mV\n", launcher_name(l), c->rpm_thr_mv);
+        }
     }
     if (s.have_result) {
         cli_printf("last launch : peak %d rpm, max %d rpm, %d revs, %d ms\n",
@@ -245,7 +255,32 @@ static int cmd_meter(int argc, char **argv)
     return 0;
 }
 
-static int rpm_scan(int seconds, bool apply)
+// "black" or "white"
+static bool parse_launcher(const char *arg, launcher_t *out)
+{
+    for (int l = 0; l < LAUNCHER_COUNT; l++) {
+        if (!strcmp(arg, launcher_name(l))) {
+            *out = l;
+            return true;
+        }
+    }
+    return false;
+}
+
+// Saves the comparator threshold of one launcher, and uses it if BX Tacho is on that one
+static void set_rpm_threshold(launcher_t launcher, int mv)
+{
+    mv = mv < 0 ? 0 : (mv > RPM_THR_MAX_MV ? RPM_THR_MAX_MV : mv);
+    settings_cal(launcher)->rpm_thr_mv = (uint16_t)mv;
+    settings_save();
+    if (launcher == load_launcher()) {
+        rpm_set_threshold_mv(mv);
+    }
+    cli_printf("%s launcher: threshold set to %d mV and saved\n", launcher_name(launcher), mv);
+}
+
+// `apply` saves the midpoint as `launcher`'s threshold
+static int rpm_scan(int seconds, bool apply, launcher_t launcher)
 {
     bool was_on = rpm_is_powered();
     rpm_power(true);
@@ -285,10 +320,7 @@ static int rpm_scan(int seconds, bool apply)
         cli_printf("Midpoint is above the comparator's %d mV limit; it will be capped.\n", RPM_THR_MAX_MV);
     }
     if (apply) {
-        rpm_set_threshold_mv(mid);
-        settings_get()->rpm_thr_mv = (uint16_t)rpm_get_threshold_mv();
-        settings_save();
-        cli_printf("threshold set to %d mV and saved\n", rpm_get_threshold_mv());
+        set_rpm_threshold(launcher, mid);
     }
     return 0;
 }
@@ -307,12 +339,22 @@ static int cmd_rpm(int argc, char **argv)
         return 0;
     }
     if (!strcmp(argv[1], "thr")) {
-        if (argc == 3) {
-            rpm_set_threshold_mv(atoi(argv[2]));
-            settings_get()->rpm_thr_mv = (uint16_t)rpm_get_threshold_mv();
-            settings_save();
+        // thr [black|white] [mV]: without a launcher, the one BX Tacho is on
+        int i = 2;
+        launcher_t launcher = load_launcher();
+        if (argc > i && parse_launcher(argv[i], &launcher)) {
+            i++;
         }
-        cli_printf("threshold %d mV\n", rpm_get_threshold_mv());
+        if (argc > i + 1) {
+            goto usage;
+        }
+        if (argc == i + 1) {
+            set_rpm_threshold(launcher, atoi(argv[i]));
+        } else {
+            cli_printf("threshold %d mV in use (%s launcher); black %u mV, white %u mV\n", rpm_get_threshold_mv(),
+                       launcher_name(load_launcher()), settings_cal(LAUNCHER_BLACK)->rpm_thr_mv,
+                       settings_cal(LAUNCHER_WHITE)->rpm_thr_mv);
+        }
         return 0;
     }
     if (!strcmp(argv[1], "sense")) {
@@ -334,22 +376,24 @@ static int cmd_rpm(int argc, char **argv)
         if (!require_diag()) {
             return 1;
         }
+        // scan [black|white] [seconds] [apply]: without a launcher, the one BX Tacho is on
         int seconds = 5;
         bool apply = false;
+        launcher_t launcher = load_launcher();
         for (int i = 2; i < argc; i++) {
             if (!strcmp(argv[i], "apply")) {
                 apply = true;
-            } else {
+            } else if (!parse_launcher(argv[i], &launcher)) {
                 seconds = atoi(argv[i]);
             }
         }
         if (seconds < 1 || seconds > 60) {
             seconds = 5;
         }
-        return rpm_scan(seconds, apply);
+        return rpm_scan(seconds, apply, launcher);
     }
 usage:
-    cli_printf("usage: rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]\n");
+    cli_printf("usage: rpm on|off | thr [black|white] [mV] | sense [count] | scan [black|white] [seconds] [apply]\n");
     return 1;
 }
 
@@ -380,6 +424,31 @@ static int cmd_load(int argc, char **argv)
         load_led_force(!strcmp(argv[2], "on"));
         cli_printf("load IR LED held %s%s\n", argv[2],
                    !strcmp(argv[2], "on") ? " (as while a top is loaded); load readings paused" : "");
+        return 0;
+    }
+    if (argc >= 2 && !strcmp(argv[1], "flash")) {
+        // A full poll next to the short flash used while the RPM channel is armed,
+        // to check that the flash settles to the same level; optionally with
+        // another settling time (us)
+        int n = argc >= 3 ? atoi(argv[2]) : 10;
+        int settle_us = argc >= 4 ? atoi(argv[3]) : 0;
+        if (settle_us < 0 || settle_us > 5000) {
+            cli_printf("settle 0-5000 us (0: the firmware's own)\n");
+            return 1;
+        }
+        for (int i = 0; i < n; i++) {
+            int poll_on, poll_off, flash_on, flash_off;
+            int poll = load_measure_raw(4, &poll_on, &poll_off);
+            vTaskDelay(pdMS_TO_TICKS(20));
+            int flash = settle_us ? load_flash_sample_settle_raw(settle_us, &flash_on, &flash_off)
+                                  : load_flash_sample_raw(&flash_on, &flash_off);
+            cli_printf("poll %d mV (ON %d OFF %d), flash %d mV (ON %d OFF %d)\n", poll, poll_on, poll_off, flash,
+                       flash_on, flash_off);
+            if (!cli_wait_ms(200)) {
+                print_stopped();
+                break;
+            }
+        }
         return 0;
     }
     int n = argc == 2 ? atoi(argv[1]) : 10;
@@ -599,57 +668,79 @@ static int cmd_cal_vbat(int argc, char **argv)
     return 1;
 }
 
+static int cmd_cal_load(int argc, char **argv)
+{
+    // cal load [black|white] empty|loaded|clear: without a launcher, the one BX
+    // Tacho is on
+    int i = 1;
+    launcher_t launcher = load_launcher();
+    bool named = argc > i && parse_launcher(argv[i], &launcher);
+    if (named) {
+        i++;
+    }
+    if (argc != i + 1) {
+        return -1;
+    }
+    const char *what = argv[i];
+
+    if (!strcmp(what, "clear")) {
+        settings_cal(launcher)->load_cal_valid = false;
+        s_have_empty[launcher] = s_have_loaded[launcher] = false;
+        settings_save();
+        cli_printf("%s launcher: load calibration cleared\n", launcher_name(launcher));
+        return 0;
+    }
+    bool empty = !strcmp(what, "empty");
+    if (!empty && strcmp(what, "loaded")) {
+        return -1;
+    }
+    int level = average_load();
+    if (level == INT_MIN) {
+        cli_printf("ADC read failed\n");
+        return 1;
+    }
+    launcher_cal_t *cal = settings_cal(launcher);
+    if (empty) {
+        cal->load_empty = (int16_t)level;
+        s_have_empty[launcher] = true;
+    } else {
+        cal->load_loaded = (int16_t)level;
+        s_have_loaded[launcher] = true;
+    }
+    cli_printf("%s launcher%s: %s level %d mV\n", launcher_name(launcher), named ? "" : " (the one in use)", what,
+               level);
+
+    if ((s_have_empty[launcher] && s_have_loaded[launcher]) || cal->load_cal_valid) {
+        int span = abs(cal->load_loaded - cal->load_empty);
+        if (span < LOAD_MIN_CONTRAST_MV) {
+            cli_printf("Contrast only %d mV (need %d). Not saved as valid.\n", span, LOAD_MIN_CONTRAST_MV);
+            cal->load_cal_valid = false;
+        } else {
+            cal->load_cal_valid = true;
+            cli_printf("Calibration valid, contrast %d mV.\n", span);
+        }
+    } else {
+        cli_printf("Now run 'cal load %s%s%s'.\n", named ? launcher_name(launcher) : "", named ? " " : "",
+                   empty ? "loaded" : "empty");
+    }
+    settings_save();
+    return 0;
+}
+
 static int cmd_cal(int argc, char **argv)
 {
-    settings_t *cfg = settings_get();
-
     if (argc >= 2 && !strcmp(argv[1], "vbat")) {
         return cmd_cal_vbat(argc - 1, argv + 1);
     }
-
-    if (argc == 3 && !strcmp(argv[1], "load")) {
-        if (!strcmp(argv[2], "clear")) {
-            cfg->load_cal_valid = false;
-            s_have_empty = s_have_loaded = false;
-            settings_save();
-            cli_printf("load calibration cleared\n");
-            return 0;
+    if (argc >= 2 && !strcmp(argv[1], "load")) {
+        int ret = cmd_cal_load(argc - 1, argv + 1);
+        if (ret >= 0) {
+            return ret;
         }
-        bool empty = !strcmp(argv[2], "empty");
-        if (!empty && strcmp(argv[2], "loaded")) {
-            goto usage;
-        }
-        int level = average_load();
-        if (level == INT_MIN) {
-            cli_printf("ADC read failed\n");
-            return 1;
-        }
-        if (empty) {
-            cfg->load_empty = (int16_t)level;
-            s_have_empty = true;
-        } else {
-            cfg->load_loaded = (int16_t)level;
-            s_have_loaded = true;
-        }
-        cli_printf("%s level %d mV\n", argv[2], level);
-
-        if ((s_have_empty && s_have_loaded) || cfg->load_cal_valid) {
-            int span = abs(cfg->load_loaded - cfg->load_empty);
-            if (span < LOAD_MIN_CONTRAST_MV) {
-                cli_printf("Contrast only %d mV (need %d). Not saved as valid.\n", span, LOAD_MIN_CONTRAST_MV);
-                cfg->load_cal_valid = false;
-            } else {
-                cfg->load_cal_valid = true;
-                cli_printf("Calibration valid, contrast %d mV.\n", span);
-            }
-        } else {
-            cli_printf("Now run 'cal load %s'.\n", empty ? "loaded" : "empty");
-        }
-        settings_save();
-        return 0;
+        goto usage;
     }
 usage:
-    cli_printf("usage: cal load empty|loaded|clear\n"
+    cli_printf("usage: cal load [black|white] empty|loaded|clear\n"
                "       cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
     return 1;
 }
@@ -672,8 +763,9 @@ static int cmd_cfg(int argc, char **argv)
     if (argc == 2 && !strcmp(argv[1], "reset")) {
         settings_reset();
         settings_save();
-        rpm_set_threshold_mv(cfg->rpm_thr_mv);
-        s_have_empty = s_have_loaded = false;
+        rpm_set_threshold_mv(settings_cal(load_launcher())->rpm_thr_mv);
+        memset(s_have_empty, 0, sizeof(s_have_empty));
+        memset(s_have_loaded, 0, sizeof(s_have_loaded));
         cli_printf("settings reset to defaults\n");
         return 0;
     }
@@ -917,9 +1009,9 @@ static const cli_cmd_t s_cmds[] = {
     {"status", "Show sensors, battery, calibration and the last launch", cmd_status},
     {"diag", "diag on|off: pause the state machine for manual sensor control", cmd_diag},
     {"meter", "meter on|off | meter | meter log [seconds] [interval_ms]: continuous RPM (CSV); Ctrl-C stops the log", cmd_meter},
-    {"rpm", "rpm on|off | thr [mV] | sense [count] | scan [seconds] [apply]", cmd_rpm},
-    {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load led on|off: hold the load LED (diag or meter mode)", cmd_load},
-    {"cal", "cal load empty|loaded|clear: load sensor; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
+    {"rpm", "rpm on|off | thr [black|white] [mV] | sense [count] | scan [black|white] [seconds] [apply] (thresholds per launcher; without one, the launcher BX Tacho is on)", cmd_rpm},
+    {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load flash [count] [settle_us]: a full poll next to a short flash sample (as while a top is loaded); load led on|off: hold the load LED (diag or meter mode)", cmd_load},
+    {"cal", "cal load [black|white] empty|loaded|clear: load sensor, per launcher (without one, the launcher in use); cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
     {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg flip on|off (display turned 180 degrees, for the other hand) | cfg ext on|off (optional Battle Pass extension, in builds that have one; restarts) | cfg reset", cmd_cfg},
     {"launch", "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", cmd_launch},
     {"ble", "ble | ble on|off: Battle Pass emulation and the console over BLE (on|off restarts)", cmd_ble},

@@ -39,7 +39,9 @@ static const char *TAG = "main";
 // so the LED is only flashed (load_flash_sample_raw), never while the next RPM
 // edge is due, and rpm.c drops edges during a flash and LOAD_FLASH_TAIL_US after
 // it (RPM_SENSE filter R15/C12, about 50 us), which catches any the light causes.
-#define LOAD_FLASH_GAP_US     1000     // between flashes while the disc turns
+// Between flash starts while the disc turns: the flash itself (LOAD_FLASH_LEN_US)
+// plus the 1 ms of dark the next one's ambient reading needs
+#define LOAD_FLASH_GAP_US     2000
 #define LOAD_FLASH_IDLE_US    10000    // ...while it is still
 #define LOAD_FLASH_TAIL_US    200
 // Flash only in this first part of an edge interval, measured as the shortest of
@@ -288,6 +290,7 @@ static void sensor_task(void *arg)
     bool raw_from_flash = false;
     bool cal_lock_held = false;
     launch_state_t prev_state = launch_get_state();
+    launcher_t prev_launcher = load_launcher();   // its RPM threshold is set at boot
     int64_t last_poll_us = 0;
     // First battery reading once VBAT has settled
     int64_t last_batt_us = (BATTERY_SETTLE_MS - BATTERY_PERIOD_MS) * 1000LL;
@@ -299,7 +302,7 @@ static void sensor_task(void *arg)
             continue;
         }
         int64_t now = esp_timer_get_time();
-        const settings_t *cfg = settings_get();
+        const launcher_cal_t *cfg = settings_cal(load_launcher());
 
         app_mode_t mode = s_mode;
         if (s_mode_changed) {
@@ -354,12 +357,14 @@ static void sensor_task(void *arg)
             if (now - last_poll_us >= DIAG_SAMPLE_MS * 1000LL) {
                 last_poll_us = now;
                 diag_readings_t *d = &snap.diag;
-                int span = cfg->load_loaded - cfg->load_empty;
                 // With the LED forced on ('load led on') a measurement would blink
                 // it off; keep it steady and the last load reading instead
                 if (!load_led_forced()) {
                     d->load_mv = load_measure_raw(4, &d->load_on_mv, &d->load_off_mv);
+                    load_track_launcher(d->load_mv, true);
                 }
+                cfg = settings_cal(load_launcher());
+                int span = cfg->load_loaded - cfg->load_empty;
                 d->load_pct_valid = cfg->load_cal_valid && d->load_mv != INT_MIN &&
                                     abs(span) >= LOAD_MIN_CONTRAST_MV;
                 d->load_pct = d->load_pct_valid ? (d->load_mv - cfg->load_empty) * 100 / span : 0;
@@ -397,9 +402,10 @@ static void sensor_task(void *arg)
             }
 
             if (sampled) {
-                snap.loaded = load_classify(diff);
+                snap.loaded = load_classify(diff, launch_get_state() != LAUNCH_PULLING);
                 snap.load_diff_mv = diff;
                 snap.load_pct = load_last_percent();
+                cfg = settings_cal(load_launcher());
             }
             if (snap.loaded != prev_loaded) {
                 prev_loaded = snap.loaded;
@@ -430,6 +436,19 @@ static void sensor_task(void *arg)
                 }
             }
         }
+        // Each launcher has its own RPM threshold (the load calibration is
+        // looked up by load_classify())
+        launcher_t launcher = load_launcher();
+        if (launcher != prev_launcher) {
+            prev_launcher = launcher;
+            rpm_set_threshold_mv(cfg->rpm_thr_mv);
+            eventlog_add(EV_LAUNCHER, launcher, mode == APP_MODE_DIAG ? snap.diag.load_mv : snap.load_diff_mv);
+            // Loaded on the old launcher's settings and loaded on the new one's is
+            // still a new load (an empty white launcher reads as loaded on the
+            // black settings, until a top on it switches to white)
+            launch_new_launcher();
+        }
+        snap.launcher = launcher;
         snap.load_cal_valid = cfg->load_cal_valid;
         snap.mode = mode;
 
@@ -633,10 +652,13 @@ static void draw_diag_screen(const app_snapshot_t *s)
     draw_status_line(s);
 
     display_text(0, 13, "LOAD_SENSE", 1);
+    // The launcher the reading says it's on, whose calibration gives the percentage
     if (d->load_pct_valid) {
-        snprintf(line, sizeof(line), "%d%%", d->load_pct);
-        display_text(DISPLAY_W - display_text_width(line, 1), 13, line, 1);
+        snprintf(line, sizeof(line), "%s %d%%", s->launcher == LAUNCHER_WHITE ? "WHITE" : "BLACK", d->load_pct);
+    } else {
+        snprintf(line, sizeof(line), "%s", s->launcher == LAUNCHER_WHITE ? "WHITE" : "BLACK");
     }
+    display_text(DISPLAY_W - display_text_width(line, 1), 13, line, 1);
     if (d->load_mv == INT_MIN) {
         display_text(0, 22, "ERR", 2);
     } else {
@@ -998,7 +1020,7 @@ void app_main(void)
     ESP_ERROR_CHECK(battery_init());
     ESP_ERROR_CHECK(rpm_init());
     ESP_ERROR_CHECK(load_init());
-    rpm_set_threshold_mv(settings_get()->rpm_thr_mv);
+    rpm_set_threshold_mv(settings_cal(load_launcher())->rpm_thr_mv);   // until the first load reading
     launch_init();
 
     configure_pm(settings_light_sleep());
