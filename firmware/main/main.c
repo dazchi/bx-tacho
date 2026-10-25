@@ -35,26 +35,15 @@ static const char *TAG = "main";
 #define LOAD_POLL_MS       50     // idle polling of the load sensor
 
 // Load sampling while the RPM channel is armed (top loaded, launch). The load
-// LED's light reflected off a loaded top reaches the RPM sensor and hides edges,
-// so the LED is only flashed (load_flash_sample_raw), never while the next RPM
-// edge is due, and rpm.c drops edges during a flash and LOAD_FLASH_TAIL_US after
-// it (RPM_SENSE filter R15/C12, about 50 us), which catches any the light causes.
-// Between flash starts while the disc turns: the flash itself (LOAD_FLASH_LEN_US)
-// plus the 1 ms of dark the next one's ambient reading needs
-#define LOAD_FLASH_GAP_US     2000
-#define LOAD_FLASH_IDLE_US    10000    // ...while it is still
+// LED's light reflected off a loaded top reaches the RPM sensor. While the disc
+// turns, load.c flashes it from the RPM interrupt at each rising edge, over
+// before the white part of the disc ends, so the light can't make or move a
+// rising edge (load_edge_flash_arm). While the disc is still, this task flashes
+// it every LOAD_FLASH_IDLE_US, and rpm.c drops edges during the flash and
+// LOAD_FLASH_TAIL_US after it (RPM_SENSE filter R15/C12, about 50 us): stopped
+// on black, the disc could otherwise see the light as an edge.
+#define LOAD_FLASH_IDLE_US    10000
 #define LOAD_FLASH_TAIL_US    200
-// Flash only in this first part of an edge interval, measured as the shortest of
-// the last three: clear of the next edge even if the disc speeds up 2.5x within
-// one interval. A flash that does land on an edge masks it, and the interval
-// after it reads double; with only the last interval as the measure, that stretched
-// the zone onto the next edge, which was masked in turn, and the scheduler held
-// itself at half speed for many revolutions.
-#define LOAD_FLASH_ZONE_PCT   40
-// ...and never later than this after an edge: early in a pull the speed can
-// more than double from one edge to the next
-#define LOAD_FLASH_ZONE_MAX_US 8000
-#define LOAD_FLASH_FIRST_US   20000    // assumed interval after the first edge
 #define DISC_STILL_US         250000   // no edge for this long: the disc is still
 #define IDLE_TICK_MS       20
 #define BATTERY_PERIOD_MS  1000
@@ -216,25 +205,11 @@ bool app_enter_deep_sleep(app_sleep_reason_t reason)
 }
 
 // Whether now is a safe moment to flash the load LED (see LOAD_FLASH_*)
-static bool load_flash_due(uint32_t now, uint32_t last_flash)
+// The disc turns: an RPM edge within DISC_STILL_US
+static bool disc_turning(uint32_t now)
 {
-    uint32_t since_flash = now - last_flash;
-    if (since_flash < LOAD_FLASH_GAP_US) {
-        return false;
-    }
     uint32_t last, shortest;
-    int n = rpm_recent_edges(&last, &shortest);
-    uint32_t since_edge = now - last;
-    if (n == 0 || since_edge > DISC_STILL_US) {
-        return since_flash >= LOAD_FLASH_IDLE_US;
-    }
-    uint32_t interval = (n >= 2 && shortest <= DISC_STILL_US) ? shortest : LOAD_FLASH_FIRST_US;
-    uint32_t zone = interval * LOAD_FLASH_ZONE_PCT / 100;
-    zone = zone < LOAD_FLASH_ZONE_MAX_US ? zone : LOAD_FLASH_ZONE_MAX_US;
-    // Done, light gone, well before the next edge is due. Past the zone, wait for
-    // the next edge (or for the disc to stand still): when it is overdue, as early
-    // in a pull, a flash would be likely to land on it.
-    return since_edge + LOAD_FLASH_LEN_US + LOAD_FLASH_TAIL_US <= zone;
+    return rpm_recent_edges(&last, &shortest) > 0 && now - last <= DISC_STILL_US;
 }
 
 // Counts loads towards the BLE gesture; true when the gesture is complete
@@ -309,9 +284,10 @@ static void sensor_task(void *arg)
             s_mode_changed = false;
             eventlog_add(EV_MODE, mode, 0);
             // Hand the hardware over cleanly in either direction
-            if (load_led_forced()) {
+            if (load_led_held() != LOAD_LED_AUTO) {
                 load_led_off();
             }
+            load_edge_flash_arm(false);
             fast_load = false;
             rpm_power(false);
             load_classifier_reset(false);
@@ -357,15 +333,19 @@ static void sensor_task(void *arg)
             if (now - last_poll_us >= DIAG_SAMPLE_MS * 1000LL) {
                 last_poll_us = now;
                 diag_readings_t *d = &snap.diag;
-                // With the LED forced on ('load led on') a measurement would blink
-                // it off; keep it steady and the last load reading instead
-                if (!load_led_forced()) {
+                // With the LED held on or off ('load led on|off', 'rpm scan') a
+                // measurement would switch it: show the live raw voltage instead
+                d->led_hold = load_led_held();
+                if (d->led_hold == LOAD_LED_AUTO) {
                     d->load_mv = load_measure_raw(4, &d->load_on_mv, &d->load_off_mv);
                     load_track_launcher(d->load_mv, true);
+                } else {
+                    int mv = load_read_raw_mv(4);
+                    d->load_mv = mv >= 0 ? mv : INT_MIN;
                 }
                 cfg = settings_cal(load_launcher());
                 int span = cfg->load_loaded - cfg->load_empty;
-                d->load_pct_valid = cfg->load_cal_valid && d->load_mv != INT_MIN &&
+                d->load_pct_valid = d->led_hold == LOAD_LED_AUTO && cfg->load_cal_valid && d->load_mv != INT_MIN &&
                                     abs(span) >= LOAD_MIN_CONTRAST_MV;
                 d->load_pct = d->load_pct_valid ? (d->load_mv - cfg->load_empty) * 100 / span : 0;
                 d->rpm_on = rpm_is_powered();
@@ -383,7 +363,17 @@ static void sensor_task(void *arg)
                 uint32_t t = (uint32_t)esp_timer_get_time();
                 // Once the release is seen the launch needs no more load readings
                 // until it ends: no flashes during the spin-down
-                if (!launch_released() && load_flash_due(t, last_flash_us)) {
+                bool want = !launch_released();
+                bool turning = want && disc_turning(t);
+                load_edge_flash_arm(turning);
+                if (turning) {
+                    int d = load_take_edge_sample(&raw_on_mv, &raw_off_mv);
+                    if (d != LOAD_NO_SAMPLE) {
+                        diff = d;
+                        raw_from_flash = true;
+                        sampled = true;
+                    }
+                } else if (want && t - last_flash_us >= LOAD_FLASH_IDLE_US) {
                     last_flash_us = t;
                     rpm_mask_begin();
                     diff = load_flash_sample_raw(&raw_on_mv, &raw_off_mv);
@@ -392,6 +382,7 @@ static void sensor_task(void *arg)
                     sampled = true;
                 }
             } else {
+                load_edge_flash_arm(false);
                 fast_load = false;
                 if (now - last_poll_us >= LOAD_POLL_MS * 1000LL) {
                     last_poll_us = now;
@@ -423,6 +414,8 @@ static void sensor_task(void *arg)
             if (launch_update(snap.loaded, !cfg->load_cal_valid)) {
                 app_note_activity();
             }
+            // Sizes the next edge flash to the white part of the disc
+            load_set_edge_interval(launch_edge_interval_us());
             snap.state = launch_get_state();
             snap.live_rpm = launch_live_rpm();
             snap.have_result = launch_get_result(&snap.result);
@@ -652,22 +645,34 @@ static void draw_diag_screen(const app_snapshot_t *s)
     draw_status_line(s);
 
     display_text(0, 13, "LOAD_SENSE", 1);
-    // The launcher the reading says it's on, whose calibration gives the percentage
-    if (d->load_pct_valid) {
-        snprintf(line, sizeof(line), "%s %d%%", s->launcher == LAUNCHER_WHITE ? "WHITE" : "BLACK", d->load_pct);
+    if (d->led_hold != LOAD_LED_AUTO) {
+        // LED held: the live raw voltage, and how the LED is held
+        const char *held = d->led_hold == LOAD_LED_ON ? "LED ON" : "LED OFF";
+        display_text(DISPLAY_W - display_text_width(held, 1), 13, held, 1);
+        if (d->load_mv == INT_MIN) {
+            display_text(0, 22, "ERR", 2);
+        } else {
+            draw_value_mv(0, 22, d->load_mv);
+        }
+        display_text(DISPLAY_W - display_text_width("RAW", 1), 22, "RAW", 1);
     } else {
-        snprintf(line, sizeof(line), "%s", s->launcher == LAUNCHER_WHITE ? "WHITE" : "BLACK");
+        // The launcher the reading says it's on, whose calibration gives the percentage
+        if (d->load_pct_valid) {
+            snprintf(line, sizeof(line), "%s %d%%", s->launcher == LAUNCHER_WHITE ? "WHITE" : "BLACK", d->load_pct);
+        } else {
+            snprintf(line, sizeof(line), "%s", s->launcher == LAUNCHER_WHITE ? "WHITE" : "BLACK");
+        }
+        display_text(DISPLAY_W - display_text_width(line, 1), 13, line, 1);
+        if (d->load_mv == INT_MIN) {
+            display_text(0, 22, "ERR", 2);
+        } else {
+            draw_value_mv(0, 22, d->load_mv);
+        }
+        snprintf(line, sizeof(line), "ON %d", d->load_on_mv);
+        display_text(DISPLAY_W - display_text_width(line, 1), 22, line, 1);
+        snprintf(line, sizeof(line), "OFF %d", d->load_off_mv);
+        display_text(DISPLAY_W - display_text_width(line, 1), 30, line, 1);
     }
-    display_text(DISPLAY_W - display_text_width(line, 1), 13, line, 1);
-    if (d->load_mv == INT_MIN) {
-        display_text(0, 22, "ERR", 2);
-    } else {
-        draw_value_mv(0, 22, d->load_mv);
-    }
-    snprintf(line, sizeof(line), "ON %d", d->load_on_mv);
-    display_text(DISPLAY_W - display_text_width(line, 1), 22, line, 1);
-    snprintf(line, sizeof(line), "OFF %d", d->load_off_mv);
-    display_text(DISPLAY_W - display_text_width(line, 1), 30, line, 1);
 
     display_text(0, 39, "RPM_SENSE", 1);
     snprintf(line, sizeof(line), "THR %d %s", rpm_get_threshold_mv(), d->trig ? "HI" : "LO");
@@ -1038,6 +1043,7 @@ void app_main(void)
     TaskHandle_t sensors;
     xTaskCreate(sensor_task, "sensors", 4096, NULL, 5, &sensors);
     rpm_set_notify_task(sensors);
+    rpm_set_edge_hook(load_on_rpm_edge);
 
     ESP_ERROR_CHECK(cli_start());
 

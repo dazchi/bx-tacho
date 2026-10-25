@@ -44,6 +44,7 @@ static volatile uint32_t s_masked;
 static volatile uint32_t s_recent[RECENT_EDGES];   // last unmasked edges, newest first
 static volatile int s_recent_count;
 static TaskHandle_t s_notify_task;
+static void (*volatile s_edge_hook)(uint32_t edge_us);
 
 static bool s_powered;
 static int s_thr_mv = RPM_THR_DEFAULT_MV;
@@ -66,6 +67,10 @@ static void IRAM_ATTR rpm_edge_isr(void *arg)
     s_recent[0] = now;
     if (s_recent_count < RECENT_EDGES) {
         s_recent_count++;
+    }
+    void (*hook)(uint32_t) = s_edge_hook;
+    if (hook != NULL) {
+        hook(now);
     }
     if (s_notify_task != NULL) {
         BaseType_t woken = pdFALSE;
@@ -137,6 +142,11 @@ esp_err_t rpm_init(void)
 void rpm_set_notify_task(TaskHandle_t task)
 {
     s_notify_task = task;
+}
+
+void rpm_set_edge_hook(void (*hook)(uint32_t edge_us))
+{
+    s_edge_hook = hook;
 }
 
 void rpm_mask_begin(void)

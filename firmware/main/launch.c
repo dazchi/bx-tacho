@@ -77,6 +77,7 @@ static int s_hist_len;
 static int s_hist_next;
 static int s_long_streak;           // consecutive gaps rejected as references
 static bool s_relative_on;          // this launch has passed RELATIVE_MIN_RPM: keep the check
+static uint32_t s_last_gap_us;      // between the last two accepted edges, 0 none
 static int s_rejected_max_rpm;      // edges dropped in this launch: faster than CONFIG_BXT_MAX_RPM
 static int s_rejected_relative;     // ...or too soon for the recent interval
 
@@ -326,6 +327,7 @@ static bool accept_edge(uint32_t t, uint32_t min_gap_us)
         if (gap > END_GAP_US) {
             filter_reset();   // the disc stopped; the old rhythm no longer applies
             s_relative_on = false;
+            s_last_gap_us = 0;
         }
         uint32_t ref = filter_reference();
         bool fast = ref && ref <= relative_max_ref_us();
@@ -369,6 +371,7 @@ static bool accept_edge(uint32_t t, uint32_t min_gap_us)
         } else {
             filter_record(gap, ref);
         }
+        s_last_gap_us = gap <= END_GAP_US ? gap : 0;
     }
     s_last_edge = t;
     s_have_last_edge = true;
@@ -410,6 +413,11 @@ void launch_new_launcher(void)
     s_was_loaded = false;
 }
 
+uint32_t launch_edge_interval_us(void)
+{
+    return s_last_gap_us;
+}
+
 bool launch_update(bool loaded, bool armed_always)
 {
     launch_state_t prev = s_state;
@@ -434,6 +442,7 @@ bool launch_update(bool loaded, bool armed_always)
         rpm_power(want_power);
         s_window_len = 0;
         s_have_last_edge = false;
+        s_last_gap_us = 0;
         filter_reset();
     }
 

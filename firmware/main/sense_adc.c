@@ -6,7 +6,9 @@
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_oneshot.h"
+#include "esp_attr.h"
 #include "esp_check.h"
+#include "esp_private/adc_private.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -58,6 +60,25 @@ esp_err_t sense_adc_init(void)
         }
     }
     return ESP_OK;
+}
+
+int IRAM_ATTR sense_adc_read_raw_isr(adc_channel_t ch)
+{
+    int raw;
+    return adc_oneshot_read_isr(s_unit, ch, &raw) == ESP_OK ? raw : -1;
+}
+
+int sense_adc_raw_to_mv(adc_channel_t ch, int raw)
+{
+    int idx = ch_index(ch);
+    int mv;
+    if (idx < 0 || raw < 0) {
+        return -1;
+    }
+    if (s_cali[idx] == NULL || adc_cali_raw_to_voltage(s_cali[idx], raw, &mv) != ESP_OK) {
+        mv = raw * 2500 / 4095;
+    }
+    return mv;
 }
 
 int sense_adc_read_mv(adc_channel_t ch, int samples)

@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "battery.h"
 #include "launch.h"
+#include "load.h"
 #include "settings.h"
 
 typedef enum {
@@ -23,6 +24,7 @@ typedef struct {
 
 // Live sensor readings shown in APP_MODE_DIAG
 typedef struct {
+    load_led_hold_t led_hold;   // AUTO: the readings below; ON/OFF: load_mv is the raw LOAD_SENSE
     int load_mv;          // ambient-cancelled LOAD_SENSE (LED on - off)
     int load_on_mv;       // raw LOAD_SENSE with the LED on
     int load_off_mv;      // raw LOAD_SENSE with the LED off (ambient and stray light)

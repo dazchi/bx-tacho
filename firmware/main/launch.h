@@ -60,6 +60,10 @@ bool launch_update(bool loaded, bool armed_always);
 // as the switch to white, not as a change of the load state.
 void launch_new_launcher(void);
 
+// The interval between the last two edges the chatter filter accepted (us),
+// 0 when there is none yet or the disc stopped
+uint32_t launch_edge_interval_us(void);
+
 launch_state_t launch_get_state(void);
 int launch_live_rpm(void);
 // True from the release (seen by the load sensor) until the launch ends

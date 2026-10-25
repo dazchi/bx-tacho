@@ -5,13 +5,22 @@
 #include <limits.h>
 #include <stdlib.h>
 #include "board.h"
+#include "driver/gptimer.h"
+#include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_rom_sys.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "hal/gpio_ll.h"
 #include "sense_adc.h"
 #include "settings.h"
+
+// The edge flash runs in interrupts that may fire while the flash cache is off
+// (an NVS write): what they call must be in IRAM
+#if !CONFIG_ADC_ONESHOT_CTRL_FUNC_IN_IRAM || !CONFIG_GPTIMER_CTRL_FUNC_IN_IRAM || !CONFIG_GPTIMER_ISR_CACHE_SAFE
+#error "Set CONFIG_ADC_ONESHOT_CTRL_FUNC_IN_IRAM, CONFIG_GPTIMER_CTRL_FUNC_IN_IRAM and CONFIG_GPTIMER_ISR_CACHE_SAFE (sdkconfig.defaults)"
+#endif
 
 static const char *TAG = "load";
 
@@ -25,6 +34,16 @@ static const char *TAG = "load";
 // been off this long, or the light still fading out is taken for ambient light
 #define FLASH_DARK_US   1000
 
+// Edge flash (load_edge_flash_arm): started at a rising RPM edge, the start of
+// the disc's white part, and over (LED off) by EDGE_FLASH_WHITE_PCT of the
+// white part, taken as half the latest valid edge interval. The LED's light
+// reaching the RPM sensor then only adds to an already high signal, so it can't
+// make or move a rising edge. The settling time is cut to fit (30000 rpm: 2 ms
+// a revolution, off within 0.9 ms of the edge), down to EDGE_FLASH_MIN_SETTLE_US.
+#define EDGE_FLASH_WHITE_PCT     90
+#define EDGE_FLASH_MIN_SETTLE_US 600   // 91 % of the level: still clear of the release thresholds
+#define EDGE_FLASH_SAMPLES       2
+
 // Hysteresis and debounce (HANDOVER.md 6.2)
 #define LOADED_PCT      60
 #define RELEASED_PCT    40
@@ -36,8 +55,23 @@ static const char *TAG = "load";
 
 
 static SemaphoreHandle_t s_lock;
-static bool s_forced;   // diag: LED held on
-static int64_t s_led_off_us;   // when the LED last went off
+static volatile load_led_hold_t s_hold;   // diag/meter: LED held on or off
+static volatile uint32_t s_led_off_us;   // when the LED last went off (esp_timer, low 32 bits)
+
+// Edge flash, shared between the task and the interrupts
+static gptimer_handle_t s_timer;
+static volatile bool s_edge_armed;      // the task wants edge flashes
+static volatile bool s_edge_busy;       // a flash is in progress (LED on)
+static volatile bool s_task_busy;       // a task-side reading owns the LED
+static volatile uint32_t s_edge_interval_us;   // latest valid RPM edge interval, 0 unknown
+static volatile uint32_t s_edge_deadline_us;   // the LED must be off by then
+static volatile int s_edge_read_us;     // how long a reading takes, measured at the edge
+static volatile int s_edge_off_raw;
+static volatile uint32_t s_edge_seq;    // completed samples...
+static volatile int s_edge_sample_off_raw;
+static volatile int s_edge_sample_on_raw;
+static uint32_t s_edge_taken_seq;       // ...and the last one the task took
+static volatile uint32_t s_edge_late;   // flashes cut short (LED off before the reading)
 
 static bool s_loaded;
 static int s_streak;
@@ -45,6 +79,147 @@ static int s_last_pct;
 
 static launcher_t s_launcher;   // black until a reading says otherwise
 static int s_launcher_streak;
+
+static inline void IRAM_ATTR led_set(bool on)
+{
+    gpio_ll_set_level(&GPIO, PIN_LOAD_IR_LED, on ? 1 : 0);
+}
+
+static inline uint32_t IRAM_ATTR now_us(void)
+{
+    return (uint32_t)esp_timer_get_time();
+}
+
+// Average of a few raw conversions, from an interrupt; -1 on error
+static int IRAM_ATTR read_raw_isr(void)
+{
+    int sum = 0;
+    for (int i = 0; i < EDGE_FLASH_SAMPLES; i++) {
+        int raw = sense_adc_read_raw_isr(ADC_CH_LOAD_SENSE);
+        if (raw < 0) {
+            return -1;
+        }
+        sum += raw;
+    }
+    return sum / EDGE_FLASH_SAMPLES;
+}
+
+// End of an edge flash: read with the LED on, then off at once
+static bool IRAM_ATTR edge_flash_alarm(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *ctx)
+{
+    if (!s_edge_busy) {
+        return false;
+    }
+    if ((int32_t)(now_us() + s_edge_read_us - s_edge_deadline_us) > 0) {
+        // Too late for a full reading before the deadline (another interrupt
+        // held this one up): light off now, no sample
+        led_set(false);
+        s_edge_late++;
+    } else {
+        int on = read_raw_isr();
+        led_set(false);
+        if (on >= 0) {
+            s_edge_sample_off_raw = s_edge_off_raw;
+            s_edge_sample_on_raw = on;
+            s_edge_seq++;
+        }
+    }
+    s_led_off_us = now_us();
+    s_edge_busy = false;
+    return false;
+}
+
+void IRAM_ATTR load_on_rpm_edge(uint32_t edge_us)
+{
+    uint32_t interval = s_edge_interval_us;
+    if (!s_edge_armed || s_edge_busy || s_task_busy || s_hold != LOAD_LED_AUTO || interval == 0) {
+        return;
+    }
+    uint32_t t = now_us();
+    if (t - s_led_off_us < FLASH_DARK_US) {
+        return;   // the last flash's light hasn't faded yet: skip this edge
+    }
+    uint32_t deadline = edge_us + interval / 2 * EDGE_FLASH_WHITE_PCT / 100;
+
+    int off = read_raw_isr();
+    uint32_t t_on = now_us();
+    int read_us = (int)(t_on - t);
+    int settle = (int)(deadline - t_on) - read_us;
+    if (off < 0 || settle < EDGE_FLASH_MIN_SETTLE_US) {
+        return;   // not enough of the white part left for a reading
+    }
+    settle = settle < FLASH_SETTLE_US ? settle : FLASH_SETTLE_US;
+
+    uint64_t count;
+    gptimer_get_raw_count(s_timer, &count);
+    gptimer_alarm_config_t alarm = {.alarm_count = count + (uint64_t)settle};
+    s_edge_off_raw = off;
+    s_edge_read_us = read_us;
+    s_edge_deadline_us = deadline;
+    s_edge_busy = true;
+    led_set(true);
+    gptimer_set_alarm_action(s_timer, &alarm);
+}
+
+void load_edge_flash_arm(bool on)
+{
+    if (on == s_edge_armed) {
+        return;
+    }
+    if (on) {
+        s_edge_taken_seq = s_edge_seq;   // nothing left over from before
+        gptimer_enable(s_timer);
+        gptimer_start(s_timer);
+        s_edge_armed = true;
+    } else {
+        s_edge_armed = false;
+        // Let a flash in progress finish (under 1 ms) before the timer stops
+        while (s_edge_busy) {
+            vTaskDelay(1);
+        }
+        gptimer_stop(s_timer);
+        gptimer_disable(s_timer);
+    }
+}
+
+void load_set_edge_interval(uint32_t interval_us)
+{
+    s_edge_interval_us = interval_us;
+}
+
+int load_take_edge_sample(int *on_mv, int *off_mv)
+{
+    uint32_t seq = s_edge_seq;
+    if (seq == s_edge_taken_seq) {
+        return LOAD_NO_SAMPLE;
+    }
+    // The interrupt may complete another sample while this reads; take the pair again then
+    int on_raw, off_raw;
+    do {
+        seq = s_edge_seq;
+        on_raw = s_edge_sample_on_raw;
+        off_raw = s_edge_sample_off_raw;
+    } while (seq != s_edge_seq);
+    s_edge_taken_seq = seq;
+
+    int on = sense_adc_raw_to_mv(ADC_CH_LOAD_SENSE, on_raw);
+    int off = sense_adc_raw_to_mv(ADC_CH_LOAD_SENSE, off_raw);
+    if (on_mv) {
+        *on_mv = on;
+    }
+    if (off_mv) {
+        *off_mv = off;
+    }
+    if (on < 0 || off < 0) {
+        return INT_MIN;
+    }
+    return on - off;
+}
+
+uint32_t load_edge_flash_late_count(void)
+{
+    return s_edge_late;
+}
 
 esp_err_t load_init(void)
 {
@@ -57,24 +232,52 @@ esp_err_t load_init(void)
     };
     ESP_RETURN_ON_ERROR(gpio_config(&out), TAG, "led");
     gpio_set_level(PIN_LOAD_IR_LED, 0);
+
+    // 1 us ticks; only enabled while edge flashes are armed (the RPM channel
+    // keeps the chip out of light sleep then anyway)
+    gptimer_config_t timer_cfg = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1000000,
+    };
+    ESP_RETURN_ON_ERROR(gptimer_new_timer(&timer_cfg, &s_timer), TAG, "timer");
+    gptimer_event_callbacks_t cbs = {.on_alarm = edge_flash_alarm};
+    ESP_RETURN_ON_ERROR(gptimer_register_event_callbacks(s_timer, &cbs, NULL), TAG, "timer cb");
     return ESP_OK;
+}
+
+// Task-side readings take the LED from the edge flash: mark it as theirs (an
+// edge then starts no flash) and wait for one in progress to end
+static void take_led(void)
+{
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_task_busy = true;
+    while (s_edge_busy) {
+        esp_rom_delay_us(50);
+    }
+}
+
+static void give_led(void)
+{
+    s_task_busy = false;
+    xSemaphoreGive(s_lock);
 }
 
 int load_measure_raw(int samples, int *on_mv, int *off_mv)
 {
-    xSemaphoreTake(s_lock, portMAX_DELAY);
+    take_led();
 
-    gpio_set_level(PIN_LOAD_IR_LED, 0);
+    led_set(false);
     esp_rom_delay_us(LED_SETTLE_US);
     int off = sense_adc_read_mv(ADC_CH_LOAD_SENSE, samples);
 
-    gpio_set_level(PIN_LOAD_IR_LED, 1);
+    led_set(true);
     esp_rom_delay_us(LED_SETTLE_US);
     int on = sense_adc_read_mv(ADC_CH_LOAD_SENSE, samples);
 
-    gpio_set_level(PIN_LOAD_IR_LED, s_forced ? 1 : 0);
-    s_led_off_us = esp_timer_get_time();
-    xSemaphoreGive(s_lock);
+    led_set(s_hold == LOAD_LED_ON);
+    s_led_off_us = now_us();
+    give_led();
 
     if (on_mv) {
         *on_mv = on;
@@ -100,20 +303,20 @@ int load_flash_sample_raw(int *on_mv, int *off_mv)
 
 int load_flash_sample_settle_raw(int settle_us, int *on_mv, int *off_mv)
 {
-    xSemaphoreTake(s_lock, portMAX_DELAY);
+    take_led();
     // Ambient first: the LED has been off since the last flash or poll. Flashes
     // are spaced so it normally has; right after a poll it may not have yet.
-    int64_t dark_us = esp_timer_get_time() - s_led_off_us;
+    uint32_t dark_us = now_us() - s_led_off_us;
     if (dark_us < FLASH_DARK_US) {
-        esp_rom_delay_us(FLASH_DARK_US - (uint32_t)dark_us);
+        esp_rom_delay_us(FLASH_DARK_US - dark_us);
     }
     int off = sense_adc_read_mv(ADC_CH_LOAD_SENSE, 2);
-    gpio_set_level(PIN_LOAD_IR_LED, 1);
+    led_set(true);
     esp_rom_delay_us(settle_us);
     int on = sense_adc_read_mv(ADC_CH_LOAD_SENSE, 2);
-    gpio_set_level(PIN_LOAD_IR_LED, s_forced ? 1 : 0);
-    s_led_off_us = esp_timer_get_time();
-    xSemaphoreGive(s_lock);
+    led_set(s_hold == LOAD_LED_ON);
+    s_led_off_us = now_us();
+    give_led();
 
     if (on_mv) {
         *on_mv = on;
@@ -129,21 +332,30 @@ int load_flash_sample_settle_raw(int settle_us, int *on_mv, int *off_mv)
 
 void load_led_off(void)
 {
-    load_led_force(false);
+    load_edge_flash_arm(false);
+    load_led_hold(LOAD_LED_AUTO);
 }
 
-void load_led_force(bool on)
+void load_led_hold(load_led_hold_t hold)
 {
-    xSemaphoreTake(s_lock, portMAX_DELAY);
-    s_forced = on;
-    gpio_set_level(PIN_LOAD_IR_LED, on ? 1 : 0);
-    s_led_off_us = esp_timer_get_time();
-    xSemaphoreGive(s_lock);
+    take_led();
+    s_hold = hold;
+    led_set(hold == LOAD_LED_ON);
+    s_led_off_us = now_us();
+    give_led();
 }
 
-bool load_led_forced(void)
+load_led_hold_t load_led_held(void)
 {
-    return s_forced;
+    return s_hold;
+}
+
+int load_read_raw_mv(int samples)
+{
+    take_led();
+    int mv = sense_adc_read_mv(ADC_CH_LOAD_SENSE, samples);
+    give_led();
+    return mv;
 }
 
 void load_classifier_reset(bool loaded)

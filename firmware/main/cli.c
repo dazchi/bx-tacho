@@ -149,9 +149,11 @@ static int cmd_status(int argc, char **argv)
     cli_printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
                usb_serial_jtag_is_connected() ? "connected" : "none");
     cli_printf("launcher    : %s\n", launcher_name(s.launcher));
-    cli_printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped, %lu masked by load flashes\n",
+    cli_printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped, %lu masked by load flashes, "
+               "%lu edge flashes cut short\n",
                rpm_is_powered() ? "on" : "off", rpm_get_threshold_mv(), cfg->edges_per_rev,
-               (unsigned long)rpm_overflow_count(), (unsigned long)rpm_masked_count());
+               (unsigned long)rpm_overflow_count(), (unsigned long)rpm_masked_count(),
+               (unsigned long)load_edge_flash_late_count());
     if (lcal->load_cal_valid) {
         cli_printf("load        : %s, %d mV (%d%%)\n", s.loaded ? "LOADED" : "empty", s.load_diff_mv, s.load_pct);
     } else {
@@ -279,14 +281,22 @@ static void set_rpm_threshold(launcher_t launcher, int mv)
     cli_printf("%s launcher: threshold set to %d mV and saved\n", launcher_name(launcher), mv);
 }
 
-// `apply` saves the midpoint as `launcher`'s threshold
+// Where `rpm scan apply` puts the threshold between the black (0) and white
+// (100) levels: above the middle, nearer the white level
+#define RPM_SCAN_THR_PCT 60
+
+// `apply` saves the RPM_SCAN_THR_PCT point as `launcher`'s threshold
 static int rpm_scan(int seconds, bool apply, launcher_t launcher)
 {
     bool was_on = rpm_is_powered();
     rpm_power(true);
+    // The load LED's light off a top or the pin reaches the RPM sensor and would
+    // raise the white level found: keep it off (no diag measurements) meanwhile
+    load_led_hold_t hold = load_led_held();
+    load_led_hold(LOAD_LED_OFF);
 
-    cli_printf("Sampling RPM_SENSE for %d s. Turn the launcher slowly so the sensor sees black and white...\n",
-               seconds);
+    cli_printf("Sampling RPM_SENSE for %d s (load LED off). Turn the launcher slowly so the sensor sees black "
+               "and white...\n", seconds);
     int lo = INT_MAX;
     int hi = INT_MIN;
     bool stopped = false;
@@ -299,6 +309,7 @@ static int rpm_scan(int seconds, bool apply, launcher_t launcher)
         vTaskDelay(1);
         stopped = i % 50 == 49 && cli_stop_requested();
     }
+    load_led_hold(hold);
     if (!was_on) {
         rpm_power(false);
     }
@@ -311,16 +322,17 @@ static int rpm_scan(int seconds, bool apply, launcher_t launcher)
         cli_printf("ADC read failed\n");
         return 1;
     }
-    int mid = (lo + hi) / 2;
-    cli_printf("min %d mV, max %d mV, contrast %d mV, midpoint %d mV\n", lo, hi, hi - lo, mid);
+    int thr = lo + (hi - lo) * RPM_SCAN_THR_PCT / 100;
+    cli_printf("min %d mV, max %d mV, contrast %d mV, %d %% point %d mV\n", lo, hi, hi - lo, RPM_SCAN_THR_PCT,
+               thr);
     if (hi - lo < 200) {
         cli_printf("WARNING: contrast below 200 mV. Move the sensor closer or adjust R13/R15.\n");
     }
-    if (mid > RPM_THR_MAX_MV) {
-        cli_printf("Midpoint is above the comparator's %d mV limit; it will be capped.\n", RPM_THR_MAX_MV);
+    if (thr > RPM_THR_MAX_MV) {
+        cli_printf("That is above the comparator's %d mV limit; it will be capped.\n", RPM_THR_MAX_MV);
     }
     if (apply) {
-        set_rpm_threshold(launcher, mid);
+        set_rpm_threshold(launcher, thr);
     }
     return 0;
 }
@@ -339,17 +351,14 @@ static int cmd_rpm(int argc, char **argv)
         return 0;
     }
     if (!strcmp(argv[1], "thr")) {
-        // thr [black|white] [mV]: without a launcher, the one BX Tacho is on
-        int i = 2;
-        launcher_t launcher = load_launcher();
-        if (argc > i && parse_launcher(argv[i], &launcher)) {
-            i++;
-        }
-        if (argc > i + 1) {
-            goto usage;
-        }
-        if (argc == i + 1) {
-            set_rpm_threshold(launcher, atoi(argv[i]));
+        // thr: show; thr black|white <mV>: set one launcher's (always named, so a
+        // launcher not detected yet can't take the other one's value)
+        launcher_t launcher;
+        if (argc == 4 && parse_launcher(argv[2], &launcher)) {
+            set_rpm_threshold(launcher, atoi(argv[3]));
+        } else if (argc != 2) {
+            cli_printf("Name the launcher: rpm thr black|white <mV>\n");
+            return 1;
         } else {
             cli_printf("threshold %d mV in use (%s launcher); black %u mV, white %u mV\n", rpm_get_threshold_mv(),
                        launcher_name(load_launcher()), settings_cal(LAUNCHER_BLACK)->rpm_thr_mv,
@@ -376,16 +385,23 @@ static int cmd_rpm(int argc, char **argv)
         if (!require_diag()) {
             return 1;
         }
-        // scan [black|white] [seconds] [apply]: without a launcher, the one BX Tacho is on
+        // scan [black|white] [seconds] [apply]: apply needs the launcher named
         int seconds = 5;
         bool apply = false;
-        launcher_t launcher = load_launcher();
+        bool named = false;
+        launcher_t launcher = LAUNCHER_BLACK;
         for (int i = 2; i < argc; i++) {
             if (!strcmp(argv[i], "apply")) {
                 apply = true;
-            } else if (!parse_launcher(argv[i], &launcher)) {
+            } else if (parse_launcher(argv[i], &launcher)) {
+                named = true;
+            } else {
                 seconds = atoi(argv[i]);
             }
+        }
+        if (apply && !named) {
+            cli_printf("Name the launcher to apply the result to: rpm scan black|white [seconds] apply\n");
+            return 1;
         }
         if (seconds < 1 || seconds > 60) {
             seconds = 5;
@@ -393,7 +409,7 @@ static int cmd_rpm(int argc, char **argv)
         return rpm_scan(seconds, apply, launcher);
     }
 usage:
-    cli_printf("usage: rpm on|off | thr [black|white] [mV] | sense [count] | scan [black|white] [seconds] [apply]\n");
+    cli_printf("usage: rpm on|off | thr [black|white <mV>] | sense [count] | scan [black|white] [seconds] [apply]\n");
     return 1;
 }
 
@@ -414,24 +430,39 @@ static int average_load(void)
 
 static int cmd_load(int argc, char **argv)
 {
-    if (argc == 3 && !strcmp(argv[1], "led") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
+    if (argc == 3 && !strcmp(argv[1], "led")) {
+        if (!strcmp(argv[2], "auto")) {
+            load_led_hold(LOAD_LED_AUTO);
+            cli_printf("load IR LED back to normal: measurements light it as they need\n");
+            return 0;
+        }
+        bool on = !strcmp(argv[2], "on");
+        if (!on && strcmp(argv[2], "off")) {
+            cli_printf("usage: load led on|off|auto\n");
+            return 1;
+        }
         // Diag, or meter mode (which never drives the load LED) to test it at speed
         app_mode_t mode = app_get_mode();
         if (mode != APP_MODE_DIAG && mode != APP_MODE_METER) {
             cli_printf("Run 'diag on' or 'meter on' first.\n");
             return 1;
         }
-        load_led_force(!strcmp(argv[2], "on"));
-        cli_printf("load IR LED held %s%s\n", argv[2],
-                   !strcmp(argv[2], "on") ? " (as while a top is loaded); load readings paused" : "");
+        load_led_hold(on ? LOAD_LED_ON : LOAD_LED_OFF);
+        cli_printf("load IR LED held %s%s; readings show the raw LOAD_SENSE until 'load led auto'\n",
+                   argv[2], on ? " (as while a top is loaded)" : " (only ambient light)");
         return 0;
     }
+    load_led_hold_t hold = load_led_held();
     if (argc >= 2 && !strcmp(argv[1], "flash")) {
         // A full poll next to the short flash used while the RPM channel is armed,
         // to check that the flash settles to the same level; optionally with
         // another settling time (us)
         int n = argc >= 3 ? atoi(argv[2]) : 10;
         int settle_us = argc >= 4 ? atoi(argv[3]) : 0;
+        if (hold != LOAD_LED_AUTO) {
+            cli_printf("The load LED is held; run 'load led auto' first.\n");
+            return 1;
+        }
         if (settle_us < 0 || settle_us > 5000) {
             cli_printf("settle 0-5000 us (0: the firmware's own)\n");
             return 1;
@@ -453,7 +484,12 @@ static int cmd_load(int argc, char **argv)
     }
     int n = argc == 2 ? atoi(argv[1]) : 10;
     for (int i = 0; i < n; i++) {
-        cli_printf("LOAD_SENSE (LED on - off) %d mV\n", load_measure(8));
+        if (hold != LOAD_LED_AUTO) {
+            cli_printf("LOAD_SENSE (raw, LED held %s) %d mV\n", hold == LOAD_LED_ON ? "on" : "off",
+                       load_read_raw_mv(8));
+        } else {
+            cli_printf("LOAD_SENSE (LED on - off) %d mV\n", load_measure(8));
+        }
         if (!cli_wait_ms(200)) {
             print_stopped();
             break;
@@ -670,18 +706,13 @@ static int cmd_cal_vbat(int argc, char **argv)
 
 static int cmd_cal_load(int argc, char **argv)
 {
-    // cal load [black|white] empty|loaded|clear: without a launcher, the one BX
-    // Tacho is on
-    int i = 1;
-    launcher_t launcher = load_launcher();
-    bool named = argc > i && parse_launcher(argv[i], &launcher);
-    if (named) {
-        i++;
-    }
-    if (argc != i + 1) {
+    // cal load black|white empty|loaded|clear: always named, so a launcher not
+    // detected yet can't take the other one's calibration
+    launcher_t launcher;
+    if (argc != 3 || !parse_launcher(argv[1], &launcher)) {
         return -1;
     }
-    const char *what = argv[i];
+    const char *what = argv[2];
 
     if (!strcmp(what, "clear")) {
         settings_cal(launcher)->load_cal_valid = false;
@@ -693,6 +724,10 @@ static int cmd_cal_load(int argc, char **argv)
     bool empty = !strcmp(what, "empty");
     if (!empty && strcmp(what, "loaded")) {
         return -1;
+    }
+    if (load_led_held() != LOAD_LED_AUTO) {
+        cli_printf("The load LED is held; run 'load led auto' first.\n");
+        return 1;
     }
     int level = average_load();
     if (level == INT_MIN) {
@@ -707,8 +742,7 @@ static int cmd_cal_load(int argc, char **argv)
         cal->load_loaded = (int16_t)level;
         s_have_loaded[launcher] = true;
     }
-    cli_printf("%s launcher%s: %s level %d mV\n", launcher_name(launcher), named ? "" : " (the one in use)", what,
-               level);
+    cli_printf("%s launcher: %s level %d mV\n", launcher_name(launcher), what, level);
 
     if ((s_have_empty[launcher] && s_have_loaded[launcher]) || cal->load_cal_valid) {
         int span = abs(cal->load_loaded - cal->load_empty);
@@ -720,8 +754,7 @@ static int cmd_cal_load(int argc, char **argv)
             cli_printf("Calibration valid, contrast %d mV.\n", span);
         }
     } else {
-        cli_printf("Now run 'cal load %s%s%s'.\n", named ? launcher_name(launcher) : "", named ? " " : "",
-                   empty ? "loaded" : "empty");
+        cli_printf("Now run 'cal load %s %s'.\n", launcher_name(launcher), empty ? "loaded" : "empty");
     }
     settings_save();
     return 0;
@@ -740,7 +773,7 @@ static int cmd_cal(int argc, char **argv)
         goto usage;
     }
 usage:
-    cli_printf("usage: cal load [black|white] empty|loaded|clear\n"
+    cli_printf("usage: cal load black|white empty|loaded|clear\n"
                "       cal vbat start | point <mV> | save | verify <mV> | show | stop\n");
     return 1;
 }
@@ -1009,9 +1042,9 @@ static const cli_cmd_t s_cmds[] = {
     {"status", "Show sensors, battery, calibration and the last launch", cmd_status},
     {"diag", "diag on|off: pause the state machine for manual sensor control", cmd_diag},
     {"meter", "meter on|off | meter | meter log [seconds] [interval_ms]: continuous RPM (CSV); Ctrl-C stops the log", cmd_meter},
-    {"rpm", "rpm on|off | thr [black|white] [mV] | sense [count] | scan [black|white] [seconds] [apply] (thresholds per launcher; without one, the launcher BX Tacho is on)", cmd_rpm},
-    {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load flash [count] [settle_us]: a full poll next to a short flash sample (as while a top is loaded); load led on|off: hold the load LED (diag or meter mode)", cmd_load},
-    {"cal", "cal load [black|white] empty|loaded|clear: load sensor, per launcher (without one, the launcher in use); cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
+    {"rpm", "rpm on|off | thr [black|white <mV>] | sense [count] | scan [black|white] [seconds] [apply] (thresholds per launcher: setting one or applying a scan needs the launcher named)", cmd_rpm},
+    {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load flash [count] [settle_us]: a full poll next to a short flash sample (as while a top is loaded); load led on|off|auto: hold the load LED on or off (diag or meter mode; readings then show the raw LOAD_SENSE), or back to normal", cmd_load},
+    {"cal", "cal load black|white empty|loaded|clear: load sensor, per launcher; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
     {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg flip on|off (display turned 180 degrees, for the other hand) | cfg ext on|off (optional Battle Pass extension, in builds that have one; restarts) | cfg reset", cmd_cfg},
     {"launch", "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", cmd_launch},
     {"ble", "ble | ble on|off: Battle Pass emulation and the console over BLE (on|off restarts)", cmd_ble},

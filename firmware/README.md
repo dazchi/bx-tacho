@@ -43,10 +43,10 @@ idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAU
 Every build also writes the files to publish, named after `PROJECT_VER` in
 `CMakeLists.txt` (with `-bbp` for a build with the extension):
 
-- `build/release/bx-tacho-v2.0.0.bin`: for updates from the web app (USB or
+- `build/release/bx-tacho-v2.1.0.bin`: for updates from the web app (USB or
   Bluetooth) or `write-flash 0x10000` (with `otadata`, see above). A copy of
   `bx-tacho.bin`, which `idf.py flash` keeps using.
-- `build/release/bx-tacho-v2.0.0-merged.bin`: everything from 0x0 (what
+- `build/release/bx-tacho-v2.1.0-merged.bin`: everything from 0x0 (what
   `idf.py flash` writes), for a blank board (`write-flash 0x0`). It overwrites
   NVS (settings and shot history) but ends below `fctry`, so the battery
   calibration stays.
@@ -86,11 +86,11 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `meter` / `meter log [s] [ms]` | Print meter readings as CSV, once or every `ms` for `s` seconds |
 | `rpm on` / `rpm off` | Power the RPM channel (diag mode) |
 | `rpm sense [n]` | Print RPM_SENSE in mV (channel must be on) |
-| `rpm scan [black\|white] [s] [apply]` | Record RPM_SENSE min/max while you turn the launcher; `apply` saves the midpoint as that launcher's threshold (without one, the launcher BX Tacho is on) |
-| `rpm thr [black\|white] [mV]` | Show the comparator thresholds, or set one launcher's (capped at 2000 mV; without a launcher, the one BX Tacho is on) |
+| `rpm scan [black\|white] [s] [apply]` | Record RPM_SENSE min/max while you turn the launcher; `apply` saves the point 60 % of the way from the black to the white level as the named launcher's threshold (`apply` needs the launcher) |
+| `rpm thr [black\|white <mV>]` | Show the comparator thresholds, or set one launcher's (capped at 2000 mV) |
 | `load [n]` / `load flash [n]` | Print ambient-cancelled LOAD_SENSE readings; `flash` puts a full poll next to the short flash sample used while a top is loaded |
-| `load led on\|off` | Hold the load LED on (diag or meter mode), to test its crosstalk into the RPM sensor. In normal use it is only flashed while the RPM channel is armed: its light reflected off a loaded top hides RPM edges |
-| `cal load [black\|white] empty\|loaded\|clear` | Calibrate the load sensor for one launcher (without one, the launcher BX Tacho is on: see `status`) |
+| `load led on\|off\|auto` | Hold the load LED on (diag or meter mode), to test its crosstalk into the RPM sensor, or off (no measurement flashes, only ambient light); `load` and the diag screen then show the raw LOAD_SENSE voltage. `auto` goes back to normal measurements, as does leaving diag or meter mode. `rpm scan` keeps it off while it samples. In normal use it is only flashed while the RPM channel is armed, as its light reflected off a loaded top reaches the RPM sensor: at each rising RPM edge while the disc turns, off again within 90 % of the disc's white part (so it can't make or move a rising edge), and every 10 ms while the disc is still |
+| `cal load black\|white empty\|loaded\|clear` | Calibrate the load sensor for one launcher |
 | `cal vbat start` … `stop` | Production VBAT calibration, see below |
 | `cfg edges <n>` | Rising edges per launcher revolution |
 | `cfg lightsleep on\|off` | Automatic light sleep on battery (default on), for power debugging |
@@ -130,9 +130,9 @@ the protocol), next to the Battle Pass one.
 
 1. `status`: check the battery reading and USB/charge state.
 2. `diag on`, `rpm on`, `rpm sense`: confirm RPM_SENSE changes between black and white.
-3. `rpm scan 5 apply` while turning the launcher slowly. Aim for ≥ 200 mV contrast.
+3. `rpm scan black 5 apply` while turning the launcher slowly. Aim for ≥ 200 mV contrast.
 4. `diag off`. Count the launcher's black/white segments and set `cfg edges <n>`.
-5. `cal load empty` with no top attached, then `cal load loaded` with one attached.
+5. `cal load black empty` with no top attached, then `cal load black loaded` with one attached.
 6. Launch and compare the peak RPM with a reference.
 7. Repeat 3 and 5 on a launcher of the other colour (see below).
 
@@ -164,8 +164,9 @@ logs each change; `status` and the diag screen show which launcher is in use.
 
 On a white launcher, until the first reading above its loaded threshold (the
 first top loaded, or the pin pushed up), BX Tacho is still on the black
-settings and the empty white launcher reads as loaded. Calibrate a launcher
-by name (`cal load white empty`) unless `status` already shows it in use.
+settings and the empty white launcher reads as loaded. The calibration commands
+always name the launcher (`cal load white empty`, `rpm scan white 5 apply`,
+`rpm thr white 80`) for that reason.
 
 Updating from 1.x resets the load and RPM calibration and `cfg edges` to
 these defaults (one calibration for every launcher can't be carried over);

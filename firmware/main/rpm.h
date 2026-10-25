@@ -38,6 +38,9 @@ uint32_t rpm_overflow_count(void);
 
 // Notify `task` (xTaskNotifyGive) on every edge, so it can act right after one
 void rpm_set_notify_task(TaskHandle_t task);
+// Call `hook` from the interrupt on every unmasked edge, with its timestamp
+// (IRAM: it may run while the flash cache is off)
+void rpm_set_edge_hook(void (*hook)(uint32_t edge_us));
 
 // Edge masking around a load LED flash, whose light can reach the RPM sensor:
 // edges from rpm_mask_begin() until tail_us after rpm_mask_end() are dropped.
