@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Firmware version, shown on the boot screen and by `status`. Bump for releases.
-set(PROJECT_VER "2.2.0")
+set(PROJECT_VER "2.3.0")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
@@ -23,22 +23,26 @@ endforeach()
 project(bx-tacho)
 
 # The files to publish, named after the version: a copy of the app image
-# (bx-tacho-v2.2.0.bin; idf.py flash keeps using bx-tacho.bin) and everything
-# from 0x0 for a blank board (bx-tacho-v2.2.0-merged.bin, what idf.py flash writes)
+# (bx-tacho-v2.3.0.bin; idf.py flash keeps using bx-tacho.bin) and everything
+# from 0x0 for a blank board (bx-tacho-v2.3.0-merged.bin, what idf.py flash writes)
 idf_build_get_property(project_ver PROJECT_VER)
 idf_build_get_property(python PYTHON)
 set(app_bin "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.bin")
+# ESP-IDF's rule for the app image names this stamp file as its output, not the
+# .bin itself: a fresh build directory has no rule for bx-tacho.bin, so depend
+# on the stamp (rewritten with every new image)
+set(app_bin_stamp "${CMAKE_BINARY_DIR}/.bin_timestamp")
 set(versioned_bin "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-v${project_ver}.bin")
 set(merged_bin "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}-v${project_ver}-merged.bin")
 add_custom_command(OUTPUT "${versioned_bin}"
     COMMAND ${CMAKE_COMMAND} -E copy "${app_bin}" "${versioned_bin}"
-    DEPENDS gen_project_binary "${app_bin}"
+    DEPENDS gen_project_binary "${app_bin_stamp}"
     COMMENT "Copying ${CMAKE_PROJECT_NAME}.bin to ${CMAKE_PROJECT_NAME}-v${project_ver}.bin"
     VERBATIM)
 add_custom_command(OUTPUT "${merged_bin}"
     COMMAND ${python} -m esptool --chip ${IDF_TARGET} merge-bin -o "${merged_bin}" @flash_args
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
-    DEPENDS gen_project_binary bootloader partition_table_bin blank_ota_data "${app_bin}"
+    DEPENDS gen_project_binary bootloader partition_table_bin blank_ota_data "${app_bin_stamp}"
     COMMENT "Merging the images into ${CMAKE_PROJECT_NAME}-v${project_ver}-merged.bin"
     VERBATIM)
 add_custom_target(versioned_bin ALL DEPENDS "${versioned_bin}" "${merged_bin}")

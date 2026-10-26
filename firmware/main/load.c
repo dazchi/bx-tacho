@@ -45,9 +45,14 @@ static const char *TAG = "load";
 #define EDGE_FLASH_SAMPLES       2
 
 // Hysteresis and debounce (HANDOVER.md 6.2)
-#define LOADED_PCT      60
+#define LOADED_PCT      90
 #define RELEASED_PCT    40
 #define DEBOUNCE_COUNT  4
+
+// A switch to the white launcher needs readings above its loaded threshold for
+// this long without a break: a bey pushed in too far on a black launcher lifts
+// the pin past it for a moment before it drops back
+#define LAUNCHER_WHITE_HOLD_US 3000000
 
 // While empty, slowly track the baseline so drift does not cause false loads
 #define BASELINE_TRACK_PCT  20
@@ -78,7 +83,9 @@ static int s_streak;
 static int s_last_pct;
 
 static launcher_t s_launcher;   // black until a reading says otherwise
-static int s_launcher_streak;
+static int s_launcher_streak;     // readings in a row pointing to black
+static bool s_white_pending;      // readings above the white threshold...
+static int64_t s_white_since_us;  // ...without a break since then
 
 static inline void IRAM_ATTR led_set(bool on)
 {
@@ -396,18 +403,38 @@ launcher_t load_track_launcher(int diff_mv, bool may_switch)
     // high (a top on it, or its pin). Below the black one's released level: only
     // a black launcher (or none) reads that low. In between (an empty white
     // launcher, the pin pushed up on a black one) it stays as it is.
+    // With automatic white detection off ('cfg autowhite off'), always black.
     int pct;
+    bool black_only = !settings_auto_white();
     launcher_t seen = s_launcher;
-    if (cal_percent(LAUNCHER_WHITE, diff_mv, &pct) && pct > LOADED_PCT) {
+    if (black_only) {
+        seen = LAUNCHER_BLACK;
+    } else if (cal_percent(LAUNCHER_WHITE, diff_mv, &pct) && pct > LOADED_PCT) {
         seen = LAUNCHER_WHITE;
     } else if (cal_percent(LAUNCHER_BLACK, diff_mv, &pct) && pct < RELEASED_PCT) {
         seen = LAUNCHER_BLACK;
     }
+    bool change = false;
     if (seen == s_launcher || !may_switch) {
         s_launcher_streak = 0;
+        s_white_pending = false;
+    } else if (black_only) {
+        change = true;   // just switched off while on white: back to black at once
+    } else if (seen == LAUNCHER_WHITE) {
+        int64_t now = esp_timer_get_time();
+        if (!s_white_pending) {
+            s_white_pending = true;
+            s_white_since_us = now;
+        } else if (now - s_white_since_us >= LAUNCHER_WHITE_HOLD_US) {
+            change = true;
+        }
     } else if (++s_launcher_streak >= DEBOUNCE_COUNT) {
+        change = true;
+    }
+    if (change) {
         s_launcher = seen;
         s_launcher_streak = 0;
+        s_white_pending = false;
         // Start from where this reading lies on the new launcher's scale, not from
         // the old state, so the switch itself isn't taken for a load or a release
         const launcher_cal_t *cal = settings_cal(seen);
@@ -447,7 +474,8 @@ bool load_classify(int diff_mv, bool may_switch)
     // Re-learn the empty baseline while idle (RAM only; NVS keeps the original),
     // only near the empty level: readings off the launcher (about 0 mV) would
     // otherwise drag it down, and it couldn't come back up
-    if (!s_loaded && pct > -BASELINE_TRACK_PCT && pct < BASELINE_TRACK_PCT && s_launcher_streak == 0) {
+    if (!s_loaded && pct > -BASELINE_TRACK_PCT && pct < BASELINE_TRACK_PCT && s_launcher_streak == 0 &&
+        !s_white_pending) {
         cfg->load_empty += (diff_mv - cfg->load_empty) / BASELINE_DIV;
     }
     return s_loaded;

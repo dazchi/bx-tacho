@@ -70,7 +70,9 @@ void load_classifier_reset(bool loaded);
 
 // Which launcher BX Tacho is on: black from boot; white once a reading is above
 // the white launcher's loaded threshold, black again once one is below the
-// black launcher's released threshold (a few readings in a row each time).
+// black launcher's released threshold (white: held for 3 s without a break,
+// as the pin pushed too far on a black launcher crosses it briefly; black: a
+// few readings in a row).
 // Called by load_classify(); diag mode calls it directly. Returns the launcher.
 launcher_t load_track_launcher(int diff_mv, bool may_switch);
 launcher_t load_launcher(void);

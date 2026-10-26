@@ -51,6 +51,11 @@ esp_err_t settings_set_ble(bool enable);
 bool settings_flip(void);
 esp_err_t settings_set_flip(bool flip);
 
+// Automatic white launcher detection (default on); off: always the black
+// launcher's settings. Saved immediately.
+bool settings_auto_white(void);
+esp_err_t settings_set_auto_white(bool on);
+
 // Optional Battle Pass extension in use, in builds that have one (bbp_ext.h;
 // default off); saved immediately, applied at boot
 bool settings_bbp_ext(void);

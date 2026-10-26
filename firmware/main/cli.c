@@ -148,7 +148,8 @@ static int cmd_status(int argc, char **argv)
                s.batt.vbat_valid ? "valid" : "not trusted while charging", s.batt.percent);
     cli_printf("usb         : VBUS %s, host %s\n", battery_usb_present() ? "yes" : "no",
                usb_serial_jtag_is_connected() ? "connected" : "none");
-    cli_printf("launcher    : %s\n", launcher_name(s.launcher));
+    cli_printf("launcher    : %s%s\n", launcher_name(s.launcher),
+               settings_auto_white() ? "" : " (white detection off: 'cfg autowhite on')");
     cli_printf("rpm channel : %s, threshold %d mV, %u edges/rev, %lu edges dropped, %lu masked by load flashes, "
                "%lu edge flashes cut short\n",
                rpm_is_powered() ? "on" : "off", rpm_get_threshold_mv(), cfg->edges_per_rev,
@@ -814,6 +815,13 @@ static int cmd_cfg(int argc, char **argv)
         cli_printf("display %s (saved)\n", on ? "turned 180 degrees" : "the normal way up");
         return 0;
     }
+    if (argc == 3 && !strcmp(argv[1], "autowhite") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
+        bool on = !strcmp(argv[2], "on");
+        settings_set_auto_white(on);
+        cli_printf("automatic white launcher detection %s (saved)%s\n", on ? "on" : "off",
+                   on ? "" : ": the black launcher's settings are always used");
+        return 0;
+    }
     if (argc == 3 && !strcmp(argv[1], "ext") && (!strcmp(argv[2], "on") || !strcmp(argv[2], "off"))) {
         const char *ext = bbp_ext_built_in();
         if (ext == NULL) {
@@ -837,7 +845,7 @@ static int cmd_cfg(int argc, char **argv)
         cli_printf("light sleep on battery: %s (saved)\n", argv[2]);
         return 0;
     }
-    cli_printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg flip on|off | cfg ext on|off | cfg reset\n");
+    cli_printf("usage: cfg edges <1-16> | cfg lightsleep on|off | cfg flip on|off | cfg ext on|off | cfg autowhite on|off | cfg reset\n");
     return 1;
 }
 
@@ -1050,7 +1058,7 @@ static const cli_cmd_t s_cmds[] = {
     {"rpm", "rpm on|off | thr [black|white <mV>] | sense [count] | scan [black|white] [seconds] [apply] (thresholds per launcher: setting one or applying a scan needs the launcher named)", cmd_rpm},
     {"load", "load [count]: print ambient-cancelled LOAD_SENSE readings; load flash [count] [settle_us]: a full poll next to a short flash sample (as while a top is loaded); load led on|off|auto: hold the load LED on or off (diag or meter mode; readings then show the raw LOAD_SENSE), or back to normal", cmd_load},
     {"cal", "cal load black|white empty|loaded|clear: load sensor, per launcher; cal vbat start|point <mV>|save|verify <mV>|show|stop: production VBAT calibration (kept by 'cfg reset')", cmd_cal},
-    {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg flip on|off (display turned 180 degrees, for the other hand) | cfg ext on|off (optional Battle Pass extension, in builds that have one; restarts) | cfg reset", cmd_cfg},
+    {"cfg", "cfg edges <n> | cfg lightsleep on|off | cfg flip on|off (display turned 180 degrees, for the other hand) | cfg autowhite on|off (automatic white launcher detection; off: always the black launcher's settings) | cfg ext on|off (optional Battle Pass extension, in builds that have one; restarts) | cfg reset", cmd_cfg},
     {"launch", "launch [n]: last launch edge by edge (first n edges, default 60), with the release and dropped edges", cmd_launch},
     {"ble", "ble | ble on|off: Battle Pass emulation and the console over BLE (on|off restarts)", cmd_ble},
     {"history", "history | history clear: shot history sent to Battle Pass apps (last 50, total, max, latest curve)", cmd_history},

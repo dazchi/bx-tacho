@@ -43,10 +43,10 @@ idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAU
 Every build also writes the files to publish, named after `PROJECT_VER` in
 `CMakeLists.txt` (with `-bbp` for a build with the extension):
 
-- `build/release/bx-tacho-v2.2.0.bin`: for updates from the web app (USB or
+- `build/release/bx-tacho-v2.3.0.bin`: for updates from the web app (USB or
   Bluetooth) or `write-flash 0x10000` (with `otadata`, see above). A copy of
   `bx-tacho.bin`, which `idf.py flash` keeps using.
-- `build/release/bx-tacho-v2.2.0-merged.bin`: everything from 0x0 (what
+- `build/release/bx-tacho-v2.3.0-merged.bin`: everything from 0x0 (what
   `idf.py flash` writes), for a blank board (`write-flash 0x0`). It overwrites
   NVS (settings and shot history) but ends below `fctry`, so the battery
   calibration stays.
@@ -95,6 +95,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `cfg edges <n>` | Rising edges per launcher revolution |
 | `cfg lightsleep on\|off` | Automatic light sleep on battery (default on), for power debugging |
 | `cfg flip on\|off` | Turn the display 180 degrees, for holding the launcher in the other hand (default off; applies at once, kept by `cfg reset`) |
+| `cfg autowhite on\|off` | Automatic white launcher detection (default on). Off: BX Tacho always uses the black launcher's settings, for anyone who only uses dark launchers (applies at once, kept by `cfg reset`) |
 | `cfg ext on\|off` | Use the optional Battle Pass extension, in builds that have one (default off; saves and restarts), see "Optional extension" |
 | `events` / `events clear` | Power/sleep event log: boots and reset reasons, load changes, launcher changes, state changes, USB, display on/off, deep sleep. Kept in RTC memory, so it survives deep sleep and resets (not power-on) |
 | `launch [n]` | Last launch edge by edge (first `n` edges, default 60): time, interval, RPM, with the release seen by the load sensor and any edges the chatter filter dropped |
@@ -143,24 +144,27 @@ launches are still measured; the display shows **ARMED** instead of **READY**.
 
 A launcher with a white housing reflects far more of the load LED's light
 than a black one, so the same top reads very differently: on the prototype
-about 100 / 300 mV (empty / loaded) on a black launcher and 490 / 700 mV on a
+about 100 / 300 mV (empty / loaded) on a black launcher and 490 / 750 mV on a
 white one. Pushing the pin up by hand reads higher still (about 500 mV on
 black, 1000 mV on white). Each kind keeps its own load calibration and RPM
-threshold (`rpm thr black 70`, `rpm thr white 80`; 70 and 80 mV by default).
+threshold (`rpm thr black 80`, `rpm thr white 90`; 80 and 90 mV by default).
 
 BX Tacho starts on the black launcher's settings and changes with two
 thresholds taken from the calibrations:
 
 - above the white launcher's **loaded** threshold (60 % of the way from its
-  empty to its loaded level, 616 mV by default): white. Only a white
+  empty to its loaded level, 646 mV by default): white. Only a white
   launcher reads that high, with a top on it or its pin pushed up.
 - below the black launcher's **released** threshold (40 %, 180 mV by
   default): black. Only a black launcher, or none, reads that low.
 - in between (an empty white launcher, the pin pushed up on a black one): no
   change.
 
-It takes 4 readings in a row, and never happens during a launch. `events`
-logs each change; `status` and the diag screen show which launcher is in use.
+`cfg autowhite off` turns the detection off: BX Tacho then always uses the black
+launcher's settings. Switching to white takes readings above its threshold for 3 s without a
+break: a bey pushed in too far on a black launcher lifts the pin past it
+for a moment before it drops back. Switching to black takes 4 readings in a
+row. Neither happens during a launch. `events` logs each change; `status` and the diag screen show which launcher is in use.
 
 On a white launcher, until the first reading above its loaded threshold (the
 first top loaded, or the pin pushed up), BX Tacho is still on the black
