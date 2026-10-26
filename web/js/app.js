@@ -182,16 +182,25 @@ function touchScroll(t, el) {
   });
 }
 
+// Keep a console at its latest line: xterm.js only follows new output while the
+// view is already at the bottom, so after scrolling up, or once a hidden tab
+// came back at a new size, fresh output landed out of sight
+function followOutput(t) {
+  t.onWriteParsed(() => t.scrollToBottom());
+}
+
 const term = new Terminal({ ...TERM_FONT, cursorBlink: true, scrollback: 5000, theme: TERM_THEME });
 const fit = new FitAddon();
 term.loadAddon(fit);
 term.open($('terminal'));
 touchScroll(term, $('terminal'));
+followOutput(term);
 
 function fitTerminal() {
   if (!$('panel-usb').hidden) {
     try {
       fit.fit();
+      term.scrollToBottom();
     } catch { /* not laid out yet */ }
   }
 }
@@ -635,11 +644,13 @@ const bleFit = new FitAddon();
 bleTerm.loadAddon(bleFit);
 bleTerm.open($('ble-terminal'));
 touchScroll(bleTerm, $('ble-terminal'));
+followOutput(bleTerm);
 
 function fitBleTerminal() {
   if (!$('panel-ble').hidden) {
     try {
       bleFit.fit();
+      bleTerm.scrollToBottom();
     } catch { /* not laid out yet */ }
   }
 }
