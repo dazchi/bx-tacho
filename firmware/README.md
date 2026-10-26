@@ -43,10 +43,10 @@ idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAU
 Every build also writes the files to publish, named after `PROJECT_VER` in
 `CMakeLists.txt` (with `-bbp` for a build with the extension):
 
-- `build/release/bx-tacho-v2.1.0.bin`: for updates from the web app (USB or
+- `build/release/bx-tacho-v2.2.0.bin`: for updates from the web app (USB or
   Bluetooth) or `write-flash 0x10000` (with `otadata`, see above). A copy of
   `bx-tacho.bin`, which `idf.py flash` keeps using.
-- `build/release/bx-tacho-v2.1.0-merged.bin`: everything from 0x0 (what
+- `build/release/bx-tacho-v2.2.0-merged.bin`: everything from 0x0 (what
   `idf.py flash` writes), for a blank board (`write-flash 0x0`). It overwrites
   NVS (settings and shot history) but ends below `fctry`, so the battery
   calibration stays.
@@ -276,6 +276,12 @@ cal vbat verify 3600     # different voltage; PASS within +-10 mV
 cal vbat stop
 ```
 `cal vbat show` (and `status`) print the stored calibration.
+
+Calibration mode keeps the RPM channel and the load LED off and the chip
+out of light sleep, so the current stays steady. While `point` or `verify`
+measures (about 0.5 s) the display is also frozen: no redraws, no I2C
+traffic. Bluetooth keeps running (it carries the console); over a data-only
+USB connection, `ble off` takes its radio bursts away too.
 
 The calibration lives in its own NVS partition (`fctry`, see
 `partitions.csv`). `cfg reset` and NVS recovery never touch it; only a new

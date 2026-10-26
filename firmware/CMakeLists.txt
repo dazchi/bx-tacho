@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 # Firmware version, shown on the boot screen and by `status`. Bump for releases.
-set(PROJECT_VER "2.1.0")
+set(PROJECT_VER "2.2.0")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
@@ -23,8 +23,8 @@ endforeach()
 project(bx-tacho)
 
 # The files to publish, named after the version: a copy of the app image
-# (bx-tacho-v2.1.0.bin; idf.py flash keeps using bx-tacho.bin) and everything
-# from 0x0 for a blank board (bx-tacho-v2.1.0-merged.bin, what idf.py flash writes)
+# (bx-tacho-v2.2.0.bin; idf.py flash keeps using bx-tacho.bin) and everything
+# from 0x0 for a blank board (bx-tacho-v2.2.0-merged.bin, what idf.py flash writes)
 idf_build_get_property(project_ver PROJECT_VER)
 idf_build_get_property(python PYTHON)
 set(app_bin "${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.bin")

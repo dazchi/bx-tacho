@@ -534,9 +534,12 @@ static bool vbat_cal_usb_power_check(void)
     return true;
 }
 
-// Average of 8 groups of 16 readings at the VBAT_SENSE pin; *spread = max - min of the groups
+// Average of 8 groups of 16 readings at the VBAT_SENSE pin; *spread = max - min
+// of the groups. The display stays frozen meanwhile (about 0.5 s): redraws
+// change the board's current, and so the supply voltage, a little.
 static int measure_vbat_pin(int *spread)
 {
+    app_hold_display(true);
     vTaskDelay(pdMS_TO_TICKS(VBAT_POINT_SETTLE_MS));
     int lo = INT_MAX;
     int hi = INT_MIN;
@@ -544,6 +547,7 @@ static int measure_vbat_pin(int *spread)
     for (int g = 0; g < 8; g++) {
         int mv = battery_read_pin_mv(16);
         if (mv < 0) {
+            app_hold_display(false);
             return -1;
         }
         sum += mv;
@@ -551,6 +555,7 @@ static int measure_vbat_pin(int *spread)
         hi = mv > hi ? mv : hi;
         vTaskDelay(pdMS_TO_TICKS(25));
     }
+    app_hold_display(false);
     *spread = hi - lo;
     return (sum + 4) / 8;
 }

@@ -74,6 +74,11 @@ typedef enum {
 
 void app_note_activity(void);
 
+// Freeze the display (no redraws, no I2C traffic) while a VBAT calibration
+// point is measured, so its current stays steady. app_hold_display(true)
+// returns once a redraw in progress has finished.
+void app_hold_display(bool hold);
+
 // Enter deep sleep (wake-up: USB plugged in, or the power switch).
 // - Command: counts down APP_SLEEP_COUNTDOWN_S on the display.
 // - Low battery: shows a dead-battery icon with the battery voltage, then a

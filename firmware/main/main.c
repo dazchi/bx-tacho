@@ -84,6 +84,8 @@ static volatile app_sleep_reason_t s_countdown_reason;
 static volatile bool s_sleep_pending;             // countdown or shutdown in progress
 static volatile bool s_shutdown;                  // countdown over: other tasks leave the hardware alone
 static volatile bool s_ui_parked;                 // UI task has switched the display off
+static volatile bool s_ui_hold;                   // app_hold_display(): no redraws
+static volatile bool s_ui_busy;                   // UI task is between waits (may be drawing)
 static volatile int s_ble_gesture_msg;            // 1/2: BLE switched off/on, shown before the restart
 static bool s_ui_running;
 
@@ -891,6 +893,24 @@ static void draw_credit(void)
     display_flush();
 }
 
+void app_hold_display(bool hold)
+{
+    s_ui_hold = hold;
+    // The UI task marks itself busy before it looks at the hold, so once it reads
+    // idle here no redraw can start until the hold is lifted
+    for (int i = 0; hold && s_ui_busy && i < 50; i++) {
+        vTaskDelay(pdMS_TO_TICKS(2));
+    }
+}
+
+// The UI task's waits: not drawing meanwhile (app_hold_display)
+static void ui_wait_ms(int ms)
+{
+    s_ui_busy = false;
+    vTaskDelay(pdMS_TO_TICKS(ms));
+    s_ui_busy = true;
+}
+
 static void ui_task(void *arg)
 {
     app_snapshot_t s;
@@ -903,14 +923,19 @@ static void ui_task(void *arg)
     draw_credit();
     vTaskDelay(pdMS_TO_TICKS(CREDIT_MS));
 
+    s_ui_busy = true;
     for (;;) {
+        if (s_ui_hold) {
+            ui_wait_ms(10);   // a VBAT calibration point is being measured
+            continue;
+        }
         if (s_shutdown) {
             if (on) {
                 display_power(false);
                 on = false;
             }
             s_ui_parked = true;
-            vTaskDelay(pdMS_TO_TICKS(100));
+            ui_wait_ms(100);
             continue;
         }
 
@@ -925,7 +950,7 @@ static void ui_task(void *arg)
                 dim = false;
             }
             draw_ble_gesture(gesture == 2);
-            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
+            ui_wait_ms(UI_PERIOD_MS);
             continue;
         }
 
@@ -941,7 +966,7 @@ static void ui_task(void *arg)
                 dim = false;
             }
             draw_update(update_pct, restarting);
-            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
+            ui_wait_ms(UI_PERIOD_MS);
             continue;
         }
 
@@ -956,7 +981,7 @@ static void ui_task(void *arg)
                 dim = false;
             }
             draw_console_code(code);
-            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
+            ui_wait_ms(UI_PERIOD_MS);
             continue;
         }
 
@@ -977,7 +1002,7 @@ static void ui_task(void *arg)
             } else {
                 draw_sleep_countdown(countdown, s_countdown_reason);
             }
-            vTaskDelay(pdMS_TO_TICKS(UI_PERIOD_MS));
+            ui_wait_ms(UI_PERIOD_MS);
             continue;
         }
 
@@ -1004,7 +1029,7 @@ static void ui_task(void *arg)
         }
 
         bool live = s.state == LAUNCH_PULLING || s.mode != APP_MODE_RUN;
-        vTaskDelay(pdMS_TO_TICKS(live ? UI_LIVE_PERIOD_MS : UI_PERIOD_MS));
+        ui_wait_ms(live ? UI_LIVE_PERIOD_MS : UI_PERIOD_MS);
     }
 }
 
