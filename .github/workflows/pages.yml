@@ -2,8 +2,8 @@
 # Copyright (C) 2026 Darren Chi
 # Publishes web/ (the BX Tacho web app) to GitHub Pages, together with the
 # firmware of the latest release (web/firmware/latest/, for the web app's
-# "Use the latest release"), on every push that changes web/ and whenever a
-# release is published.
+# "Use the latest release") and the user manual (web/manual/, from docs/), on
+# every push that changes either and whenever a release is published.
 # One-time setup: repository Settings > Pages > Build and deployment > Source: GitHub Actions.
 name: Deploy web app
 
@@ -12,6 +12,8 @@ on:
     branches: [master]
     paths:
       - 'web/**'
+      - 'docs/manual-zh-TW.html'
+      - 'docs/manual-screens/**'
       - '.github/workflows/pages.yml'
   release:
     types: [published]
@@ -45,6 +47,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      - name: Add the user manual
+        run: |
+          mkdir -p web/manual
+          cp docs/manual-zh-TW.html web/manual/index.html
+          cp -r docs/manual-screens web/manual/
       - name: Add the latest release's firmware
         env:
           GH_TOKEN: ${{ github.token }}

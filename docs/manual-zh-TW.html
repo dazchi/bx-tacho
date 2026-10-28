@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BX Tacho 使用說明</title>
+<style>
+  @page { size: A4; margin: 11mm 12mm; }
+  :root {
+    --ink: #1c1d22;
+    --muted: #5d6070;
+    --line: #d7d9e0;
+    --accent: #2252d1;
+    --soft: #eef2fc;
+    --paper: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 10.2pt/1.5 "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  }
+  .page { max-width: 186mm; margin: 0 auto; }
+  .page + .page { break-before: page; }
+  /* a page as tall as the sheet, so its last items can sit at the bottom */
+  .page.fill { display: flex; flex-direction: column; min-height: 274mm; }
+  .page.fill .grow, .page.fill .grow .app { flex: 1; display: flex; flex-direction: column; }
+  .page.fill .grow .app { display: grid; }
+  .appside { display: flex; flex-direction: column; align-self: stretch; }
+  @media screen { .page.fill { min-height: 297mm; } }
+  header { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 2px solid var(--ink); padding-bottom: 4px; margin-bottom: 8px; }
+  h1 { font-size: 19pt; margin: 0; letter-spacing: 0.5px; }
+  h1 small { font-size: 11pt; font-weight: 500; color: var(--muted); margin-left: 8px; }
+  header p { margin: 0; color: var(--muted); font-size: 9pt; }
+  .intro { margin: 0 0 8px; }
+  .cols { columns: 2; column-gap: 7mm; }
+  section { break-inside: avoid; margin: 0 0 7px; }
+  h2 { font-size: 11.5pt; margin: 0 0 4px; padding: 2px 7px; background: var(--soft); border-left: 4px solid var(--accent); }
+  ol, ul { margin: 2px 0 0; padding-left: 18px; }
+  li { margin: 1px 0; }
+  p { margin: 2px 0; }
+  .scr { font-family: "Consolas", "Menlo", monospace; font-weight: 700; background: #111; color: #cfe8ff; padding: 0 5px; border-radius: 3px; white-space: nowrap; font-size: 9pt; }
+  .tip { border: 1.5px solid var(--accent); border-radius: 6px; padding: 4px 8px; }
+  .tip h2 { background: none; border: 0; padding: 0; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm 5mm; margin: 2px 0 8px; }
+  .grid.four { grid-template-columns: repeat(4, 1fr); gap: 4mm; }
+  figure { margin: 0; break-inside: avoid; }
+  figure img { width: 100%; display: block; }
+  figcaption { font-size: 9pt; line-height: 1.4; margin-top: 3px; }
+  figcaption b { display: block; font-size: 9.6pt; }
+  .step { display: inline-block; min-width: 1.5em; text-align: center; background: var(--accent); color: #fff; border-radius: 9px; font-size: 8.5pt; font-weight: 700; margin-right: 3px; }
+  .steps { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 7mm; }
+  .st { display: flex; align-items: center; gap: 3mm; break-inside: avoid; }
+  .st img { width: 36mm; flex: none; }
+  .pinfig { margin: 4mm 0 0; text-align: center; }
+  .pinfig .pinsketch { width: 70mm; display: block; margin: 0 auto; }
+  .warn { margin: 3mm 0 0; padding: 3px 8px; border-left: 4px solid #d97706; background: #fff7e6; font-size: 9.6pt; }
+  .pinfig figcaption { font-size: 9pt; color: var(--muted); margin-top: 2px; }
+  .st p { margin: 0; font-size: 9.8pt; }
+  .sketch { display: block; width: 48mm; margin: 2px auto 0; }
+  a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  .app { display: grid; grid-template-columns: 1fr 40mm 40mm; gap: 5mm; align-items: start; }
+  .app .tip, section .tip { margin-top: 6px; }
+  ol.big li { margin: 3px 0; }
+  .qr { margin-top: auto; padding-top: 5mm; text-align: center; }
+  .qr img { width: 32mm; margin: 0 auto; }
+  .qr figcaption { font-size: 9pt; line-height: 1.45; }
+  .qr figcaption b { display: block; font-size: 10pt; }
+  .phone img { border: 1px solid var(--line); border-radius: 8px; }
+  .phone figcaption { text-align: center; color: var(--muted); }
+  .upd { display: grid; grid-template-columns: 1fr 42mm 42mm; gap: 5mm; align-items: start; margin-bottom: 6mm; }
+  .mounts { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .mounts figure { margin: 0; }
+  .mountsketch { width: 78%; display: block; margin: 0 auto; }
+  .mounts figcaption { text-align: center; font-size: 9pt; color: var(--muted); }
+  .mountnotes { margin: 2px 0 0; }
+  .ico { height: 1.25em; vertical-align: -0.25em; }
+  .note { color: var(--muted); font-size: 9pt; margin: 0 0 6px; }
+  footer { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 4px; color: var(--muted); font-size: 8.6pt; display: flex; justify-content: space-between; }
+  @media screen { body { background: #e9ebf0; } .page { background: var(--paper); padding: 12mm; margin: 16px auto; box-shadow: 0 1px 4px rgba(0,0,0,.15); } }
+  @media screen and (max-width: 640px) { .cols { columns: 1; } .grid, .grid.four { grid-template-columns: repeat(2, 1fr); } .page { padding: 16px; margin: 0; } }
+</style>
+</head>
+<body>
+
+<!-- ============ Page 1: the basics ============ -->
+<div class="page">
+  <header>
+    <h1>BX Tacho<small>戰鬥陀螺發射轉速計 使用說明</small></h1>
+    <p>適用韌體 v2.3 以上</p>
+  </header>
+  <p class="intro">BX Tacho 夾在 Beyblade X 發射器上，發射時會<b>自動</b>量出陀螺的轉速（RPM，每分鐘轉幾圈），顯示在小螢幕上。不用按任何按鈕！螢幕上每個畫面長什麼樣子，請看第 5、6 頁。</p>
+
+  <section>
+    <h2>安裝示意圖</h2>
+    <div class="mounts">
+      <figure><svg class="mountsketch" viewBox="0 0 300 132" role="img" aria-label="安裝示意圖：從上面看，BX Tacho 疊在發射器上，上下兩個卡扣扣住發射器">
+        <g fill="none" stroke="#1c1d22" stroke-width="1.4" stroke-linejoin="round">
+          <!-- ripcord, under everything -->
+          <path d="M6 75 H128 V81 H6 Z" fill="#fff4bf"/>
+          <!-- launcher (top view of your photo turned 90 degrees anticlockwise) -->
+          <rect x="136" y="19.5" width="47" height="7" rx="1" fill="#e9eaee"/>
+          <rect x="136" y="105.5" width="45" height="7" rx="1" fill="#e9eaee"/>
+          <rect x="118" y="26" width="130" height="80" rx="6" fill="#e9eaee"/>
+          <path d="M122 51 H247 M122 80 H247" stroke-width="0.8"/>
+          <path d="M247.5 56 L235 61 V71 L247.5 76" stroke-width="0.8"/>
+          <rect x="248" y="72" width="4" height="12" rx="1" fill="#e9eaee"/>
+          <path d="M252 75 H266 V81 H252" fill="#fff4bf"/>
+          <rect x="266" y="58" width="8" height="40" rx="2" fill="#fff4bf"/>
+        </g>
+        <text x="171" y="46" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" font-size="4.6" font-weight="700" fill="#5d6070">BEYBLADE X WINDER LAUNCHER</text>
+        <text x="225" y="100" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" font-size="7" font-weight="700" fill="#1c1d22">IN ▷</text>
+        <g fill="none" stroke="#1c1d22" stroke-width="1.4" stroke-linejoin="round">
+          <!-- BX Tacho -->
+          <rect x="146" y="12" width="24" height="26" rx="4" fill="#fff"/>
+          <rect x="146" y="94" width="24" height="26" rx="4" fill="#fff"/>
+          <rect x="70" y="34" width="120" height="64" rx="10" fill="#fff"/>
+          <rect x="64" y="61" width="6" height="8" rx="1" fill="#1c1d22"/>
+          <rect x="108" y="53.29" width="48" height="25.41" rx="1.5"/>
+        </g>
+        <image href="manual-screens/ready.svg" x="108" y="53.29" width="48" height="25.41" preserveAspectRatio="none"/>
+        <g font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" fill="#1c1d22">
+          <text x="80" y="47" font-size="9" font-weight="700">BX Tacho</text>
+          <text x="8" y="70" font-size="10">拉條</text>
+          <text x="158" y="9.5" font-size="9" fill="#5d6070" text-anchor="middle">卡扣</text>
+          <text x="158" y="130" font-size="9" fill="#5d6070" text-anchor="middle">卡扣</text>
+        </g>
+      </svg><figcaption>拉條發射器</figcaption></figure>
+      <figure><svg class="mountsketch" viewBox="0 0 300 132" role="img" aria-label="安裝示意圖：旋風發射器，從上面看，BX Tacho 幾乎對齊發射器的右邊">
+        <g fill="none" stroke="#1c1d22" stroke-width="1.4" stroke-linejoin="round">
+          <!-- launcher -->
+          <rect x="186" y="19.5" width="33" height="7" rx="1" fill="#e9eaee"/>
+          <rect x="186" y="105.5" width="33" height="7" rx="1" fill="#e9eaee"/>
+          <rect x="91" y="60" width="6" height="12" rx="1" fill="#e9eaee"/>
+          <rect x="96" y="26" width="140" height="80" rx="6" fill="#e9eaee"/>
+          <rect x="99" y="53" width="134" height="26" fill="#c9ccd4" stroke-width="0.8"/>
+          <path d="M236 62 H250 V70 H236" fill="#e9eaee"/>
+          <rect x="250" y="46" width="8" height="40" rx="2" fill="#e9eaee"/>
+          <!-- BX Tacho -->
+          <rect x="190.5" y="12" width="24" height="26" rx="4" fill="#fff"/>
+          <rect x="190.5" y="94" width="24" height="26" rx="4" fill="#fff"/>
+          <rect x="114.5" y="34" width="120" height="64" rx="10" fill="#fff"/>
+          <rect x="108.5" y="61" width="6" height="8" rx="1" fill="#1c1d22"/>
+          <rect x="152.5" y="53.29" width="48" height="25.41" rx="1.5"/>
+        </g>
+        <image href="manual-screens/ready.svg" x="152.5" y="53.29" width="48" height="25.41" preserveAspectRatio="none"/>
+        <g font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" fill="#1c1d22">
+          <text x="124.5" y="47" font-size="9" font-weight="700">BX Tacho</text>
+          <text x="202.5" y="9.5" font-size="9" fill="#5d6070" text-anchor="middle">卡扣</text>
+          <text x="202.5" y="130" font-size="9" fill="#5d6070" text-anchor="middle">卡扣</text>
+        </g>
+      </svg><figcaption>旋風發射器：卡榫比較靠近把手，BX Tacho 幾乎對齊發射器的右邊</figcaption></figure>
+    </div>
+    <p class="mountnotes">從上面看：把 BX Tacho <b>疊在發射器上面</b>，用上下兩個<b>卡扣</b>扣住發射器兩側的卡榫；螢幕上的字是正的時候，發射器的把手在右邊。不同發射器的卡榫位置不一樣，BX Tacho 的位置也會不同。</p>
+    <p class="warn"><b>左手模式：</b>如果 BX Tacho 設定成左手模式（例如收到時就設好了），螢幕會<b>上下顛倒</b>。這份說明都以「正常」方向為準；可在網頁 App 的「<b>螢幕方向</b>」選「<b>正常</b>」改回來。</p>
+  </section>
+
+  <section>
+    <h2>怎麼使用</h2>
+    <div class="steps">
+      <div class="st"><img src="manual-screens/splash.svg" alt="開機畫面"><p><span class="step">1</span>把 BX Tacho 夾到發射器上，把電源開關往下撥開機。先出現開機畫面。</p></div>
+      <div class="st"><img src="manual-screens/ready.svg" alt="READY"><p><span class="step">2</span>左上角顯示 <span class="scr">READY</span>：準備好了。</p></div>
+      <div class="st"><img src="manual-screens/loaded.svg" alt="LOADED"><p><span class="step">3</span>把陀螺裝上發射器，變成 <span class="scr">LOADED</span>。</p></div>
+      <div class="st"><img src="manual-screens/launch.svg" alt="LAUNCH!"><p><span class="step">4</span>像平常一樣拉動拉條發射！顯示 <span class="scr">LAUNCH!</span> 和現在的轉速。</p></div>
+      <div class="st"><img src="manual-screens/result.svg" alt="RESULT"><p><span class="step">5</span>發射完顯示 <span class="scr">RESULT</span>，大數字是這次的<b>最高轉速</b>。</p></div>
+      <div class="st"><img src="manual-screens/loaded-again.svg" alt="再次 LOADED"><p><span class="step">6</span>再裝上陀螺，就可以發射下一次。上一次的成績會留著。</p></div>
+    </div>
+    <section class="tip">
+      <h2>白色發射器小提醒</h2>
+      <p>BX Tacho 開機時先當作「黑色發射器」。用<b>白色外殼</b>的發射器時，第一次裝上陀螺後請<b>等 3 秒</b>再發射，它會自動認出是白色發射器。在那之前，沒有裝載陀螺的白色發射器可能會顯示 <span class="scr">LOADED</span>，這是正常的。</p>
+    </section>
+    <p class="warn"><b>注意：</b>裝陀螺和拉動拉條發射時，發射器的<b>底部要朝下</b>（平常發射的方向），陀螺裝載偵測才會準確。底部朝上的話，小柱子會因為重力一直停在上面，BX Tacho 會以為陀螺一直裝著。</p>
+    <p class="warn"><b>提醒：</b>每個陀螺發射器的尺寸都會有一點點誤差（公差），有時可能讓 BX Tacho 量不到轉速，或判斷不出陀螺有沒有裝上。如果遇到這種情況，歡迎將問題反饋給作者：<a href="https://github.com/dazchi/bx-tacho/issues">github.com/dazchi/bx-tacho/issues</a>。</p>
+  </section>
+
+  <footer>
+    <span>手機或電腦看紀錄、更新軟體：<a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a></span>
+    <span>第 1 頁 / 共 6 頁</span>
+  </footer>
+</div>
+
+<!-- ============ Page 2: power, charging, power saving ============ -->
+<div class="page">
+  <header>
+    <h1>基本操作<small>開關機、充電與省電</small></h1>
+    <p>BX Tacho 使用說明</p>
+  </header>
+
+  <div class="cols">
+    <section>
+      <h2>開機與關機</h2>
+      <ul>
+        <li><b>開機：</b>把電源開關<b>往下</b>撥。螢幕會先出現 BX TACHO 和版本號，再出現 MADE BY DAZCHI，然後就可以用了。</li>
+        <li><b>關機：</b>把電源開關<b>往上</b>撥。紀錄不會不見。</li>
+      </ul>
+      <p class="note">外殼上沒有標示「開」「關」。請把 BX Tacho 拿成螢幕上的字是正的，這時電源開關在<b>左邊</b>：往上撥是<b>關</b>，往下撥是<b>開</b>。</p>
+      <svg class="sketch" viewBox="0 0 300 186" role="img" aria-label="示意圖：從上面看 BX Tacho，螢幕是開機畫面，電源開關在左邊，往上是關、往下是開">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" fill="#1c1d22"/></marker></defs>
+        <g fill="none" stroke="#1c1d22" stroke-width="1.6" stroke-linejoin="round">
+          <!-- clips -->
+          <path d="M165 50 V18 a10 10 0 0 1 10 -10 H197 a10 10 0 0 1 10 10 V50"/>
+          <path d="M165 140 V168 a10 10 0 0 0 10 10 H197 a10 10 0 0 0 10 -10 V140"/>
+          <!-- case -->
+          <rect x="82" y="50" width="170" height="90" rx="14"/>
+          <rect x="90" y="58" width="154" height="74" rx="9" stroke-width="0.8"/>
+          <!-- screen -->
+          <rect x="130" y="75.94" width="72" height="38.12" rx="2"/>
+          <!-- switch -->
+          <rect x="72" y="88" width="10" height="10" rx="1.5" fill="#1c1d22"/>
+          <!-- arrows -->
+          <path d="M60 84 V62" marker-end="url(#ah)"/>
+          <path d="M60 102 V124" marker-end="url(#ah)"/>
+        </g>
+        <image href="manual-screens/splash.svg" x="130" y="75.94" width="72" height="38.12" preserveAspectRatio="none"/>
+        <g font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" fill="#1c1d22">
+          <text x="36" y="68" font-size="17" font-weight="700">關</text>
+          <text x="36" y="132" font-size="17" font-weight="700">開</text>
+          <text x="2" y="97" font-size="12">電源開關</text>
+          <text x="214" y="159" font-size="11" fill="#5d6070" dominant-baseline="middle">卡扣</text>
+        </g>
+      </svg>
+    </section>
+
+    <section>
+      <h2>充電</h2>
+      <ul>
+        <li>用 USB-C 線接上充電器或電腦。</li>
+        <li>建議用<b>一般的 5V 充電器</b>或電腦的 USB 孔。<b>不建議</b>用快充充電器（PD 快充、QC 快充等）。</li>
+        <li>充電時指示燈會亮，充飽後熄滅。螢幕右上角會出現閃電符號 <img class="ico" src="manual-screens/icon-charging.svg" alt="充電中圖示">，充飽時顯示 <span style="white-space:nowrap"><span class="scr">FULL</span> <img class="ico" src="manual-screens/icon-full.svg" alt="充飽圖示">。</span></li>
+        <li>充電時也可以照常使用。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>省電：螢幕變暗與自動休眠</h2>
+      <ul>
+        <li><b>30 秒</b>沒有動作：螢幕變暗。</li>
+        <li><b>2 分鐘</b>沒有動作：螢幕關掉。裝上陀螺、發射或插上 USB，螢幕就會再亮起來。</li>
+        <li>用電池時，<b>5 分鐘</b>沒有動作：整台自動休眠。要叫醒它，把電源開關<b>關掉再打開</b>，或插上 USB 線。</li>
+        <li>插著 USB 時不會休眠。</li>
+      </ul>
+      <p class="warn"><b>注意：</b>不用的時候，請盡量把電源開關<b>關掉</b>。自動休眠時還是會慢慢耗電，如果<b>很久不用</b>，一定要把開關關掉，不然電池會被用光。</p>
+    </section>
+
+
+
+  </div>
+
+  <footer>
+    <span>手機或電腦看紀錄、更新軟體：<a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a></span>
+    <span>第 2 頁 / 共 6 頁</span>
+  </footer>
+</div>
+
+<!-- ============ Page 3: Bluetooth ============ -->
+<div class="page fill">
+  <header>
+    <h1>藍牙<small>開啟、關閉與連上網頁</small></h1>
+    <p>BX Tacho 使用說明</p>
+  </header>
+
+  <section>
+    <h2>開啟／關閉藍牙</h2>
+    <p class="note">藍牙讓手機或電腦的 App（或網頁 <a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a>）看到你的發射紀錄。不用藍牙時可以關掉，比較省電。</p>
+    <div class="steps">
+      <div class="st"><img src="manual-screens/ready.svg" alt="READY"><p><span class="step">1</span>開機，等螢幕左上角出現 <span class="scr">READY</span>（或 <span class="scr">RESULT</span>）。</p></div>
+      <div class="st"><img src="manual-screens/loaded.svg" alt="LOADED"><p><span class="step">2</span>把陀螺<b>裝上、拿下</b>，連續做 <b>5 次</b>。不用陀螺也可以：用手指<b>按一下發射器底部中間的小柱子再放開</b>，一樣連續 5 次。動作要快，每次不要停超過 1 秒多。</p></div>
+      <div class="st"><img src="manual-screens/ble-gesture-off.svg" alt="BLE OFF"><p><span class="step">3</span>螢幕出現 <span class="scr">BLE OFF</span>（關閉）或 <span class="scr">BLE ON</span>（開啟），然後自動重新開機。</p></div>
+      <div class="st"><img src="manual-screens/ble-off.svg" alt="藍牙關閉"><p><span class="step">4</span>看上方中間的藍牙符號：被劃掉就是關閉了。要再打開，重做一次就好。關機後也會記住。</p></div>
+    </div>
+    <figure class="pinfig"><svg class="pinsketch big" viewBox="0 0 136 72" role="img" aria-label="示意圖：從下面看發射器，底部中間的小柱子">
+        <defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" fill="#2252d1"/></marker></defs>
+        <rect x="0.5" y="0.5" width="135" height="71" rx="3" fill="#fff" stroke="#d7d9e0"/>
+        <g fill="none" stroke="#1c1d22" stroke-width="0.9" stroke-linejoin="round">
+          <path d="M21 6 V3.5 H38 V6"/>
+          <rect x="9" y="6" width="41" height="61" rx="3.5"/>
+          <rect x="5.5" y="34" width="3.5" height="17" rx="0.8"/>
+          <rect x="50" y="34" width="3.5" height="17" rx="0.8"/>
+          <circle cx="14" cy="11" r="1.8"/><circle cx="45" cy="11" r="1.8"/>
+          <circle cx="15" cy="62" r="1.8"/><circle cx="44" cy="62" r="1.8"/>
+          <circle cx="29.5" cy="45" r="15"/>
+          <circle cx="29.5" cy="45" r="12.5" stroke-width="0.6"/>
+          <path d="M24 37 a9.5 9.5 0 0 1 9 -1.2" stroke-width="2" stroke-linecap="round"/>
+          <path d="M37.5 41 a9.5 9.5 0 0 1 -0.8 9.5" stroke-width="2" stroke-linecap="round"/>
+          <path d="M28 54.4 a9.5 9.5 0 0 1 -7.6 -6" stroke-width="2" stroke-linecap="round"/>
+        </g>
+        <circle cx="29.5" cy="45" r="2.6" fill="#2252d1"/>
+        <path d="M76 36 L34.5 44" fill="none" stroke="#2252d1" stroke-width="1" marker-end="url(#ah2)"/>
+        <g font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" fill="#1c1d22">
+          <text x="78" y="33" font-size="10" font-weight="700">小柱子</text>
+          <text x="78" y="45" font-size="8">按一下再放開</text>
+          <text x="78" y="66" font-size="7" fill="#5d6070">發射器底部</text>
+        </g>
+      </svg><figcaption>不用陀螺時，用手指按發射器底部中間的小柱子（步驟 2）</figcaption></figure>
+    <p class="warn"><b>注意：</b>裝上／拿下陀螺，或按／放小柱子的時候，發射器的<b>底部要朝下</b>。如果底部朝上，小柱子會因為重力一直停在上面，BX Tacho 會以為陀螺一直裝著，這樣就切換不了藍牙。</p>
+  </section>
+
+  <section class="grow">
+    <h2>用藍牙連上網頁 App</h2>
+    <div class="app">
+      <div>
+        <ol class="big">
+          <li>BX Tacho 開機，確認藍牙是開著的（上方中間的藍牙符號<b>沒有</b>被劃掉）。</li>
+          <li>用 <b>Chrome</b> 打開 <a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a>（電腦也可以用 Edge）。不用安裝任何東西。</li>
+          <li>點上方的「<b>藍牙</b>」分頁，再按藍色的「<b>透過藍牙連線</b>」按鈕。</li>
+          <li>在跳出的清單裡選 <b>BEYBLADE_TOOL01</b>，按「配對」。</li>
+          <li>連上後，BX Tacho 螢幕上方中間的藍牙符號會變成 <img class="ico" src="manual-screens/icon-ble-connected.svg" alt="已連線的藍牙圖示">（兩旁多了小點）。網頁上你會看到最新的發射轉速、最高紀錄、發射次數、電量，下面還有發射曲線和最近 50 次的發射。每次發射完都會自動更新。</li>
+        </ol>
+        <div class="tip">
+          <h2>手機只能用 Android</h2>
+          <p>在手機上，網頁 App 只支援 <b>Android 手機的 Chrome</b>。iPhone、iPad 的瀏覽器都不支援這種藍牙連線，所以無法使用。電腦請用 Chrome 或 Edge。</p>
+          <p>找不到 BX Tacho 時：確認手機的藍牙已開啟（有些手機還要打開「定位」），並靠近一點再試一次。</p>
+        </div>
+      </div>
+      <figure class="phone"><img src="manual-screens/webapp-top.png" alt="網頁 App：藍牙分頁與最新發射轉速"><figcaption>連線後的畫面</figcaption></figure>
+      <div class="appside">
+        <figure class="phone"><img src="manual-screens/webapp-curve.png" alt="網頁 App：發射曲線與最近 50 次發射"><figcaption>往下捲：發射曲線與最近 50 次</figcaption></figure>
+        <figure class="qr"><img src="manual-screens/qr-webapp-bluetooth.svg" alt="QR code：https://dazchi.github.io/bx-tacho/#bluetooth"><figcaption><b>用手機掃描</b>打開網頁 App 藍牙連接頁面</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>手機或電腦看紀錄、更新軟體：<a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a></span>
+    <span>第 3 頁 / 共 6 頁</span>
+  </footer>
+</div>
+
+<!-- ============ Page 4: updating the firmware ============ -->
+<div class="page">
+  <header>
+    <h1>更新軟體<small>透過藍牙或 USB</small></h1>
+    <p>BX Tacho 使用說明</p>
+  </header>
+  <p class="intro">有新版本時更新軟體（韌體），可以修正問題、加入新功能。更新<b>不會</b>刪掉發射紀錄和設定。如果過程中出了問題，BX Tacho 會保留原本的軟體，再試一次就好。</p>
+
+  <section>
+    <h2>透過藍牙更新（推薦）</h2>
+    <div class="upd">
+      <ol class="big">
+        <li>先把 BX Tacho 充電到 <b>50% 以上</b>，或一邊插著 USB 線一邊更新。電量不夠的話網頁會提醒你。</li>
+        <li>照第 3 頁的步驟，用藍牙連上網頁 App。</li>
+        <li>往下捲到「<b>更新韌體</b>」，右上角會顯示 BX Tacho 目前的版本。</li>
+        <li>按「<b>使用最新版本（v…）</b>」。網頁會下載最新的軟體，並自動檢查檔案沒有壞掉。</li>
+        <li>按藍色的「<b>透過藍牙更新</b>」。</li>
+        <li>BX Tacho 螢幕會出現 <b>6 位數代碼</b>。在網頁跳出的「輸入代碼」視窗輸入，按「<b>解鎖</b>」。</li>
+        <li>等大約 <b>1 分鐘</b>。BX Tacho 螢幕顯示 <span class="scr">FIRMWARE UPDATE</span> 和百分比，網頁也有進度條。這時<b>不要關機，也不要關掉或重新整理網頁</b>。</li>
+        <li>螢幕出現 <span class="scr">DONE</span>，BX Tacho 會自動重新開機。開機畫面的版本號變成新的，就完成了！</li>
+      </ol>
+      <figure class="phone"><img src="manual-screens/webapp-update.png" alt="網頁 App：更新韌體區塊"><figcaption>網頁的「更新韌體」（步驟 3～5、7）</figcaption></figure>
+      <figure class="phone"><img src="manual-screens/webapp-code.png" alt="網頁 App：輸入代碼視窗"><figcaption>輸入代碼（步驟 6）</figcaption></figure>
+    </div>
+    <div class="grid">
+      <figure><img src="manual-screens/console-code.svg" alt="BX Tacho 螢幕：6 位數代碼"><figcaption><b>步驟 6：代碼</b>把螢幕上的 6 位數字輸入到網頁（每次都不一樣）。</figcaption></figure>
+      <figure><img src="manual-screens/update.svg" alt="BX Tacho 螢幕：FIRMWARE UPDATE 47%"><figcaption><b>步驟 7：更新中</b>顯示 <span class="scr">DO NOT TURN OFF</span>：千萬不要關機。</figcaption></figure>
+      <figure><img src="manual-screens/update-done.svg" alt="BX Tacho 螢幕：DONE RESTARTING"><figcaption><b>步驟 8：完成</b>接著自動重新開機。</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>用 USB 線更新（電腦）</h2>
+    <ol class="big">
+      <li>在電腦用 Chrome 或 Edge 打開 <a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a>，點「<b>USB</b>」分頁。</li>
+      <li>用 USB-C 線把 BX Tacho 接到電腦。</li>
+      <li>在「更新韌體」按「<b>使用最新版本（v…）</b>」，再按「<b>更新韌體</b>」。跳出視窗時，選 BX Tacho 的 USB 裝置，按「連線」。</li>
+      <li>等它寫入完成、自動重新開機。過程中<b>不要拔線</b>。</li>
+    </ol>
+  </section>
+
+  <footer>
+    <span>手機或電腦看紀錄、更新軟體：<a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a></span>
+    <span>第 4 頁 / 共 6 頁</span>
+  </footer>
+</div>
+
+<!-- ============ Page 5: start-up and launching ============ -->
+<div class="page">
+  <header>
+    <h1>螢幕畫面圖解<small>開機與發射</small></h1>
+    <p>BX Tacho 使用說明</p>
+  </header>
+
+  <section>
+    <h2>開機時</h2>
+    <div class="grid">
+      <figure><img src="manual-screens/splash.svg" alt="開機畫面：BX TACHO 和版本號"><figcaption><b>開機畫面</b>BX TACHO 和軟體版本號。</figcaption></figure>
+      <figure><img src="manual-screens/credit.svg" alt="MADE BY DAZCHI"><figcaption><b>製作者</b>接著出現一下，然後就可以使用了。</figcaption></figure>
+      <figure><img src="manual-screens/dim.svg" alt="變暗的螢幕"><figcaption><b>螢幕變暗</b>30 秒沒有動作會變暗，2 分鐘後關掉。裝上陀螺就會再亮。</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>發射的步驟</h2>
+    <p class="note">上排的文字是狀態，中間的大數字是轉速，右上角是電量。</p>
+    <div class="grid">
+      <figure><img src="manual-screens/ready.svg" alt="READY 畫面"><figcaption><b><span class="step">1</span>READY 準備好</b>還沒發射過時顯示 <span class="scr">----</span>。右下角是這台的藍牙地址。</figcaption></figure>
+      <figure><img src="manual-screens/loaded.svg" alt="LOADED 畫面"><figcaption><b><span class="step">2</span>LOADED 陀螺裝好了</b>把陀螺裝上發射器，就會變成這樣。</figcaption></figure>
+      <figure><img src="manual-screens/launch.svg" alt="LAUNCH! 畫面"><figcaption><b><span class="step">3</span>LAUNCH! 發射中</b>拉動拉條時，大數字是現在的轉速。</figcaption></figure>
+      <figure><img src="manual-screens/result.svg" alt="RESULT 畫面"><figcaption><b><span class="step">4</span>RESULT 結果</b>大數字是這次發射的<b>最高轉速</b>（PEAK RPM）。</figcaption></figure>
+      <figure><img src="manual-screens/loaded-again.svg" alt="再次 LOADED"><figcaption><b><span class="step">5</span>再裝上陀螺</b>上一次的成績還會留著，直到下一次發射。</figcaption></figure>
+    </div>
+  </section>
+
+
+  <footer>
+    <span>畫面中的數字只是範例。</span>
+    <span>第 5 頁 / 共 6 頁</span>
+  </footer>
+</div>
+
+<!-- ============ Page 6: battery, Bluetooth and special screens ============ -->
+<div class="page">
+  <header>
+    <h1>螢幕畫面圖解<small>電池、藍牙與其他畫面</small></h1>
+    <p>BX Tacho 使用說明</p>
+  </header>
+
+  <section>
+    <h2>電池（右上角）</h2>
+    <div class="grid four">
+      <figure><img src="manual-screens/battery.svg" alt="電量 85%"><figcaption><b>剩下的電量</b>電池圖示裡的格子越多，電越多。</figcaption></figure>
+      <figure><img src="manual-screens/low.svg" alt="LOW 15%"><figcaption><b>LOW 電快用完了</b>請盡快充電。</figcaption></figure>
+      <figure><img src="manual-screens/charging.svg" alt="充電中"><figcaption><b>充電中</b>閃電符號，旁邊是電池電壓。</figcaption></figure>
+      <figure><img src="manual-screens/full.svg" alt="FULL"><figcaption><b>FULL 充飽了</b>可以拔掉充電線。</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>藍牙（上方中間）</h2>
+    <div class="grid">
+      <figure><img src="manual-screens/ble-on.svg" alt="藍牙開啟"><figcaption><b>藍牙開啟</b>App 可以找到它。</figcaption></figure>
+      <figure><img src="manual-screens/ble-connected.svg" alt="藍牙已連線"><figcaption><b>已連上 App</b>藍牙符號兩旁多了小點。</figcaption></figure>
+      <figure><img src="manual-screens/ble-off.svg" alt="藍牙關閉"><figcaption><b>藍牙關閉</b>藍牙符號被劃掉。</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>其他畫面</h2>
+    <div class="grid four">
+      <figure><img src="manual-screens/low-battery.svg" alt="LOW BATTERY"><figcaption><b>沒電了</b>電池耗盡，會自動進入休眠保護電池。</figcaption></figure>
+      <figure><img src="manual-screens/countdown.svg" alt="DEEP SLEEP IN 倒數"><figcaption><b>休眠倒數</b>插上 USB 充電，就會醒來。</figcaption></figure>
+      <figure><img src="manual-screens/ble-gesture-off.svg" alt="BLE OFF"><figcaption><b>藍牙開／關</b>短時間內連續裝上、拿下陀螺（或按放發射器底部中間的小柱子）5 次，會切換藍牙並重新開機。</figcaption></figure>
+      <figure><img src="manual-screens/update.svg" alt="FIRMWARE UPDATE"><figcaption><b>更新軟體中</b><b style="display:inline">千萬不要關機</b>，等它自己重新開機。</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>注意事項</h2>
+    <ul>
+      <li>不要讓它淋到水或摔落。</li>
+      <li>內含鋰電池，請勿擠壓或放在高溫的地方（例如夏天的車裡）。想拆開自己動手改裝的話請務必小心，別刺破或短路電池。</li>
+      <li>長時間不用時，請關機並每幾個月充一次電。</li>
+      <li>螢幕顯示 <span class="scr">DO NOT TURN OFF</span> 時，千萬不要關機。</li>
+    </ul>
+  </section>
+
+  <section class="tip">
+    <h2>聲明</h2>
+    <p>BX Tacho 是一個<b>開源的 DIY 專案</b>，可能會有一些預期外的小問題。遇到問題時，可以先關機再開機，或到 <a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a> 把軟體更新到最新版；也歡迎到 <a href="https://github.com/dazchi/bx-tacho">github.com/dazchi/bx-tacho</a> 回報問題。</p>
+  </section>
+
+  <footer>
+    <span>手機或電腦看紀錄、更新軟體：<a href="https://dazchi.github.io/bx-tacho">dazchi.github.io/bx-tacho</a></span>
+    <span>第 6 頁 / 共 6 頁</span>
+  </footer>
+</div>
+</body>
+</html>
