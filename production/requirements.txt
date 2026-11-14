@@ -1,2 +1,3 @@
 esptool>=5.0
 pyserial>=3.5
+certifi   # HTTPS to GitHub with python.org's Python on macOS

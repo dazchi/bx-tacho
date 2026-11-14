@@ -25,6 +25,20 @@ From an ESP-IDF terminal (it has esptool and pyserial), or after
 python bx_production.py
 ```
 
+**On macOS** (no ESP-IDF needed), in this folder:
+
+```
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python bx_production.py
+```
+
+No drivers are needed: the ESP32-C3's USB serial and the PPK2 are standard
+USB CDC devices (`/dev/cu.usbmodem…`). `certifi` in `requirements.txt` gives
+Python from python.org the certificates to reach GitHub. The PPK2 shows up as
+two ports there; the tool finds its command port by asking each for its
+metadata (on Windows it goes by the port's USB location).
+
 The page opens at http://127.0.0.1:8765/. **Automatic flashing is off** at
 start and every time the Flash tab is opened (from the VBAT calibration or
 Database tab), so a board plugged in

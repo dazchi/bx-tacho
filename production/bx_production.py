@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import re
+import ssl
 import struct
 import subprocess
 import sys
@@ -37,6 +38,11 @@ from pathlib import Path
 
 import serial
 import serial.tools.list_ports
+
+try:
+    import certifi   # Python from python.org on macOS has no CA certificates of its own
+except ImportError:
+    certifi = None
 
 import boarddb
 import vbatcal
@@ -106,11 +112,20 @@ def list_releases():
     return out, error
 
 
+# HTTPS to GitHub: with certifi's CA bundle when it's installed (python.org's
+# Python on macOS can't verify certificates without it), else the system's
+SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where()) if certifi else None
+
+
+def _urlopen(url, timeout):
+    return urllib.request.urlopen(url, timeout=timeout, context=SSL_CONTEXT)
+
+
 def _ask_releases():
     try:
         req = urllib.request.Request(f'https://api.github.com/repos/{REPO}/releases?per_page=100',
                                      headers={'Accept': 'application/vnd.github+json'})
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with _urlopen(req, timeout=15) as r:
             data = json.load(r)
         out = []
         for rel in data:
@@ -140,7 +155,7 @@ def latest_release():
     try:
         req = urllib.request.Request(f'https://api.github.com/repos/{REPO}/releases/latest',
                                      headers={'Accept': 'application/vnd.github+json'})
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with _urlopen(req, timeout=15) as r:
             return json.load(r)['tag_name']
     except (OSError, ValueError, KeyError) as e:
         have = sorted((p.name for p in (HERE / 'firmware').glob('v*') if p.is_dir()), key=version_key)
@@ -167,7 +182,7 @@ def fetch_release(tag, name=None):
         if not path.exists():
             print(f'downloading {base}/{file}')
             try:
-                with urllib.request.urlopen(f'{base}/{file}', timeout=60) as r:
+                with _urlopen(f'{base}/{file}', timeout=60) as r:
                     data = r.read()
             except OSError as e:
                 raise RuntimeError(f'could not download {file} of {tag}: {e}') from None
@@ -536,7 +551,7 @@ def read_ids(state, port):
                 try:
                     # DTR/RTS low: opening the port must not reset the chip. A write
                     # timeout so a console that isn't reading can't hang the tool.
-                    s = serial.Serial()
+                    s = vbatcal.exclusive(serial.Serial())
                     s.port, s.baudrate, s.timeout, s.write_timeout = port, 115200, 0.1, 1.0
                     s.dtr = s.rts = False
                     s.open()

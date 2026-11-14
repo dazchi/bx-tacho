@@ -6,3 +6,4 @@ vbat_cal.csv
 __pycache__/
 production.db
 production.db-*
+.venv/

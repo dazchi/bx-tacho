@@ -10,6 +10,7 @@ Bluetooth goes back on.
 """
 
 import datetime
+import os
 import random
 import re
 import time
@@ -31,23 +32,68 @@ PPK2_VID = 0x1915
 PPK2_MIN_MV, PPK2_MAX_MV = 800, 5000
 
 
+def exclusive(s):
+    """Open serial ports for this process only, as Windows always does: on
+    macOS and Linux another program (or a second thread here) could otherwise
+    open the same port at the same time. Call before s.open()."""
+    if os.name == 'posix':
+        s.exclusive = True
+    return s
+
+
+PPK2_PROBE_RETRY_S = 10   # ports that didn't answer are asked again after this
+_ppk2_probed = {}         # (port, ...) -> (command port or None, when)
+
+
+def _answers_metadata(port):
+    """Whether this port answers the PPK2's metadata request (the command
+    interface does; it ends with "END")"""
+    try:
+        with exclusive(serial.Serial()) as s:
+            s.port, s.baudrate, s.timeout, s.write_timeout = port, 9600, 0.2, 1
+            s.open()
+            s.reset_input_buffer()
+            s.write(bytes([PPK2_GET_META_DATA]))
+            end, data = time.time() + 1.5, b''
+            while time.time() < end and b'END' not in data:
+                data += s.read(256)
+            return b'END' in data
+    except (serial.SerialException, OSError):
+        return False
+
+
 def find_ppk2():
     """The PPK2's command port, or None. It shows up as "nRF Connect USB CDC
-    ACM"; the command interface's location ends in 1."""
+    ACM" (product "PPK2"). On Windows the command interface's location ends in
+    1; elsewhere (macOS reports the same location for both of its ports) the
+    port that answers a metadata request, asked once per set of ports."""
     candidates = [p for p in serial.tools.list_ports.comports()
                   if p.vid == PPK2_VID and ((p.product or '') == 'PPK2'
                                             or (p.description or '').startswith('nRF Connect USB CDC ACM'))]
-    for p in candidates:
-        if (p.location or '').endswith('1'):
-            return p.device
-    return candidates[0].device if len(candidates) == 1 else None
+    if len(candidates) == 1:
+        return candidates[0].device
+    if os.name == 'nt':
+        for p in candidates:
+            if (p.location or '').endswith('1'):
+                return p.device
+        return None
+    if not candidates:
+        return None
+    key = tuple(sorted(p.device for p in candidates))
+    found, when = _ppk2_probed.get(key, (None, 0.0))
+    if found is None and time.time() - when >= PPK2_PROBE_RETRY_S:
+        found = next((dev for dev in key if _answers_metadata(dev)), None)
+        _ppk2_probed[key] = (found, time.time())
+    return found
 
 
 class PPK2:
     """Just enough of the PPK2 to use it as an adjustable supply"""
 
     def __init__(self, port):
-        self.ser = serial.Serial(port, 9600, timeout=1, write_timeout=1)
+        self.ser = exclusive(serial.Serial())
+        self.ser.port, self.ser.baudrate, self.ser.timeout, self.ser.write_timeout = port, 9600, 1, 1
+        self.ser.open()
         # Ask for the metadata first, as Nordic's tools do; the answer isn't needed
         self.ser.write(bytes([PPK2_GET_META_DATA]))
         end = time.time() + 2
@@ -87,7 +133,7 @@ class Console:
     only types once the console has gone quiet."""
 
     def __init__(self, port):
-        self.s = serial.Serial()
+        self.s = exclusive(serial.Serial())
         self.s.port, self.s.baudrate, self.s.timeout, self.s.write_timeout = port, 115200, 0.1, 1.0
         self.s.dtr = self.s.rts = False   # opening the port must not reset the chip
         self.s.open()
