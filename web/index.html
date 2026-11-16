@@ -39,6 +39,7 @@
             <h1 class="title" data-i18n="usb.title">Console</h1>
             <button class="btn btn--primary" id="usb-connect">Connect over USB</button>
           </div>
+          <p class="aside-text device-line" id="usb-device" hidden></p>
           <p class="note" id="usb-note" hidden></p>
           <div class="screen screen--term">
             <div id="terminal" class="term" aria-label="BX Tacho console" data-i18n-attr="aria-label:term.aria"></div>
@@ -81,6 +82,70 @@
               <button class="chip" data-cmd="cal load white empty">cal load white empty</button>
               <button class="chip" data-cmd="cal load white loaded">cal load white loaded</button>
             </div>
+            <!-- Moved into the Bluetooth console's Calibration while that one is in use -->
+            <section class="guide" id="guide" aria-labelledby="guide-title">
+              <h3 class="guide__title" id="guide-title" data-i18n="guide.title">Several launchers</h3>
+              <p class="aside-text guide__board" id="guide-board"></p>
+              <p class="aside-text" data-i18n="guide.intro">Measure every launcher this BX Tacho will be used on. The guide works out one empty / loaded setting that tells a loaded launcher from an empty one on all of them, with the most room on both sides.</p>
+              <div class="setting">
+                <span class="setting__label" id="guide-group-label" data-i18n="guide.group">Launchers</span>
+                <div class="seg" role="group" aria-labelledby="guide-group-label" id="guide-group">
+                  <button class="seg__btn" data-group="black" aria-pressed="true" data-i18n="guide.black">Black</button>
+                  <button class="seg__btn" data-group="white" aria-pressed="false" data-i18n="guide.white">White</button>
+                </div>
+              </div>
+              <p class="aside-text" data-i18n="guide.colourHelp">Black or white? Look only at the colour right around the two small openings BX Tacho reads through, not at the rest of the launcher. A mostly white launcher that is dark around the openings, like the string launcher below, is a black launcher.</p>
+              <div class="guide__sketches">
+                <figure class="guide__figure">
+                      <svg class="guide__sketch guide__sketch--black" viewBox="0 0 170 92" aria-hidden="true" focusable="false">
+                        <rect class="sk-body" x="8" y="6" width="124" height="24" rx="11"/>
+                        <rect class="sk-body" x="8" y="62" width="124" height="24" rx="11"/>
+                        <rect x="12" y="27" width="116" height="38" rx="4" fill="#18202b" class="sk-line"/>
+                        <polygon points="72,40 78,37 84,40 84,52 78,55 72,52" fill="#e9edf1" stroke="#e9edf1" stroke-width="1.5"/>
+                        <rect x="90" y="40" width="11" height="12" rx="2" fill="#e9edf1" stroke="#e9edf1" stroke-width="1.5"/>
+                        <ellipse class="sk-ring" cx="86" cy="46" rx="24" ry="15"/>
+                        <path class="sk-handle" d="M132 46 H152 M152 30 V62"/>
+                      </svg>
+                  <figcaption data-i18n="guide.sketch.black">Black: dark around the openings</figcaption>
+                </figure>
+                <figure class="guide__figure">
+                      <svg class="guide__sketch guide__sketch--white" viewBox="0 0 170 92" aria-hidden="true" focusable="false">
+                        <rect class="sk-body" x="8" y="6" width="124" height="24" rx="11"/>
+                        <rect class="sk-body" x="8" y="62" width="124" height="24" rx="11"/>
+                        <rect x="12" y="27" width="116" height="38" rx="4" fill="#ffffff" class="sk-line"/>
+                        <polygon points="72,40 78,37 84,40 84,52 78,55 72,52" fill="#ffffff" stroke="#18202b" stroke-width="1.5"/>
+                        <rect x="90" y="40" width="11" height="12" rx="2" fill="#ffffff" stroke="#18202b" stroke-width="1.5"/>
+                        <ellipse class="sk-ring" cx="86" cy="46" rx="24" ry="15"/>
+                        <path class="sk-handle" d="M132 46 H152 M152 30 V62"/>
+                      </svg>
+                  <figcaption data-i18n="guide.sketch.white">White: light around the openings</figcaption>
+                </figure>
+              </div>
+              <div class="guide__wrap">
+                <table class="guide__table">
+                  <thead>
+                    <tr>
+                      <th scope="col" data-i18n="guide.col.launcher">Launcher</th>
+                      <th scope="col" data-i18n="guide.col.empty">Empty (mV)</th>
+                      <th scope="col" data-i18n="guide.col.loaded">Loaded (mV)</th>
+                      <th scope="col"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="guide-rows"></tbody>
+                </table>
+              </div>
+              <div class="guide__actions">
+                <button class="btn" id="guide-add" data-i18n="guide.add">Add a launcher</button>
+                <button class="chip chip--quiet" id="guide-reset" data-i18n="guide.reset">Start over</button>
+              </div>
+              <p class="note" id="guide-next" data-tone="info"></p>
+              <div class="guide__result" id="guide-result" hidden></div>
+              <div class="guide__apply" id="guide-apply-row" hidden>
+                <code class="guide__cmds" id="guide-cmds"></code>
+                <button class="btn btn--primary" id="guide-apply" data-i18n="guide.apply">Save to BX Tacho</button>
+              </div>
+              <p class="note" id="guide-msg" hidden></p>
+            </section>
           </div>
         </div>
 

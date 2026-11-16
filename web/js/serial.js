@@ -6,6 +6,9 @@ import { usbSerial } from './usbserial.js';
 
 export const ESPRESSIF_VID = 0x303a;
 
+const OPEN_TRIES = 5;          // about 2 s in all
+const OPEN_RETRY_MS = 500;
+
 // Computers have Web Serial. Chrome on Android has it for Bluetooth serial ports
 // only, so there USB goes through WebUSB instead (usbserial.js).
 const isAndroid = navigator.userAgentData?.platform === 'Android' || /Android/i.test(navigator.userAgent);
@@ -43,7 +46,18 @@ export class SerialLink {
   }
 
   async open() {
-    await this.port.open({ baudRate: 115200 });
+    // Windows can refuse a port for a moment after it appears (BX Tacho just
+    // plugged in, or restarting): try again before giving up. A port another
+    // program holds keeps failing, and the last error is reported.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.port.open({ baudRate: 115200 });
+        break;
+      } catch (e) {
+        if (e.name === 'InvalidStateError' || attempt >= OPEN_TRIES) throw e;   // already open here: no use
+        await new Promise((r) => setTimeout(r, OPEN_RETRY_MS));
+      }
+    }
     this.writer = this.port.writable.getWriter();
     this.reading = this.readLoop();
   }

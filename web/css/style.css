@@ -712,6 +712,204 @@ button {
   margin: 0;
 }
 
+/* Several launchers: measure each, get one setting for all */
+.guide {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.guide__title {
+  margin: 0;
+  font-size: var(--t-lead);
+  font-weight: 700;
+}
+
+.guide__board {
+  font-variant-numeric: tabular-nums;
+}
+
+.guide__board[data-tone='bad'] {
+  color: var(--bad);
+}
+
+.guide .note {
+  margin: 0;
+}
+
+/* How to tell a black launcher from a white one: two outline sketches */
+.guide__sketches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+
+.guide__figure {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  font-size: var(--t-small);
+  color: var(--muted);
+}
+
+.guide__sketch {
+  width: 170px;
+  height: auto;
+}
+
+.guide__sketch .sk-body {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.guide__sketch .sk-line {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.guide__sketch .sk-ring {
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+.guide__sketch .sk-handle {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.guide__wrap {
+  overflow-x: auto;
+}
+
+.guide__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-small);
+}
+
+.guide__table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.guide__table td {
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.guide__table td:first-child {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.guide__cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.guide__input {
+  width: 6em;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* The launcher that limits the setting: the highest empty, the lowest loaded */
+.guide__input[data-limit] {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 1px var(--warn);
+}
+
+.guide__remove {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.guide__remove:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.guide__remove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.guide__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.guide__result {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--ok);
+  background: var(--paper);
+  font-size: var(--t-small);
+}
+
+.guide__result[data-tone='warn'] {
+  border-left-color: var(--warn);
+}
+
+.guide__result[data-tone='bad'] {
+  border-left-color: var(--bad);
+}
+
+.guide__result p {
+  margin: 0;
+}
+
+.guide__result .guide__setting {
+  font-size: var(--t-body);
+  font-weight: 700;
+}
+
+.guide__apply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.guide__cmds {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
 .curve {
   margin: 0;
   background: var(--surface);

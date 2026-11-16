@@ -9,6 +9,7 @@ import { BleConsole, readInfo } from './bleconsole.js';
 import { BleUpdater, OtaError } from './bleota.js';
 import { drawCurve, drawHistory } from './chart.js';
 import { analyzeImage, flashFirmware, loadBootFiles } from './flasher.js';
+import { MIN_CONTRAST_MV, crossCheck, parseLoadReadings, suggest } from './calguide.js';
 import { drawPixelText, pixelWidth, revealPixelText } from './pixelfont.js';
 import { ESPRESSIF_VID, SerialLink, requestBxPort, serialApi, serialSupported } from './serial.js';
 
@@ -25,6 +26,7 @@ const state = {
   usbUsed: false,        // the USB console was connected before (same)
   flip: null,            // display turned (cfg flip): true/false, null while not known
   cal: false,            // Calibration under the console is on: BX Tacho is in diag mode
+  guide: null,           // the several-launchers guide under it (loadGuide)
   bfw: null,             // firmware to send over Bluetooth: { bytes, info }
   updating: false,       // ...being sent
   fw: null,              // { bytes, info, name }
@@ -101,6 +103,7 @@ function setLink(kind) {
   updateBleUpdateButton();
   if (!kind) state.flip = null;   // not known for the next connection
   if (!kind) state.cal = false;
+  if (kind !== 'usb') $('usb-device').hidden = true;
   renderFlip();
   renderCal();
 
@@ -209,8 +212,16 @@ function fitTerminal() {
 }
 new ResizeObserver(fitTerminal).observe($('terminal'));
 
+const usbDecoder = new TextDecoder();   // the USB console's output, for the launcher guide
+let usbLastRx = 0;                      // when it last sent anything (Date.now())
 const serial = new SerialLink({
-  onData: (bytes) => term.write(bytes),
+  onData: (bytes) => {
+    usbLastRx = Date.now();
+    const text = capture ? usbDecoder.decode(bytes, { stream: true }) : '';
+    if (capture?.quiet) answerTerminalQueries(text);
+    else term.write(bytes);
+    if (capture) captureText(text);
+  },
   onClose: (reason, why) => {
     if (state.flashing) return;
     setLink(null);
@@ -232,14 +243,78 @@ async function connectUsb() {
     await serial.connect();
     setLink('usb');
     term.write(`\x1b[90m${t('term.connected')}\x1b[0m\r\n`);
+    await readUsbDevice();
     await serial.write('\r');   // ask for a fresh prompt
     term.focus();
   } catch (e) {
-    if (e.name !== 'NotFoundError') note('usb-note', 'err.portOpen', { msg: e.message }, 'bad');
+    if (e.name !== 'NotFoundError') note('usb-note', 'err.portOpen', { msg: e.message.replace(/[.。]+$/, '') }, 'bad');
   }
 }
 
 $('usb-connect').addEventListener('click', connectUsb);
+
+// While the USB output is hidden (a quiet consoleRun), the terminal can't
+// answer the console's line editor, which asks for the cursor position
+// (ESC[6n) around each prompt and the terminal's status (ESC[5n) when it
+// starts, and takes whatever comes next as the answer: answer it here
+let queryTail = '';
+function answerTerminalQueries(text) {
+  const seen = queryTail + text;
+  queryTail = seen.slice(-3);   // a sequence split over two chunks
+  if (seen.includes('\x1b[6n')) serial.write(`\x1b[1;${term.cols}R`);
+  if (seen.includes('\x1b[5n')) serial.write('\x1b[0n');
+}
+
+// A connection closed right after a prompt (tab closed, cable pulled, another
+// program) can leave the line editor waiting for the answer to its cursor
+// query, swallowing what's typed next. Answer it, unseen, and clear the line
+// with Ctrl-U in case nothing was waiting (then the answer was typed in).
+async function unstickUsbConsole() {
+  const cap = { text: '', quiet: true };
+  capture = cap;
+  try {
+    await serial.write('\x1b[1;80R\x15');
+    await sleep(USB_QUIET_MS);
+    await usbSettled();
+  } finally {
+    if (capture === cap) capture = null;
+  }
+}
+
+// Which BX Tacho is on USB, under the heading as on the Bluetooth tab: its
+// Bluetooth address (`id`) and firmware version (`status`), asked quietly
+// once the console shows its prompt (it may still be starting)
+async function readUsbDevice() {
+  const line = $('usb-device');
+  line.hidden = true;
+  await unstickUsbConsole();
+  try {
+    await consoleRun('', (txt) => /bxt>/.test(txt), 5000);   // Enter, shown as usual
+  } catch {
+    return;   // no prompt: leave the console alone
+  }
+  queryTail = '';
+  // Done once the answer and the next prompt are in (or the command is unknown)
+  const after = (re) => (txt) => {
+    const at = txt.search(re) >= 0 ? txt.search(re) : txt.search(/Unrecognized command/);
+    return at >= 0 && /bxt>/.test(txt.slice(at));
+  };
+  const ask = async (cmd, re) => {
+    try {
+      return await consoleRun(cmd, after(re), 3000, true);
+    } catch {
+      return '';   // still starting, or no answer
+    }
+  };
+  const addr = (await ask('id', /bluetooth\s*:/)).match(/bluetooth\s*:\s*([0-9A-F]{2}(?::[0-9A-F]{2}){5})/)?.[1] ?? null;
+  const version = state.link === 'usb'
+    ? (await ask('status', /firmware\s*:/)).match(/firmware\s*:\s*\S+ v(\S+?),/)?.[1] ?? null : null;
+  if (state.link !== 'usb' || (!addr && !version)) return;
+  if (addr && version) setText(line, 'ble.device', { addr, v: version });
+  else if (version) setText(line, 'ble.deviceNoAddr', { v: version });
+  else setText(line, 'usb.deviceNoVersion', { addr });
+  line.hidden = false;
+}
 
 for (const c of document.querySelectorAll('.quick .chip[data-cmd]')) {
   c.addEventListener('click', () => {
@@ -509,6 +584,7 @@ async function flash() {
       term.write(`\x1b[90m${t('term.connected')}\x1b[0m\r\n`);
       // Let the new firmware finish booting, then ask for a prompt
       await new Promise((r) => setTimeout(r, 1500));
+      if (state.link === 'usb') await readUsbDevice();
       if (state.link === 'usb') await serial.write('\r');
     }
   } catch (e) {
@@ -663,7 +739,10 @@ function fitBleTerminal() {
 new ResizeObserver(fitBleTerminal).observe($('ble-terminal'));
 
 const bcon = new BleConsole({
-  onText: (text) => bleTerm.write(text),
+  onText: (text) => {
+    bleTerm.write(text);
+    captureText(text);
+  },
   onReady: () => {
     renderConsole();
     settleUnlock(null);
@@ -870,12 +949,16 @@ function renderCal() {
     }
     $(`${kind}-cal-panel`).hidden = !state.cal || state.link !== kind;
   }
+  placeGuide();
 }
 
 async function setCal(on) {
   if (on === state.cal) return;
   if (state.link === 'usb') {
-    await serial.write(`diag ${on ? 'on' : 'off'}\r`);
+    // Its answer, then the next prompt (the echo of the command ends with a new line first)
+    try {
+      await consoleRun(`diag ${on ? 'on' : 'off'}`, (txt) => /diag (on|off)\r?\n[\s\S]*bxt>/.test(txt), 3000);
+    } catch { /* no prompt seen: go on, the next command waits for quiet anyway */ }
   } else if (state.link === 'ble') {
     try {
       await unlockConsole();   // the code on the display, if the console is locked
@@ -888,6 +971,7 @@ async function setCal(on) {
   }
   state.cal = on;
   renderCal();
+  if (on) await identifyGuideBoard();
 }
 
 for (const kind of ['usb', 'ble']) {
@@ -907,6 +991,387 @@ async function leaveCal() {
     await runCommand('diag off');
   }
 }
+
+// ---------------------------------------------------------------- several launchers
+
+// The guide under Calibration: measure each launcher of a colour (empty, then
+// with a bey attached), and save one setting that works on all of them
+// (calguide.js). It sits in the Calibration of the console in use. The
+// readings are kept in this browser between visits, for each BX Tacho apart:
+// turning Calibration on asks the board for its serial number (`id`).
+
+const GUIDE_KEY = 'bxt-calguide';
+const GUIDE_SAMPLES = 5;   // `load 5`: five readings, about a second
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const blankRows = () => [{ empty: null, loaded: null }];
+const blankBoard = () => ({ black: blankRows(), white: blankRows() });
+
+// { group, boards: { '20D5C26A9C10': { black: [{ empty, loaded }], white: [...] } } }
+function loadGuide() {
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(GUIDE_KEY));
+  } catch { /* storage blocked or bad: start empty */ }
+  const rows = (list) => (Array.isArray(list) && list.length
+    ? list.map((r) => ({ empty: Number.isFinite(r?.empty) ? r.empty : null, loaded: Number.isFinite(r?.loaded) ? r.loaded : null }))
+    : blankRows());
+  const boards = {};
+  for (const [sn, b] of Object.entries(saved?.boards ?? {})) {
+    if (/^[0-9A-F]{12}$/.test(sn)) boards[sn] = { black: rows(b?.black), white: rows(b?.white) };
+  }
+  return {
+    group: saved?.group === 'white' ? 'white' : 'black',
+    boards,
+    serial: null,          // the connected BX Tacho's serial number, once `id` answered
+    idFailed: false,       // ...it didn't
+    noBoard: blankBoard(), // shown until then
+    busy: null,            // 'id' while asking, { at, what } while measuring, 'apply' while saving
+  };
+}
+
+function saveGuide() {
+  const g = state.guide;
+  try {
+    localStorage.setItem(GUIDE_KEY, JSON.stringify({ group: g.group, boards: g.boards }));
+  } catch { /* storage blocked: kept for this visit only */ }
+}
+
+// The readings of the BX Tacho connected now
+function guideBoard() {
+  const g = state.guide;
+  if (!g.serial) return g.noBoard;
+  g.boards[g.serial] ??= blankBoard();
+  return g.boards[g.serial];
+}
+
+state.guide = loadGuide();
+
+// What the console prints while the guide runs a command (both consoles)
+let capture = null;
+
+function captureText(text) {
+  if (capture) capture.text += text;
+}
+
+// Before typing on the USB console: wait until it has been quiet for a moment.
+// Around each prompt its line editor asks the terminal for the cursor position
+// (ESC[6n) and takes whatever comes next as the answer; the terminal answers a
+// few milliseconds later, so a command typed right after a prompt appeared was
+// taken for that answer and lost (Calibration stuck reading the serial number)
+const USB_QUIET_MS = 200;
+async function usbSettled(maxMs = 2000) {
+  const end = Date.now() + maxMs;
+  while (Date.now() - usbLastRx < USB_QUIET_MS && Date.now() < end) await sleep(25);
+}
+
+// Run a command on the console in use and return its output, once `until`
+// says it's all there (over Bluetooth also once BX Tacho is ready again).
+// quiet (USB only): the command and its output stay out of the terminal.
+async function consoleRun(line, until, timeoutMs = 8000, quiet = false) {
+  const cap = { text: '', quiet: quiet && state.link === 'usb' };
+  capture = cap;
+  try {
+    if (state.link === 'usb') {
+      await usbSettled();
+      await serial.write(`${line}\r`);
+    } else if (state.link === 'ble' && bcon.open && !bcon.locked) {
+      for (const end = Date.now() + 3000; bcon.busy && Date.now() < end;) await sleep(50);
+      if (bcon.busy) throw new Error(t('guide.err.timeout'));
+      await runCommand(line);
+    } else {
+      throw new Error(t('guide.err.console'));
+    }
+    const end = Date.now() + timeoutMs;
+    while (!until(cap.text) && !(state.link === 'ble' && !bcon.busy)) {
+      if (!state.link) throw new Error(t('guide.err.console'));
+      if (Date.now() > end) throw new Error(t('guide.err.timeout'));
+      await sleep(50);
+    }
+    while (state.link === 'ble' && bcon.busy && Date.now() < end) await sleep(50);
+    return cap.text;
+  } finally {
+    if (capture === cap) capture = null;
+  }
+}
+
+const guideReady = () => state.cal && !state.guide.busy && !!state.guide.serial
+  && (state.link === 'usb' || (state.link === 'ble' && bcon.open && !bcon.locked && !bcon.busy));
+
+function guideMsg(key, params = {}, tone = 'bad') {
+  const m = $('guide-msg');
+  m.hidden = !key;
+  m.dataset.tone = tone;
+  if (key) m.textContent = t(key, params);
+}
+
+function guideRows() {
+  return guideBoard()[state.guide.group];
+}
+
+const mvValue = (s) => {
+  const v = Number.parseInt(s, 10);
+  return Number.isFinite(v) ? v : null;
+};
+
+// The table: rebuilt when rows come or go, a reading is measured or the
+// language changes (typing only updates the result, so the field keeps focus)
+function renderGuideRows() {
+  const g = state.guide;
+  const body = $('guide-rows');
+  body.innerHTML = '';
+  guideRows().forEach((row, i) => {
+    const tr = document.createElement('tr');
+    const name = document.createElement('td');
+    name.textContent = t('guide.row', { n: i + 1 });
+    tr.append(name);
+    for (const what of ['empty', 'loaded']) {
+      const td = document.createElement('td');
+      const cell = document.createElement('div');
+      cell.className = 'guide__cell';
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'number', inputMode: 'numeric', step: 1, className: 'guide__input' });
+      input.value = row[what] ?? '';
+      input.dataset.at = i;
+      input.dataset.what = what;
+      input.setAttribute('aria-label', t(`guide.aria.${what}`, { n: i + 1 }));
+      input.addEventListener('input', () => {
+        row[what] = mvValue(input.value);
+        saveGuide();
+        renderGuideResult();
+      });
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.dataset.measure = '';
+      const measuring = g.busy?.at === i && g.busy?.what === what;
+      btn.textContent = t(measuring ? 'guide.measuring' : 'guide.measure');
+      btn.setAttribute('aria-label', t(`guide.aria.measure.${what}`, { n: i + 1 }));
+      btn.addEventListener('click', () => measureLauncher(i, what));
+      cell.append(input, btn);
+      td.append(cell);
+      tr.append(td);
+    }
+    const td = document.createElement('td');
+    const rm = document.createElement('button');
+    rm.className = 'guide__remove';
+    rm.textContent = '×';
+    rm.dataset.remove = '';
+    rm.setAttribute('aria-label', t('guide.aria.remove', { n: i + 1 }));
+    rm.addEventListener('click', () => {
+      guideRows().splice(i, 1);
+      if (!guideRows().length) guideRows().push({ empty: null, loaded: null });
+      saveGuide();
+      guideMsg(null);
+      renderGuide();
+    });
+    td.append(rm);
+    tr.append(td);
+    body.append(tr);
+  });
+  renderGuideResult();
+}
+
+function guideP(key, params, cls) {
+  const p = document.createElement('p');
+  p.textContent = t(key, params);
+  if (cls) p.className = cls;
+  return p;
+}
+
+// The next step, the setting with its margins, and Save
+function renderGuideResult() {
+  const g = state.guide;
+  const rows = guideRows();
+  const s = suggest(rows);
+
+  // Mark the launchers that set the limits
+  for (const input of $('guide-rows').querySelectorAll('.guide__input')) {
+    const at = Number(input.dataset.at);
+    const limit = s && !s.single && s.verdict !== 'contrast'
+      && ((input.dataset.what === 'empty' && at === s.emaxAt) || (input.dataset.what === 'loaded' && at === s.lminAt));
+    input.toggleAttribute('data-limit', !!limit);
+  }
+
+  // The next step
+  const next = $('guide-next');
+  const open = rows.findIndex((r) => r.empty === null || r.loaded === null);
+  if (open >= 0) {
+    next.textContent = t(rows[open].empty === null ? 'guide.next.empty' : 'guide.next.loaded', { n: open + 1 });
+  } else {
+    next.textContent = t(rows.length === 1 ? 'guide.next.more' : 'guide.next.done');
+  }
+
+  // The setting
+  const res = $('guide-result');
+  res.innerHTML = '';
+  res.hidden = !s;
+  let canApply = false;
+  if (s?.verdict === 'contrast') {
+    res.dataset.tone = 'bad';
+    res.append(guideP('guide.res.contrast', { n: s.at + 1, d: s.diff, min: MIN_CONTRAST_MV }));
+  } else if (s?.verdict === 'impossible') {
+    res.dataset.tone = 'bad';
+    res.append(guideP('guide.res.window', { emax: s.emax, ea: s.emaxAt + 1, lmin: s.lmin, la: s.lminAt + 1, w: s.w }),
+      guideP('guide.res.impossible', { ea: s.emaxAt + 1, la: s.lminAt + 1 }));
+  } else if (s) {
+    canApply = true;
+    res.dataset.tone = s.verdict === 'ok' && s.spinOk ? 'ok' : 'warn';
+    if (s.single) res.append(guideP('guide.res.single'));
+    else res.append(guideP('guide.res.window', { emax: s.emax, ea: s.emaxAt + 1, lmin: s.lmin, la: s.lminAt + 1, w: s.w }));
+    res.append(guideP('guide.res.setting', { e: s.empty, l: s.loaded }, 'guide__setting'),
+      guideP('guide.res.thresholds', { rel: s.released, load: s.loadedAt }));
+    if (!s.single) res.append(guideP('guide.res.margins', { mr: s.marginReleased, ml: s.marginLoaded }));
+    if (!s.single || s.verdict !== 'ok') res.append(guideP(s.verdict === 'ok' ? 'guide.res.ok' : 'guide.res.tight'));
+    if (!s.spinOk) res.append(guideP('guide.res.spin', { la: s.lminAt + 1 }));
+    // Both colours measured: can BX Tacho still tell them apart?
+    const other = g.group === 'black' ? 'white' : 'black';
+    const board = guideBoard();
+    const os = suggest(board[other]);
+    if (os && os.loadedAt !== undefined) {
+      const [bRows, b, wRows, w] = g.group === 'black' ? [rows, s, board.white, os] : [board.black, os, rows, s];
+      for (const c of crossCheck(bRows, b, wRows, w)) {
+        res.dataset.tone = 'warn';
+        res.append(guideP(c.problem === 'blackLooksWhite' ? 'guide.res.blackLooksWhite' : 'guide.res.whiteLooksBlack', c));
+      }
+    }
+  }
+
+  // Save
+  $('guide-apply-row').hidden = !canApply;
+  if (canApply) {
+    $('guide-cmds').textContent = `cal load ${g.group} empty ${s.empty}\ncal load ${g.group} loaded ${s.loaded}`;
+    $('guide-apply').textContent = t(g.busy === 'apply' ? 'guide.saving' : 'guide.apply');
+  }
+  renderGuideButtons();
+}
+
+function renderGuideButtons() {
+  const g = state.guide;
+  const ready = guideReady();
+  for (const b of $('guide-rows').querySelectorAll('[data-measure]')) b.disabled = !ready;
+  for (const b of $('guide-rows').querySelectorAll('[data-remove]')) b.disabled = !!g.busy;
+  for (const b of $('guide-group').querySelectorAll('.seg__btn')) {
+    b.setAttribute('aria-pressed', String(b.dataset.group === g.group));
+    b.disabled = !!g.busy;
+  }
+  $('guide-add').disabled = !!g.busy;
+  $('guide-reset').disabled = !!g.busy;
+  $('guide-apply').disabled = !ready;
+}
+
+function renderGuide() {
+  const g = state.guide;
+  const line = $('guide-board');
+  if (g.serial) line.textContent = t('guide.board', { sn: g.serial });
+  else line.textContent = t(g.busy === 'id' ? 'guide.board.reading' : g.idFailed ? 'guide.board.unknown' : 'guide.board.none');
+  line.dataset.tone = g.idFailed && !g.serial ? 'bad' : '';
+  renderGuideRows();
+}
+
+// Which BX Tacho this is: its serial number (factory MAC) from `id`
+async function identifyGuideBoard() {
+  const g = state.guide;
+  g.serial = null;
+  g.idFailed = false;
+  g.busy = 'id';
+  guideMsg(null);
+  renderGuide();
+  try {
+    const text = await consoleRun('id', (txt) => {
+      const at = txt.search(/serial\s*:\s*[0-9A-F]{12}/);
+      return at >= 0 && /bxt>/.test(txt.slice(at));
+    });
+    const m = text.match(/serial\s*:\s*([0-9A-F]{12})/);
+    if (m && state.cal) g.serial = m[1];
+    else g.idFailed = true;
+  } catch {
+    g.idFailed = true;
+  }
+  g.busy = null;
+  renderGuide();
+}
+
+// The guide goes with the Calibration of the console in use
+function placeGuide() {
+  if (!state.guide) return;
+  if (!state.cal && state.guide.serial) {   // off, or disconnected: another board may come next
+    state.guide.serial = null;
+    renderGuide();
+  }
+  const panel = state.link ? $(`${state.link}-cal-panel`) : null;
+  if (panel && $('guide').parentElement !== panel) panel.append($('guide'));
+  renderGuideButtons();
+}
+
+async function measureLauncher(at, what) {
+  const g = state.guide;
+  if (!guideReady()) return;
+  g.busy = { at, what };
+  guideMsg(null);
+  renderGuideRows();
+  try {
+    const text = await consoleRun(`load ${GUIDE_SAMPLES}`, (txt) => /LOAD_SENSE \(raw/.test(txt)
+      || (parseLoadReadings(txt).length >= GUIDE_SAMPLES && /bxt>/.test(txt.slice(txt.lastIndexOf(' mV')))));
+    if (/LOAD_SENSE \(raw/.test(text)) throw Object.assign(new Error(), { key: 'guide.err.held' });
+    const readings = parseLoadReadings(text);
+    if (!readings.length) throw Object.assign(new Error(), { key: 'guide.err.noReading' });
+    const row = guideRows()[at];
+    if (row) row[what] = Math.round(readings.reduce((a, b) => a + b, 0) / readings.length);
+    saveGuide();
+  } catch (e) {
+    if (e.key) guideMsg(e.key);
+    else guideMsg('guide.err.measure', { msg: e.message });
+  }
+  g.busy = null;
+  renderGuideRows();
+}
+
+async function applyGuide() {
+  const g = state.guide;
+  const s = suggest(guideRows());
+  if (!guideReady() || !s || s.loadedAt === undefined) return;
+  g.busy = 'apply';
+  guideMsg(null);
+  renderGuideResult();
+  // Done once the level is taken (or refused) and the prompt is back
+  const until = (txt) => /(\(set\)|usage:|must be)[\s\S]*bxt>/.test(txt) || (state.link === 'ble' && /\(set\)|usage:|must be/.test(txt));
+  try {
+    for (const [what, mv] of [['empty', s.empty], ['loaded', s.loaded]]) {
+      const text = await consoleRun(`cal load ${g.group} ${what} ${mv}`, until);
+      if (!/\(set\)/.test(text)) throw Object.assign(new Error(), { key: 'guide.err.old' });
+      if (what === 'loaded' && /Not saved as valid/.test(text)) throw Object.assign(new Error(), { key: 'guide.err.invalid' });
+    }
+    guideMsg('guide.saved', { group: t(`guide.${g.group}`).toLowerCase(), e: s.empty, l: s.loaded }, 'info');
+  } catch (e) {
+    if (e.key) guideMsg(e.key);
+    else guideMsg('guide.err.save', { msg: e.message });
+  }
+  g.busy = null;
+  renderGuideResult();
+}
+
+for (const b of $('guide-group').querySelectorAll('.seg__btn')) {
+  b.addEventListener('click', () => {
+    state.guide.group = b.dataset.group;
+    saveGuide();
+    guideMsg(null);
+    renderGuide();
+  });
+}
+$('guide-add').addEventListener('click', () => {
+  guideRows().push({ empty: null, loaded: null });
+  saveGuide();
+  renderGuide();
+});
+$('guide-reset').addEventListener('click', () => {
+  guideBoard()[state.guide.group] = blankRows();
+  saveGuide();
+  guideMsg(null);
+  renderGuide();
+});
+$('guide-apply').addEventListener('click', applyGuide);
+document.addEventListener('langchange', renderGuide);
+renderGuide();
 
 // ---------------------------------------------------------------- firmware over Bluetooth
 
