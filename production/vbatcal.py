@@ -127,91 +127,119 @@ CONTROL = re.compile(r'[\x00-\x09\x0b-\x1f\x7f]')   # all but \n (left over from
 
 class Console:
     """One connection to the firmware console, kept open while the firmware
-    runs (closing and reopening the port can leave the console silent). The
-    line editor asks the terminal for the cursor position and width around each
-    prompt and takes what comes next as the answer, so this answers those and
-    only types once the console has gone quiet."""
+    runs. It waits for what the console actually does, not fixed quiet times:
+    the line editor asks for the cursor position twice before each prompt
+    ("\x1b[6n", answered at once) and then prints "bxt> "; only after that
+    does it read what's typed, so a line is typed in one write as soon as that
+    prompt is there, and a command is over as soon as its next prompt is."""
+
+    PROMPT = b'bxt> '
 
     def __init__(self, port):
         self.s = exclusive(serial.Serial())
-        self.s.port, self.s.baudrate, self.s.timeout, self.s.write_timeout = port, 115200, 0.1, 1.0
+        self.s.port, self.s.baudrate, self.s.timeout, self.s.write_timeout = port, 115200, 0.01, 1.0
         self.s.dtr = self.s.rts = False   # opening the port must not reset the chip
         self.s.open()
-        self.quiet(0.3)
-        # Answer a cursor query an earlier connection may have left waiting
-        self.s.write(b'\x1b[1;200R\r')
-        self.quiet(0.3)
+        self._tail = b''   # the end of the last read: a cursor query may be split across two
 
     def _read(self):
+        """Raw bytes so far, cursor queries answered, also one split across two
+        reads (unanswered, the line editor takes the next line typed for the
+        answer, and that command never runs)"""
         chunk = self.s.read(512)
-        if b'\x1b[6n' in chunk:
-            self.s.write(b'\x1b[1;200R')
-        return chunk.decode('utf-8', 'replace')
+        if chunk:
+            both = self._tail + chunk
+            n = both.count(b'\x1b[6n') - self._tail.count(b'\x1b[6n')
+            if n:
+                self.s.write(b'\x1b[1;200R' * n)
+            self._tail = both[-3:]
+        return chunk
 
-    def quiet(self, quiet_s=0.4, max_s=3.0):
-        text, end, last = '', time.time() + max_s, time.time()
-        while time.time() < end and time.time() - last < quiet_s:
-            chunk = self._read()
-            if chunk:
-                last = time.time()
-                text += chunk
-        return text
+    def _ready(self, raw, after_newline=True):
+        # The prompt after the cursor queries: the editor is waiting for input.
+        # A command's echo redraws "bxt> " too, before its newline.
+        if after_newline:
+            nl = raw.find(b'\n')
+            if nl < 0:
+                return False
+            raw = raw[nl:]
+        q = raw.rfind(b'\x1b[6n')
+        return q >= 0 and self.PROMPT in raw[q:]
 
-    def wait_prompt(self, timeout=20.0):
-        """Press Enter until the prompt answers (the firmware may still be starting)"""
-        end = time.time() + timeout
+    ECHO_S = 1.0   # a typed line is echoed within ~50 ms: none after this, it was taken for something else
+
+    def _until_prompt(self, timeout, after_newline=True, done=None):
+        """Read until a ready prompt (or done(plain text) is true); returns
+        (raw, True) then, or (raw so far, False) after `timeout`, or after
+        ECHO_S if a command's line hasn't been echoed (after_newline)"""
+        start = time.time()
+        raw, end = b'', start + timeout
         while time.time() < end:
-            self.s.write(b'\r')
-            text, until = '', time.time() + 0.5
-            while time.time() < until and 'bxt>' not in text:
-                text += self._read()
-            if 'bxt>' in text:
-                self.quiet()
+            raw += self._read()
+            if self._ready(raw, after_newline) or (done and done(self._plain(raw))):
+                return raw, True
+            if after_newline and not done and b'\n' not in raw and time.time() - start > self.ECHO_S:
+                break
+        return raw, False
+
+    @staticmethod
+    def _plain(raw):
+        return CONTROL.sub('', ANSI.sub('', raw.decode('utf-8', 'replace')))
+
+    def wait_prompt(self, timeout=5.0):
+        """Enter until the prompt answers (the firmware may still be starting).
+        Later tries also stop a command an earlier connection left running
+        (Ctrl-C: `load` ignores Enter) and answer a cursor query it may have
+        left waiting."""
+        end, first = time.time() + timeout, True
+        while time.time() < end:
+            self.s.write(b'\r' if first else b'\x03\x1b[1;200R\r')
+            first = False
+            if self._until_prompt(min(0.4, max(0.05, end - time.time())), after_newline=False)[1]:
+                self.s.reset_input_buffer()
+                self._tail = b''
                 return True
         return False
+
+    def send(self, line):
+        """Type `line` and Enter, at a ready prompt, without waiting for its
+        output (a command that keeps printing: read it with _read(), stop it
+        with stop())"""
+        self.s.write(line.encode() + b'\r')
 
     def cmd(self, line, timeout=10.0, done=None):
         """Type `line` and return its output (escape codes and the echo removed).
         Finishes at the next prompt, or when done(text) is true (for commands
-        that restart the chip, after which the port may vanish). A line the
-        console garbled ("Unrecognized command": nothing ran) is typed again."""
+        that restart the chip, after which the port may vanish); after
+        `timeout`, with what came so far. A line the console garbled
+        ("Unrecognized command": nothing ran) is typed again, and so is one
+        that wasn't even echoed (taken for something else: it didn't run
+        either), after getting a prompt back."""
         for attempt in range(3):
-            out = self._cmd(line, timeout, done)
-            if 'Unrecognized command' not in out:
+            out, echoed = self._cmd(line, timeout, done)
+            if echoed and 'Unrecognized command' not in out:
                 return out
-            time.sleep(0.3)
+            self.wait_prompt(2.0)
         return out
 
     def _cmd(self, line, timeout, done):
-        # The line editor's cursor queries around a prompt can come late; typing
-        # into one makes it take the keystrokes as the answer. So first an Enter
-        # and its prompt, answered and quiet, then the line.
-        self.quiet(0.3)
-        self.s.write(b'\r')
-        text, until = '', time.time() + 1.5
-        while time.time() < until and 'bxt>' not in text:
-            text += self._read()
-        self.quiet()
-        for ch in line.encode() + b'\r':
-            self.s.write(bytes([ch]))
-            time.sleep(0.02)
-        text, end = '', time.time() + timeout
-        while time.time() < end:
-            text += self._read()
-            plain = ANSI.sub('', text)
-            nl = plain.find('\n')
-            if done and done(plain):
-                break
-            if nl >= 0 and 'bxt>' in plain[nl:]:
-                break
+        """(output, whether the line was echoed: it ran)"""
+        self.send(line)
         try:
-            self.quiet()
+            raw, ok = self._until_prompt(timeout, done=done)
         except serial.SerialException:
-            pass   # restarting
-        plain = CONTROL.sub('', ANSI.sub('', text))
-        nl = plain.find('\n')
-        out = plain[nl + 1:] if nl >= 0 else plain
-        return out.split('bxt>')[0].strip()
+            if not done:
+                raise
+            raw, ok = b'', True   # restarting: the port went away
+        text = self._plain(raw)
+        nl = text.find('\n')
+        out = text[nl + 1:] if nl >= 0 else text
+        return out.split('bxt>')[0].strip(), ok or nl >= 0
+
+    def stop(self, timeout=3.0):
+        """Ctrl-C a command that's still printing; True once the prompt is back"""
+        self.s.write(b'\x03')
+        return self._until_prompt(timeout, after_newline=False)[1]
 
     def close(self):
         try:
@@ -230,7 +258,6 @@ SETTLE_S = 0.7              # after changing the PPK2 voltage (the firmware wait
 CAL_ATTEMPTS = 3            # calibrations tried when a check fails (the first failed check ends a try)
 POWER_UP_S = 15             # for the board to appear on USB once the PPK2 is on
 CONNECT_TIMEOUT_S = 20      # for its console to answer, after power-up or a restart
-RESTART_DELAY_S = 0.4       # `ble on|off` restarts 200 ms after its reply
 POLL_S = 0.1
 
 RE_POINT = re.compile(r'point (\d+): VBAT (\d+) mV, pin (\d+) mV \(nominal reading (\d+) mV, ([+-]\d+) mV\)')
@@ -296,9 +323,10 @@ def run_calibration(ui, bp, ppk_port, db_path, ppk2_offset_mv=0, verify_per_segm
         out = con.cmd(line, done=lambda t: 'Restarting' in t or 'already' in t)
         ui.log(out)
         if 'Restarting' in out:
+            # No wait for the reset: until it, the firmware is still in `ble`,
+            # so no prompt can come from the old console, only from the new one
             con.close()
             con = None
-            time.sleep(RESTART_DELAY_S)   # don't catch the old console before it resets
             connect('Waiting for the restart')
         elif 'already' not in out:
             raise CalFailed(f'`{line}` failed: {out[-160:]!r}')

@@ -16,12 +16,14 @@ Needs esptool and pyserial (requirements.txt; both come with ESP-IDF).
 """
 
 import argparse
+import collections
 import csv
 import io
 import datetime
 import hashlib
 import json
 import os
+import queue
 import re
 import ssl
 import struct
@@ -62,8 +64,8 @@ POLL_S = 0.5
 SETTLE_S = 3.0
 # The Database tab only reads the IDs, so it looks a board up sooner; if the
 # port drops out after all, the board is looked up again when it's back
-DETECT_SETTLE_S = 1.0
-DETECT_POLL_S = 0.2
+DETECT_SETTLE_S = 0.5
+DETECT_POLL_S = 0.1
 SETTLE_GIVE_UP_S = 15   # still unsettled after this: ask for BOOT held while plugging in
 GONE_S = 5              # missing this long while settling: unplugged
 OPEN_RETRIES = 3        # esptool couldn't open the port: find the board again and retry
@@ -271,10 +273,18 @@ class State:
         self.identified = {}       # board key -> IDs read for the Database tab, for adding it
         self.fw = fw            # load_firmware(): what's flashed; changed with set_firmware
         self.fw_lock = threading.Lock()   # one firmware download or upload at a time
+        self.diag_stream = DiagStream()     # the Diagnose tab's LOAD_SENSE readings
+        self.diag_cmds = queue.Queue()      # commands for the board on the Diagnose tab
+        self.batt_boards = {}               # Battery % tab: key -> its row (state.data['batt']['boards'])
+        self.batt_again = set()             # keys to calibrate again although they have a curve
         self.data = {
             # flash: every ESP32-C3 plugged in is erased and flashed; update: its
             # firmware is updated, settings and calibration kept; cal: VBAT
-            # calibration, nothing is flashed. Changed only while all are idle.
+            # calibration, nothing is flashed; diag: the Diagnose tab, a board
+            # plugged in goes into diag mode and its LOAD_SENSE readings are
+            # shown; batt: Battery % tab, boards on USB are watched until
+            # charged, then their battery percentage calibration is started.
+            # Changed only while all are idle.
             'mode': 'flash',
             # Off: boards plugged in are left alone, even in flash or update mode,
             # so a board already calibrated (or a customer's) isn't erased or
@@ -311,6 +321,19 @@ class State:
             'update_total_count': 0,
             'update_recent': [],
             'usb': [],               # boards on USB, settled: [{key, port}] (for the Database tab)
+            'diag': {
+                'phase': 'idle',     # idle | waiting | starting | streaming | failed
+                'message': '',
+                'port': None,
+                'serial': None,      # its USB serial number: the factory MAC
+                'firmware': None,
+                'launcher': None,    # in use when it went into diag mode
+                'cal': None,         # parse_board_state() of its `status`: the launchers' load levels
+                'led': 'auto',       # auto | on | off: `load led`
+                'boards': 0,         # boards on USB (only the first is read)
+            },
+            # Battery % tab: every board on USB, and the ones started this session
+            'batt': {'boards': [], 'started_count': 0},
             'log': [],
         }
 
@@ -325,6 +348,13 @@ class State:
             self.data['cal'].update(kw)
             self.seq += 1
             self.lock.notify_all()
+
+    def update_diag(self, **kw):
+        with self.lock:
+            if any(self.data['diag'].get(k) != v for k, v in kw.items()):
+                self.data['diag'].update(kw)
+                self.seq += 1
+                self.lock.notify_all()
 
     def log(self, text):
         lines = [line.rstrip() for line in text.splitlines() if line.strip()]
@@ -502,97 +532,41 @@ def parse_board_state(text):
     return st
 
 
-def _read_for(s, seconds, until=None):
-    """Read for up to `seconds` (until `until` appears), answering the line
-    editor's cursor query (ESC[6n) as a terminal would."""
-    text = ''
-    end = time.time() + seconds
-    while time.time() < end:
-        chunk = s.read(512)
-        if b'\x1b[6n' in chunk:
-            s.write(b'\x1b[1;200R')
-        text += chunk.decode('utf-8', 'replace')
-        if until and until(text):
-            break
-    return text
-
-
-def _read_until_quiet(s, quiet_s=0.4, max_s=3.0):
-    """Read (answering cursor queries) until nothing has come for `quiet_s`."""
-    text = ''
-    end = time.time() + max_s
-    last = time.time()
-    while time.time() < end and time.time() - last < quiet_s:
-        chunk = s.read(512)
-        if chunk:
-            last = time.time()
-            if b'\x1b[6n' in chunk:
-                s.write(b'\x1b[1;200R')
-            text += chunk.decode('utf-8', 'replace')
-    return text
-
-
 def read_ids(state, port):
-    """Ask the firmware console for `id` and parse it. On each new connection
-    the console first asks the terminal where its cursor is (ESC[6n) and takes
-    whatever comes next as the answer, so nothing may be typed until that's
-    over: wait, answer it, send Enter and wait for the prompt, then type `id`.
-    Retries stay on one connection: closing and reopening the port left the
-    console silent."""
+    """Ask the firmware console for `id` and parse it: as soon as the port
+    opens and the prompt answers (the firmware may still be starting, and the
+    port may drop out once on the way), until ID_TIMEOUT_S. Retries stay on
+    one connection while the port does."""
     deadline = time.time() + ID_TIMEOUT_S
     text = ''
     attempt = 0
-    s = None
+    con = None
     try:
         while time.time() < deadline:
             attempt += 1
             state.update(message=f'Asking the firmware for its IDs (try {attempt})')
-            if s is None:
-                try:
-                    # DTR/RTS low: opening the port must not reset the chip. A write
-                    # timeout so a console that isn't reading can't hang the tool.
-                    s = vbatcal.exclusive(serial.Serial())
-                    s.port, s.baudrate, s.timeout, s.write_timeout = port, 115200, 0.1, 1.0
-                    s.dtr = s.rts = False
-                    s.open()
-                except serial.SerialException:
-                    s = None
-                    time.sleep(0.5)
-                    continue
-                _read_until_quiet(s, 1.0)                  # whatever the console sends on connecting
-                # A connection closed right after a reply leaves the line editor waiting
-                # for the answer to its cursor query, taking keystrokes for it: answer
-                # it now. If nothing was waiting, this is just a line it rejects.
-                s.write(b'\x1b[1;200R\r')
-                _read_until_quiet(s)
             try:
-                s.write(b'\r')
-                text = _read_for(s, 1.5, lambda t: 'bxt>' in t)
-                # Around each prompt the line editor asks for the cursor position and
-                # the terminal width, taking what comes next as the answer: type only
-                # once it has gone quiet
-                text += _read_until_quiet(s)
-                for ch in b'id\r':
-                    s.write(bytes([ch]))
-                    time.sleep(0.02)
-                text = _read_for(s, 3.0, lambda t: ID_PATTERNS['chip'].search(t) is not None)
+                if con is None:
+                    con = vbatcal.Console(port)
+                if not con.wait_prompt(min(5.0, max(0.1, deadline - time.time()))):
+                    continue
+                text = con.cmd('id', timeout=3.0)
             except serial.SerialException as e:
-                state.log(f'console: {e}')
-                s.close()
-                s = None
-                time.sleep(1.0)
+                # Not there yet, or dropped out: open it again once it's back
+                if con is not None:
+                    state.log(f'console: {e}')
+                    con.close()
+                    con = None
+                time.sleep(0.1)
                 continue
             found = {k: (p.search(text).group(1) if p.search(text) else None) for k, p in ID_PATTERNS.items()}
             if found['serial_mac'] and found['bt_mac'] and found['unique_id']:
                 if found['unique_id'] == 'not programmed':
                     found['unique_id'] = ''
-                # Let the next prompt's cursor queries be answered before closing
-                _read_until_quiet(s)
                 return found
-            time.sleep(0.5)
     finally:
-        if s is not None:
-            s.close()
+        if con is not None:
+            con.close()
     last = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', text).strip().replace('\r', ' ').replace('\n', ' ')
     state.log(f'last console reply: {last[-200:] or "(nothing)"}')
     raise RuntimeError('the firmware did not answer `id` (did it start?)')
@@ -758,6 +732,10 @@ def identify_board(state, db_path, key):
                              + ' is on: the board is being written, not read')
         if state.data['cal']['phase'] == 'running':
             raise ValueError('a calibration is running')
+        if state.data['mode'] == 'diag':
+            raise ValueError('the Diagnose tab has its console open')
+        if state.data['mode'] == 'batt':
+            raise ValueError('the Battery % tab has its console open')
         if state.data['phase'] in ('flashing', 'identifying'):
             raise ValueError('a board is being flashed')
     # One board at a time (several plugged in at once wait their turn)
@@ -936,7 +914,366 @@ def select_local(state, filename, data):
     return set_firmware(state, load)
 
 
-MODE_NAMES = {'flash': 'flash', 'update': 'firmware update', 'cal': 'VBAT calibration'}
+# ---------------------------------------------------------------- diagnose
+
+DIAG_POINTS = 1500   # readings kept for a page that (re)connects: 5 min at 5 a second
+# No fixed waits: a board is opened as soon as its port appears, and is ready
+# when its prompt answers. These only bound how long that may take.
+DIAG_PROMPT_TIMEOUT_S = 5.0   # for the prompt: a board just plugged in is still starting its firmware
+DIAG_FAIL_PAUSE_S = 0.05      # after a failure with the port still there (it may not open yet): not a busy loop
+LOAD_LEDS = ('auto', 'on', 'off')
+# `load` prints "LOAD_SENSE (LED on - off) 123 mV", or with the LED held
+# "LOAD_SENSE (raw, LED held on) 1234 mV"
+RE_LOAD_LINE = re.compile(r'LOAD_SENSE \(([^)]*)\) (-?\d+) mV')
+RE_LAUNCHER = re.compile(r'^launcher\s*:\s*(black|white)', re.M)
+
+
+class DiagStream:
+    """The latest LOAD_SENSE readings of the board on the Diagnose tab, for
+    /diag/stream. A new session (another board, or the LED changed) starts the
+    page's chart again."""
+
+    def __init__(self):
+        self.cond = threading.Condition()
+        self.seq = 0
+        self.session = 0
+        self.points = collections.deque(maxlen=DIAG_POINTS)   # (seq, time, mV)
+
+    def reset(self):
+        with self.cond:
+            self.points.clear()
+            self.session += 1
+            self.seq += 1
+            self.cond.notify_all()
+
+    def add(self, mv):
+        with self.cond:
+            self.seq += 1
+            self.points.append((self.seq, round(time.time(), 3), mv))
+            self.cond.notify_all()
+
+    def wait(self, after, session):
+        """Wait (up to 15 s) for readings after `after` (of `session`);
+        returns (session, seq, [[time, mV], ...]): all of them for a new session"""
+        with self.cond:
+            self.cond.wait_for(lambda: self.seq != after, timeout=15)
+            new = session != self.session
+            return self.session, self.seq, [[t, mv] for s, t, mv in self.points if new or s > after]
+
+
+class DiagError(RuntimeError):
+    pass
+
+
+def diag_worker(state):
+    """On the Diagnose tab: put the first board on USB into diag mode and
+    stream its LOAD_SENSE readings, until it's unplugged or the tab is left.
+    It doesn't wait for the port to settle: it opens it at once, and if the
+    port drops out (as right after plugging in) it opens it again when it's
+    back. Unplugging shows as the port failing, not by polling."""
+    last_why = None
+    while True:
+        with state.lock:
+            # Waits for the tab to be opened (set_mode notifies), not a fixed poll
+            if not state.lock.wait_for(lambda: state.data['mode'] == 'diag', timeout=5):
+                if state.data['diag']['phase'] != 'idle':
+                    state.update_diag(phase='idle', message='', port=None, serial=None, boards=0)
+                continue
+        ports = esp_ports()
+        if not ports:
+            last_why = None
+            state.update_diag(phase='waiting', message='Plug in a board running the BX Tacho firmware',
+                              port=None, serial=None, firmware=None, launcher=None, cal=None, led='auto', boards=0)
+            time.sleep(DETECT_POLL_S)   # the OS has no plug-in event to wait on here
+            continue
+        p = ports[0]
+        key = board_key(p)
+        try:
+            diag_session(state, key, p.device, len(ports))
+            last_why = None
+            continue   # the tab was left, or it was unplugged
+        except DiagError as e:
+            why = str(e)
+        except (serial.SerialException, OSError) as e:
+            why = f'its port could not be used ({e})'
+        if find_board(key) is None:
+            last_why = None
+            continue   # unplugged (or dropped out for a moment): not a failure
+        state.update_diag(phase='failed', message=why)
+        if why != last_why:   # once, not on every try
+            state.log(f'diagnose: {p.device}: {why}')
+            last_why = why
+        time.sleep(DIAG_FAIL_PAUSE_S)
+
+
+def diag_session(state, key, port, boards):
+    def wanted():
+        return state.data['mode'] == 'diag'
+
+    state.update_diag(phase='starting', message='Waiting for its console', port=port, serial=key, boards=boards)
+    while True:   # commands sent while it wasn't streaming are of no use now
+        try:
+            state.diag_cmds.get_nowait()
+        except queue.Empty:
+            break
+    con = vbatcal.Console(port)
+    in_diag = False
+    try:
+        if not con.wait_prompt(DIAG_PROMPT_TIMEOUT_S):
+            raise DiagError('no prompt from its console (still starting, or no firmware on it)')
+        status = con.cmd('status')
+        version = RE_FIRMWARE.search(status)
+        launcher = RE_LAUNCHER.search(status)
+        out = con.cmd('diag on')
+        if 'diag on' not in out:
+            raise DiagError(f'it did not go into diag mode: {out or "no answer"}')
+        in_diag = True
+        led = 'auto'
+        state.update_diag(firmware=version.group(1) if version else None,
+                          launcher=launcher.group(1) if launcher else None, cal=parse_board_state(status),
+                          led=led)
+        state.log(f'diagnose: board {key} on {port} in diag mode')
+        state.diag_stream.reset()
+        con.send('load 1000000')   # a reading every 200 ms, until Ctrl-C
+        state.update_diag(phase='streaming', message='')
+        text = ''
+        while wanted():
+            try:
+                cmd = state.diag_cmds.get_nowait()
+            except queue.Empty:
+                cmd = None
+            if cmd and cmd[0] == 'led' and cmd[1] != led:
+                con.stop()
+                out = con.cmd(f'load led {cmd[1]}')
+                if 'held' in out or 'back to normal' in out:
+                    led = cmd[1]
+                    state.log(f'diagnose: load led {led}')
+                else:
+                    state.log(f'diagnose: load led {cmd[1]}: {out}')
+                state.update_diag(led=led)
+                state.diag_stream.reset()   # raw readings with the LED held: another scale
+                con.send('load 1000000')
+                text = ''
+            text += con._read().decode('utf-8', 'replace')
+            *lines, text = vbatcal.CONTROL.sub('', vbatcal.ANSI.sub('', text)).split('\n')
+            for line in lines:
+                m = RE_LOAD_LINE.search(line)
+                if m:
+                    state.diag_stream.add(int(m.group(2)))
+        # Left the tab: out of diag mode, as it was
+        con.stop()
+        con.cmd('diag off')
+        in_diag = False
+        state.log(f'diagnose: board {key} out of diag mode')
+    finally:
+        if in_diag and wanted() and find_board(key) is not None:
+            try:   # failed while streaming, but still plugged in: don't leave it in diag mode
+                con.stop()
+                con.cmd('diag off')
+            except (serial.SerialException, OSError):
+                pass
+        con.close()
+
+
+def diag_led(state, led):
+    """Returns None, or why the load LED can't be changed now"""
+    if led not in LOAD_LEDS:
+        return 'unknown LED setting'
+    with state.lock:
+        if state.data['mode'] != 'diag':
+            return 'switch to the Diagnose tab first'
+        if state.data['diag']['phase'] != 'streaming':
+            return 'no board in diag mode'
+    state.diag_cmds.put(('led', led))
+    return None
+
+
+# ---------------------------------------------------------------- battery percentage
+
+BATT_POLL_S = 2.0   # how often a charging board's `status` is read
+# "power       : USB, charging, VBAT 4012 mV (not trusted while charging), 87%"
+RE_POWER = re.compile(r'^power\s*:\s*(USB, charging|USB, charged|battery), VBAT (-?\d+) mV \([^)]*\), (-?\d+)%', re.M)
+RE_MODE = re.compile(r'^mode\s*:\s*(\S+)', re.M)
+
+
+def batt_row(state, key, **kw):
+    """Change a board's row on the Battery % tab (None: remove it)"""
+    with state.lock:
+        if kw.get('remove'):
+            state.batt_boards.pop(key, None)
+        else:
+            state.batt_boards.setdefault(key, {'key': key}).update(kw)
+        rows = sorted(state.batt_boards.values(), key=lambda r: (r.get('order', 0), r['key']))
+        state.data['batt']['boards'] = [dict(r) for r in rows]
+        state.seq += 1
+        state.lock.notify_all()
+
+
+def batt_worker(state, db_path):
+    """On the Battery % tab: one thread per board on USB (batt_board)"""
+    threads = {}
+    while True:
+        with state.lock:
+            if not state.lock.wait_for(lambda: state.data['mode'] == 'batt', timeout=5):
+                # Left the tab: only the boards started this session stay listed
+                if any(r['phase'] != 'started' for r in state.batt_boards.values()) and                         not any(t.is_alive() for t in threads.values()):
+                    for k in [k for k, r in state.batt_boards.items() if r['phase'] != 'started']:
+                        batt_row(state, k, remove=True)
+                continue
+        for p in esp_ports():
+            k = board_key(p)
+            if k not in threads or not threads[k].is_alive():
+                t = threading.Thread(target=batt_board, args=(state, db_path, k, p.device), daemon=True)
+                threads[k] = t
+                t.start()
+        time.sleep(DETECT_POLL_S)
+
+
+def batt_board(state, db_path, key, port):
+    """Watch one board until it's charged, then `cal batt start`, and ask for
+    it to be unplugged (which starts the run). Ends when it's unplugged or
+    the tab is left; armed but still plugged in then: `cal batt stop`. While
+    it stays plugged in, a failure (its port not opening yet right after
+    plugging in, a console not answering) is tried again."""
+    def wanted():
+        return state.data['mode'] == 'batt'
+
+    with state.lock:
+        prev = state.batt_boards.get(key)
+        order = prev['order'] if prev else time.time()
+    if prev and prev.get('phase') == 'started':
+        # On USB again during its run: that cancelled it (the firmware restarts)
+        state.log(f'battery %: board {prev.get("serial") or key} plugged in again: its calibration run was '
+                  'cancelled, unless it had finished (CURVE SAVED)')
+    batt_row(state, key, port=port, order=order, phase='connecting', message='Waiting for its console',
+             serial=key, power=None, vbat=None, pct=None)
+    armed = [False]   # cal batt start answered "armed" (set by batt_session)
+    last_why = None
+    while True:
+        try:
+            batt_session(state, db_path, key, port, armed)
+            batt_row(state, key, remove=True)   # the tab was left
+            return
+        except (DiagError, serial.SerialException, OSError) as e:
+            why = str(e)
+        p = find_board(key)
+        if p is None:
+            with state.lock:
+                row = dict(state.batt_boards.get(key) or {})
+            if armed[0] or row.get('phase') == 'armed':
+                # Unplugged when armed: the run has started, on its battery
+                with state.lock:
+                    state.data['batt']['started_count'] += 1
+                state.batt_again.discard(key)
+                batt_row(state, key, phase='started', port=None, power=None, since=time.time(),
+                         message='Running on its battery: leave it unplugged until it shows CURVE SAVED and sleeps '
+                                 '(several hours). Plugging USB in before cancels it.')
+                state.log(f'battery %: board {row.get("serial") or key} unplugged: calibration run started')
+            elif row.get('phase') != 'started':
+                batt_row(state, key, remove=True)
+            return
+        if not wanted():
+            batt_row(state, key, remove=True)
+            return
+        # Still plugged in: show why and try again (the port may not open yet)
+        port = p.device
+        batt_row(state, key, port=port, phase='connecting' if not armed[0] else 'armed',
+                 message=f'Trying again: {why}')
+        if why != last_why:
+            state.log(f'battery %: {port}: {why}')
+            last_why = why
+        time.sleep(0.3)
+
+
+def batt_session(state, db_path, key, port, armed):
+    """One connection to a board on the Battery % tab, until the tab is left
+    (raises when it fails or the board is unplugged)"""
+    def wanted():
+        return state.data['mode'] == 'batt'
+
+    con = vbatcal.Console(port)
+    try:
+        if not con.wait_prompt(5.0):
+            raise DiagError('no prompt from its console (still starting, or no firmware on it)')
+        ids_text = con.cmd('id')
+        ids = {k: (p.search(ids_text).group(1) if p.search(ids_text) else None) for k, p in ID_PATTERNS.items()}
+        if ids['serial_mac']:
+            batt_row(state, key, serial=ids['serial_mac'])
+        recorded = False
+        charging_since = None
+        misses = 0   # status replies without the power line, in a row
+        while wanted():
+            status = con.cmd('status')
+            m = RE_POWER.search(status)
+            mode = RE_MODE.search(status)
+            st = parse_board_state(status)
+            if not recorded and ids.get('unique_id') not in (None, '', 'not programmed'):
+                # Its row in the database gets what it says now, as on the Database tab
+                if boarddb.save_board_state(db_path, ids['unique_id'], st):
+                    refresh_counts(state, db_path)
+                recorded = True
+            if not m:
+                # Once may be a garbled reply: ask again; several times, the firmware has none
+                misses += 1
+                if misses >= 3:
+                    raise DiagError(f'no power line in its status (firmware too old?): {status[:120]!r}')
+                con.wait_prompt(2.0)
+                continue
+            misses = 0
+            power, vbat, pct = m.group(1), int(m.group(2)), int(m.group(3))
+            row = {'power': power, 'vbat': vbat, 'pct': pct, 'curve': st.get('batt_curve')}
+            if mode and mode.group(1) == 'batt-cal':
+                armed[0] = True   # armed already (before the tab was opened again)
+                batt_row(state, key, phase='armed', message='Unplug USB now: the calibration run starts', **row)
+            elif 'vbat' in st and st['vbat'] is None:
+                batt_row(state, key, phase='failed', message='No VBAT calibration: do the VBAT calibration first '
+                         '(the curve is only as good as its voltage readings)', **row)
+            elif st.get('batt_cal') == 1 and key not in state.batt_again:
+                batt_row(state, key, phase='calibrated', message=f'Already has a measured curve: {st["batt_curve"]}',
+                         **row)
+            elif mode and mode.group(1) != 'run':
+                batt_row(state, key, phase='failed', message=f'It is in {mode.group(1)} mode: leave it first', **row)
+            elif power == 'battery':
+                batt_row(state, key, phase='failed', message='It reads no USB power: use a USB cable with power, '
+                         'not the data-only one', **row)
+            elif power == 'USB, charging':
+                charging_since = charging_since or time.time()
+                batt_row(state, key, phase='charging', message='Charging', since=charging_since, **row)
+            else:
+                # Charged: arm the calibration
+                out = con.cmd('cal batt start')
+                if 'armed' in out:
+                    armed[0] = True
+                    state.log(f'battery %: board {ids.get("serial_mac") or key} charged ({vbat} mV): calibration '
+                              'armed, unplug it')
+                    batt_row(state, key, phase='armed', message='Unplug USB now: the calibration run starts', **row)
+                else:
+                    batt_row(state, key, phase='failed', message=f'cal batt start: {out[-200:]}', **row)
+            # Its status again in a moment: the state of charge has no event to wait on
+            end = time.time() + BATT_POLL_S
+            while time.time() < end and wanted():
+                con._read()   # answers the console, and fails at once when it's unplugged
+        # Left the tab
+        if armed[0]:
+            con.cmd('cal batt stop')
+            state.log(f'battery %: board {key}: calibration cancelled (tab left)')
+    finally:
+        con.close()
+
+
+def batt_again(state, key):
+    """Calibrate a board that already has a curve; None, or why not"""
+    with state.lock:
+        if state.data['mode'] != 'batt':
+            return 'switch to the Battery % tab first'
+        if key not in state.batt_boards:
+            return 'that board is no longer on USB'
+        state.batt_again.add(key)
+    return None
+
+
+MODE_NAMES = {'flash': 'flash', 'update': 'firmware update', 'cal': 'VBAT calibration', 'diag': 'diagnose',
+              'batt': 'battery percentage calibration'}
 
 
 def set_mode(state, mode):
@@ -1038,6 +1375,21 @@ def make_handler(state, db_path):
                 stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
                 self.reply(out.getvalue().encode('utf-8-sig'), 'text/csv; charset=utf-8',
                            [('Content-Disposition', f'attachment; filename="bx-tacho-boards-{stamp}.csv"')])
+            elif path == '/diag/stream':
+                # Server-sent events: the Diagnose tab's readings as they come
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                session, seq = None, -1
+                try:
+                    while True:
+                        session, seq, points = state.diag_stream.wait(seq, session)
+                        body = json.dumps({'session': session, 'points': points})
+                        self.wfile.write(f'data: {body}\n\n'.encode())
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    pass
             elif path == '/events':
                 # Server-sent events: the whole state on every change
                 self.send_response(200)
@@ -1079,6 +1431,10 @@ def make_handler(state, db_path):
                 why = set_auto_flash(state, bool(body.get('on')))
             elif self.path == '/cal/start':
                 why = start_cal(state)
+            elif self.path == '/diag/led':
+                why = diag_led(state, str(body.get('led')))
+            elif self.path == '/batt/again':
+                why = batt_again(state, str(body.get('key')))
             elif self.path == '/db/board':
                 # The customer columns, edited on the Database tab
                 try:
@@ -1181,6 +1537,8 @@ def main():
                      daemon=True).start()
     threading.Thread(target=ppk2_watcher, args=(state,), daemon=True).start()
     threading.Thread(target=usb_watcher, args=(state,), daemon=True).start()
+    threading.Thread(target=diag_worker, args=(state,), daemon=True).start()
+    threading.Thread(target=batt_worker, args=(state, db_path), daemon=True).start()
 
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(state, db_path))
     url = f'http://127.0.0.1:{args.port}/'

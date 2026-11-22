@@ -147,6 +147,40 @@
     border: 1px solid var(--wait); background: var(--surface); color: var(--wait); cursor: pointer; }
   .plug button.primary { background: var(--wait); color: #fff; }
   td.clip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .status[data-phase="starting"] { background: var(--busy-soft); border-color: var(--busy); }
+  .status[data-phase="starting"] h2 { color: var(--busy); }
+  .status[data-phase="streaming"] { background: var(--ok-soft); border-color: var(--ok); }
+  .status[data-phase="streaming"] h2 { color: var(--ok); }
+  .diag-now { margin-top: 14px; display: flex; gap: 8px 16px; align-items: baseline; flex-wrap: wrap; }
+  .diag-now b { font: 700 3.2rem/1 var(--mono); }
+  .diag-now span { color: var(--muted); }
+  .diag-bar { display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .diag-bar h3 { margin: 0; flex: 1 1 auto; }
+  .diag-bar select { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { font: inherit; font-size: 0.9rem; padding: 4px 12px; border: 0; background: var(--bg);
+    color: var(--muted); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--wait); color: #fff; }
+  .seg button:disabled { opacity: 0.45; cursor: not-allowed; }
+  #diag-chart { display: block; width: 100%; height: 280px; }
+  td.now { font-weight: 700; }
+  .status[data-phase="armed"] { background: var(--busy-soft); border-color: var(--busy); }
+  .status[data-phase="armed"] h2 { color: var(--busy); }
+  .status[data-phase="armed"] { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px var(--busy-soft); } }
+  .status[data-phase="charging"] { background: var(--surface); border-color: var(--wait); }
+  td.armed { color: var(--busy); font-weight: 700; }
+  td.started, td.calibrated { color: var(--ok); font-weight: 700; }
+  td.charging { color: var(--wait); font-weight: 600; }
+  td.failed { color: var(--bad); font-weight: 700; }
+  td.msg { white-space: normal; min-width: 240px; color: var(--muted); }
+  .row-btn { font: inherit; font-size: 0.85rem; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--wait);
+    background: var(--surface); color: var(--wait); cursor: pointer; }
+  .pct { display: inline-block; width: 60px; height: 8px; border-radius: 4px; background: var(--line);
+    vertical-align: middle; margin-right: 6px; overflow: hidden; }
+  .pct i { display: block; height: 100%; background: var(--ok); }
 </style>
 </head>
 <body>
@@ -160,6 +194,8 @@
     <button role="tab" id="tab-flash" data-mode="flash" aria-selected="true">Flash</button>
     <button role="tab" id="tab-update" data-mode="update" aria-selected="false">Update</button>
     <button role="tab" id="tab-cal" data-mode="cal" aria-selected="false">VBAT calibration</button>
+    <button role="tab" id="tab-diag" data-mode="diag" aria-selected="false">Diagnose</button>
+    <button role="tab" id="tab-batt" data-mode="batt" aria-selected="false">Battery %</button>
     <button role="tab" id="tab-db" aria-selected="false">Database</button>
   </nav>
   <p class="tab-error" id="tab-error"></p>
@@ -246,6 +282,74 @@
           <tbody id="cal-recent"></tbody>
         </table>
       </div>
+    </section>
+  </div>
+
+  <div class="view" id="view-diag" hidden>
+    <div class="status" id="diag-status" data-phase="waiting">
+      <h2 id="diag-title">Plug in a board</h2>
+      <p id="diag-message"></p>
+      <div class="diag-now"><b id="diag-mv">–</b><span id="diag-what"></span></div>
+      <dl class="ids" id="diag-ids" hidden></dl>
+    </div>
+    <section>
+      <div class="diag-bar">
+        <h3>LOAD_SENSE</h3>
+        <label>Load LED <span class="seg" id="diag-led">
+          <button data-led="auto" aria-pressed="true">Auto</button><button data-led="on" aria-pressed="false">On</button><button data-led="off" aria-pressed="false">Off</button>
+        </span></label>
+        <label>Levels <select id="diag-levels">
+          <option value="use" selected>launcher in use</option><option value="black">black</option>
+          <option value="white">white</option><option value="both">both</option><option value="none">none</option>
+        </select></label>
+        <label>Last <select id="diag-window">
+          <option value="10">10 s</option><option value="30" selected>30 s</option>
+          <option value="60">1 min</option><option value="300">5 min</option>
+        </select></label>
+      </div>
+      <canvas id="diag-chart"></canvas>
+      <p class="db-info" id="diag-stats"></p>
+    </section>
+    <section>
+      <h3>Load calibration</h3>
+      <div class="table"><table>
+        <thead><tr><th>Launcher</th><th>Empty</th><th>Loaded</th><th>Released below (40 %)</th>
+          <th>Loaded above (90 %)</th><th>Now</th></tr></thead>
+        <tbody id="diag-cal"></tbody>
+      </table></div>
+      <p class="db-info">From the board's <code>status</code> when it went into diag mode (the saved levels). Now: where the
+        reading lies from empty (0 %) to loaded (100 %); above the white launcher's loaded threshold BX Tacho takes it
+        for a white launcher, below the black one's released threshold for a black one.</p>
+    </section>
+  </div>
+
+  <div class="view" id="view-batt" hidden>
+    <div class="status" id="batt-status" data-phase="waiting">
+      <h2 id="batt-title">Plug in boards to charge</h2>
+      <p id="batt-message"></p>
+      <ol class="steps">
+        <li>Fit the battery and do the VBAT calibration first (the curve is only as good as its voltage readings).</li>
+        <li>Plug the boards in with a USB cable that has power (not the data-only one). Several at once is fine:
+          each is watched until its charger reports it charged.</li>
+        <li>When a board is charged, its calibration is started (<code>cal batt start</code>) and it is shown here:
+          <b>unplug it</b>. The run then goes on on its battery for several hours, until BX Tacho shows CURVE SAVED
+          and goes to sleep. Plugging it in before that cancels it.</li>
+      </ol>
+    </div>
+    <div class="counts">
+      <div class="count"><b id="batt-count">0</b><span>on USB</span></div>
+      <div class="count"><b id="batt-started">0</b><span>calibration runs started this session</span></div>
+    </div>
+    <section>
+      <h3>Boards</h3>
+      <div class="table"><table>
+        <thead><tr><th>Serial (MAC)</th><th>Port</th><th>Power</th><th>VBAT</th><th>Battery</th><th>State</th>
+          <th></th><th></th></tr></thead>
+        <tbody id="batt-rows"></tbody>
+      </table></div>
+      <p class="db-info">The charger's "charged" signal decides, not the voltage: a board that charges for hours and
+        never shows charged may have the CHRG pull-up too weak (R7 4.7 kΩ). Leaving this tab cancels the calibration
+        of boards still plugged in.</p>
     </section>
   </div>
 
@@ -923,12 +1027,14 @@ setInterval(loadReleases, 5 * 60 * 1000);
 
 function render(s) {
   lastState = s;
-  for (const mode of ['flash', 'update', 'cal']) {
+  for (const mode of ['flash', 'update', 'cal', 'diag', 'batt']) {
     $(`tab-${mode}`).setAttribute('aria-selected', String(!browsing && s.mode === mode));
   }
   const upd = s.mode === 'update';
   $('view-flash').hidden = browsing || !(s.mode === 'flash' || upd);
   $('view-cal').hidden = browsing || s.mode !== 'cal';
+  $('view-diag').hidden = browsing || s.mode !== 'diag';
+  $('view-batt').hidden = browsing || s.mode !== 'batt';
   $('tab-db').setAttribute('aria-selected', String(browsing));
   $('view-db').hidden = !browsing;
   $('db-mode').textContent = !browsing ? ''
@@ -940,6 +1046,8 @@ function render(s) {
   if (browsing && s.db_version !== dbVersion) loadDb();
   if (browsing) handleUsb(s.usb);
   renderCal(s);
+  renderDiag(s);
+  renderBatt(s);
 
   $('fw').innerHTML = '';
   $('fw').append('Firmware ', Object.assign(document.createElement('code'), { textContent: s.firmware.version }),
@@ -1005,6 +1113,264 @@ function render(s) {
   lastPhase = s.phase;
 }
 
+// ---- Diagnose tab: the board's LOAD_SENSE readings, from /diag/stream
+const DIAG_TITLES = {
+  idle: 'Plug in a board', waiting: 'Plug in a board', starting: 'Connecting',
+  streaming: 'Diag mode: live readings', failed: 'Not answering',
+};
+const LOADED_PCT = 90, RELEASED_PCT = 40;   // the firmware's thresholds (load.c)
+let diagSession = null;
+let diagPoints = [];   // [time (s), mV]
+let diagDrawQueued = false;
+
+function diagPct(c, l, v) {
+  const empty = c[`${l}_load_empty_mv`], loaded = c[`${l}_load_loaded_mv`];
+  if (empty === null || empty === undefined || loaded === null || loaded === undefined || loaded === empty) return null;
+  return Math.trunc((v - empty) * 100 / (loaded - empty));
+}
+function diagLevel(c, l, pct) {
+  const empty = c[`${l}_load_empty_mv`], loaded = c[`${l}_load_loaded_mv`];
+  return empty === null || empty === undefined ? null : Math.round(empty + (loaded - empty) * pct / 100);
+}
+
+function renderDiag(s) {
+  const d = s.diag;
+  $('diag-status').dataset.phase = d.phase === 'idle' ? 'waiting' : d.phase;
+  $('diag-title').textContent = DIAG_TITLES[d.phase] || d.phase;
+  $('diag-message').textContent = d.phase === 'streaming'
+    ? 'The launch state machine is paused while this tab is open; leaving it takes the board out of diag mode.'
+      + (d.boards > 1 ? ` ${d.boards} boards are on USB: only the first is read.` : '')
+    : d.message || (d.phase === 'starting' ? 'Opening its console' : 'Plug in a board running the BX Tacho firmware');
+  const ids = $('diag-ids');
+  ids.innerHTML = '';
+  for (const [label, v] of [['Serial (MAC)', d.serial], ['Port', d.port], ['Firmware', d.firmware],
+                            ['Launcher', d.launcher]]) {
+    if (!v) continue;
+    ids.append(Object.assign(document.createElement('dt'), { textContent: label }),
+               Object.assign(document.createElement('dd'), { textContent: v }));
+  }
+  ids.hidden = !ids.childElementCount;
+  for (const b of $('diag-led').querySelectorAll('button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.led === d.led));
+    b.disabled = d.phase !== 'streaming';
+  }
+  diagDraw();
+}
+
+function diagDraw() {
+  if (diagDrawQueued) return;
+  diagDrawQueued = true;
+  requestAnimationFrame(() => {
+    diagDrawQueued = false;
+    if (lastState && lastState.mode === 'diag' && !browsing) drawDiag(lastState.diag);
+  });
+}
+
+function drawDiag(d) {
+  const streaming = d.phase === 'streaming';
+  const last = diagPoints.length ? diagPoints[diagPoints.length - 1] : null;
+  const raw = d.led !== 'auto';
+  $('diag-mv').textContent = streaming && last ? `${last[1]} mV` : '–';
+  $('diag-what').textContent = !streaming ? ''
+    : raw ? `raw LOAD_SENSE, LED held ${d.led}` : 'LED on minus LED off (ambient light cancelled)';
+
+  // The calibration table, with where the latest reading lies
+  const c = d.cal || {};
+  const tb = $('diag-cal');
+  tb.innerHTML = '';
+  for (const l of ['black', 'white']) {
+    const tr = document.createElement('tr');
+    const known = c[`${l}_load_empty_mv`] !== null && c[`${l}_load_empty_mv`] !== undefined;
+    const pct = known && last && !raw ? diagPct(c, l, last[1]) : null;
+    tr.append(cell(l), cell(known ? mv(c[`${l}_load_empty_mv`]) : (d.cal ? 'not calibrated' : ''), true),
+              cell(known ? mv(c[`${l}_load_loaded_mv`]) : '', true),
+              cell(known ? mv(diagLevel(c, l, RELEASED_PCT)) : '', true),
+              cell(known ? mv(diagLevel(c, l, LOADED_PCT)) : '', true));
+    const now = cell(pct === null ? '' : `${pct} %` + (pct > LOADED_PCT ? ' · loaded' : pct < RELEASED_PCT ? ' · empty' : ''), true);
+    now.classList.add('now');
+    tr.append(now);
+    tb.append(tr);
+  }
+
+  // The chart: the last `win` seconds, right edge at the latest reading
+  const cv = $('diag-chart');
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (!w) return;
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement);
+  const color = (v) => css.getPropertyValue(v).trim();
+  const win = Number($('diag-window').value);
+  const t1 = last ? last[0] : 0, t0 = t1 - win;
+  const pts = diagPoints.filter((p) => p[0] >= t0);
+  const levels = [];
+  const show = $('diag-levels').value;
+  if (show !== 'none' && !raw) {
+    for (const l of show === 'both' ? ['black', 'white'] : [show === 'use' ? d.launcher || 'black' : show]) {
+      if (c[`${l}_load_empty_mv`] === null || c[`${l}_load_empty_mv`] === undefined) continue;
+      levels.push([`${l} empty`, c[`${l}_load_empty_mv`], false]);
+      levels.push([`${l} loaded`, c[`${l}_load_loaded_mv`], false]);
+      levels.push([`${l} released < ${RELEASED_PCT} %`, diagLevel(c, l, RELEASED_PCT), true]);
+      levels.push([`${l} loaded > ${LOADED_PCT} %`, diagLevel(c, l, LOADED_PCT), true]);
+    }
+  }
+  const vals = pts.map((p) => p[1]).concat(levels.map((x) => x[1]));
+  let lo = vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1000;
+  const pad = Math.max(10, (hi - lo) * 0.08);
+  lo -= pad; hi += pad;
+  const L = 56, Rt = 8, T = 8, B = 22;
+  const x = (t) => L + (t - t0) / win * (w - L - Rt);
+  const y = (v) => T + (hi - v) / (hi - lo) * (h - T - B);
+  g.font = '11px ui-monospace, Consolas, monospace';
+  g.fillStyle = color('--muted');
+  g.strokeStyle = color('--line');
+  g.lineWidth = 1;
+  // Grid: about 5 steps of 1, 2 or 5 x 10^n mV
+  const raw10 = (hi - lo) / 5, mag = 10 ** Math.floor(Math.log10(raw10));
+  const step = [1, 2, 5, 10].map((k) => k * mag).find((s) => s >= raw10);
+  g.textAlign = 'right';
+  g.textBaseline = 'middle';
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    g.beginPath(); g.moveTo(L, y(v)); g.lineTo(w - Rt, y(v)); g.stroke();
+    g.fillText(`${Math.round(v)}`, L - 6, y(v));
+  }
+  g.textAlign = 'center';
+  g.textBaseline = 'top';
+  const tstep = win <= 10 ? 2 : win <= 30 ? 5 : win <= 60 ? 10 : 60;
+  for (let s = 0; s <= win; s += tstep) {
+    g.fillText(s ? `-${s} s` : 'now', x(t1 - s), h - B + 6);
+  }
+  // Calibration levels
+  g.textAlign = 'left';
+  g.textBaseline = 'bottom';
+  for (const [label, v, dashed] of levels) {
+    g.strokeStyle = label.startsWith('white') ? color('--busy') : color('--muted');
+    g.setLineDash(dashed ? [4, 4] : []);
+    g.beginPath(); g.moveTo(L, y(v)); g.lineTo(w - Rt, y(v)); g.stroke();
+    g.fillStyle = g.strokeStyle;
+    g.textAlign = dashed ? 'right' : 'left';   // thresholds on the right: they lie close to the levels
+    g.fillText(`${label} ${v}`, dashed ? w - Rt - 4 : L + 4, y(v) - 1);
+  }
+  g.setLineDash([]);
+  // The readings
+  g.strokeStyle = color('--wait');
+  g.lineWidth = 2;
+  g.beginPath();
+  pts.forEach((p, i) => (i ? g.lineTo(x(p[0]), y(p[1])) : g.moveTo(x(p[0]), y(p[1]))));
+  g.stroke();
+
+  // Over the window: noise and range
+  if (pts.length) {
+    const v = pts.map((p) => p[1]);
+    const mean = v.reduce((a, b) => a + b, 0) / v.length;
+    const sd = Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / v.length);
+    const min = Math.min(...v), max = Math.max(...v);
+    $('diag-stats').textContent = `Last ${$('diag-window').selectedOptions[0].text}: ${v.length} readings · `
+      + `min ${min} mV · max ${max} mV · peak to peak ${max - min} mV · mean ${mean.toFixed(1)} mV · `
+      + `standard deviation ${sd.toFixed(1)} mV`;
+  } else {
+    $('diag-stats').textContent = streaming ? 'Waiting for readings…' : '';
+  }
+}
+
+const diagEvents = new EventSource('/diag/stream');
+diagEvents.onmessage = (e) => {
+  const m = JSON.parse(e.data);
+  if (m.session !== diagSession) {
+    diagSession = m.session;
+    diagPoints = [];
+  }
+  diagPoints.push(...m.points);
+  if (diagPoints.length) {
+    const t0 = diagPoints[diagPoints.length - 1][0] - 300;
+    const i = diagPoints.findIndex((p) => p[0] >= t0);
+    if (i > 0) diagPoints.splice(0, i);
+  }
+  diagDraw();
+};
+for (const b of $('diag-led').querySelectorAll('button')) {
+  b.addEventListener('click', () => post('/diag/led', { led: b.dataset.led }));
+}
+$('diag-window').addEventListener('change', diagDraw);
+$('diag-levels').addEventListener('change', diagDraw);
+window.addEventListener('resize', diagDraw);
+
+// ---- Battery % tab: boards charging, then their battery percentage calibration
+const BATT_STATE = {
+  connecting: 'Connecting', charging: 'Charging', armed: 'UNPLUG NOW', started: 'Run started',
+  calibrated: 'Has a curve', failed: 'Not possible',
+};
+let battArmed = new Set();
+let battBeep = 0;
+
+function since(t) {
+  const m = Math.floor((Date.now() / 1000 - t) / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+}
+
+function renderBatt(s) {
+  const rows = s.batt.boards;
+  const live = rows.filter((r) => r.phase !== 'started');
+  const armed = rows.filter((r) => r.phase === 'armed');
+  const charging = rows.filter((r) => r.phase === 'charging');
+  $('batt-count').textContent = live.length;
+  $('batt-started').textContent = s.batt.started_count;
+  const st = $('batt-status');
+  if (armed.length) {
+    st.dataset.phase = 'armed';
+    $('batt-title').textContent = `Unplug ${armed.map((r) => r.serial).join(', ')}`;
+    $('batt-message').textContent = 'Charged: its battery calibration is armed. Unplug USB to start the run.';
+  } else if (charging.length) {
+    st.dataset.phase = 'charging';
+    $('batt-title').textContent = `Charging ${charging.length} board${charging.length > 1 ? 's' : ''}`;
+    $('batt-message').textContent = 'Each one is armed as soon as its charger reports it charged.';
+  } else {
+    st.dataset.phase = 'waiting';
+    $('batt-title').textContent = 'Plug in boards to charge';
+    $('batt-message').textContent = live.length ? 'None charging now: see the boards below.' : '';
+  }
+  // A tone when a board is to be unplugged, and again every 15 s until it is
+  const keys = new Set(armed.map((r) => r.key));
+  const fresh = [...keys].some((k) => !battArmed.has(k));
+  if (s.mode === 'batt' && keys.size && (fresh || Date.now() - battBeep > 15000)) {
+    beep(true);
+    battBeep = Date.now();
+  }
+  battArmed = keys;
+
+  const body = $('batt-rows');
+  body.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    const pct = cell('');
+    if (r.pct !== null && r.pct !== undefined) {
+      const bar = document.createElement('span');
+      bar.className = 'pct';
+      bar.append(Object.assign(document.createElement('i'), { style: `width:${Math.max(0, Math.min(100, r.pct))}%` }));
+      pct.append(bar, `${r.pct} %`);
+    }
+    const state = cell((BATT_STATE[r.phase] || r.phase)
+      + (r.phase === 'charging' && r.since ? ` · ${since(r.since)}` : '')
+      + (r.phase === 'started' && r.since ? ` · ${since(r.since)} ago` : ''));
+    state.className = r.phase;
+    const msg = cell(r.phase === 'charging' ? '' : r.message);
+    msg.classList.add('msg');
+    const act = cell('');
+    if (r.phase === 'calibrated') {
+      const b = Object.assign(document.createElement('button'), { className: 'row-btn', textContent: 'Calibrate again' });
+      b.addEventListener('click', () => post('/batt/again', { key: r.key }));
+      act.append(b);
+    }
+    tr.append(cell(r.serial, true), cell(r.port || '', true), cell(r.power || ''), cell(mv(r.vbat), true), pct,
+              state, msg, act);
+    body.append(tr);
+  }
+}
+
 async function post(path, body) {
   try {
     const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1026,7 +1392,12 @@ for (const tab of document.querySelectorAll('.tabs button[data-mode]')) {
     }
   });
 }
-$('tab-db').addEventListener('click', () => {
+$('tab-db').addEventListener('click', async () => {
+  // The Diagnose and Battery % tabs keep the boards' consoles open: leave them first
+  if (!browsing && lastState && (lastState.mode === 'diag' || lastState.mode === 'batt')) {
+    await post('/mode', { mode: 'flash' });
+    if ($('tab-error').textContent) return;
+  }
   if (!browsing) plugged.clear();   // boards already on USB are looked up again
   browsing = true;
   $('tab-error').textContent = '';

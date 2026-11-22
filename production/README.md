@@ -148,6 +148,63 @@ a good multimeter at the clip while a board is on it (in `cal vbat` mode); if
 the board sees, say, 6 mV less than the setting, start the tool with
 `--ppk2-offset-mv -6`.
 
+## Diagnose
+
+The **Diagnose** tab shows a board's load sensor live. Nothing is flashed
+or written. Plug in a board running the firmware and the tool:
+
+- opens its console, reads `status` (firmware, launcher in use, both
+  launchers' load levels) and turns on `diag on`, which pauses the launch
+  state machine;
+- streams `load` (a reading every 200 ms: LED on minus LED off, so ambient
+  light cancels) to the page.
+
+The page shows:
+
+- the latest reading, and a chart of the last 10 s to 5 min;
+- the empty and loaded levels and both thresholds (released below 40 %,
+  loaded above 90 %) of the launcher in use, black, white or both;
+- noise over the chart's window (min, max, peak to peak, mean, standard
+  deviation);
+- where the reading lies on each launcher's scale.
+
+**Load LED On / Off** holds the LED (`load led on|off`); the readings are
+then the raw LOAD_SENSE voltage, on a new chart. **Auto** goes back to normal
+readings.
+
+Leaving the tab (for the Database tab too) stops the readings and sends
+`diag off`. Diag mode isn't saved, but a board unplugged while the tab is open
+can't be sent `diag off`: on battery it stays in diag mode (not measuring
+launches) until it restarts or is plugged in here again and the tab left. With
+several boards on USB, only the first is read.
+
+## Battery percentage calibration
+
+The **Battery %** tab starts the firmware's battery percentage calibration
+(`cal batt`, see the firmware README) on boards as soon as they're charged.
+Fit the battery and do the VBAT calibration first. Then plug the boards in
+with a USB cable that has power; several at once is fine. For each one the
+tool:
+
+- reads its `status` every 2 s and lists its power, VBAT and percentage;
+- waits until the charger reports it charged (`power: USB, charged`), then
+  runs `cal batt start`;
+- shows **Unplug** in large type and sounds a tone (again every 15 s until it
+  is unplugged).
+
+Unplugging starts the run, on the battery, for several hours, until BX Tacho
+shows CURVE SAVED and goes to sleep. Plugging it in before that cancels it;
+the log notes it if a board started this session comes back. A board that
+already has a measured curve is left alone, unless you press **Calibrate
+again**. One without a VBAT calibration, in another mode, or without USB
+power is shown with the reason. Each board's row in the database gets its
+`status` as on the Database tab. Leaving the tab sends `cal batt stop` to
+boards armed but still plugged in.
+
+"Charged" comes from the charger's CHRG signal, not from the voltage. A board
+whose CHRG pull-up is too weak (R7 100 kΩ instead of 4.7 kΩ) never shows
+charged, so it is never armed.
+
 ## Database
 
 Everything goes to one SQLite file, `production.db` in the folder you run the
