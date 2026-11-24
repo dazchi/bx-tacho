@@ -13,6 +13,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "hal/gpio_ll.h"
+#include "eventlog.h"
 #include "sense_adc.h"
 #include "settings.h"
 
@@ -48,6 +49,8 @@ static const char *TAG = "load";
 #define LOADED_PCT      90
 #define RELEASED_PCT    40
 #define DEBOUNCE_COUNT  4
+// On a switch of launcher, a reading above this on the new one's scale starts loaded
+#define SWITCH_LOADED_PCT 50
 
 // A switch to the white launcher needs readings above its loaded threshold for
 // this long without a break: a bey pushed in too far on a black launcher lifts
@@ -58,6 +61,37 @@ static const char *TAG = "load";
 // (load_empty_mv(): the saved calibration stays as it is)
 #define BASELINE_TRACK_PCT  20
 #define BASELINE_DIV        32  // EMA weight 1/32
+
+// Re-learning a launcher from its launches (load_launch_ended()). On some
+// launchers the pin reads higher when empty than the calibration allows: after
+// a launch the reading never gets below the released threshold, the top stays
+// "loaded" and the next one is never armed. A launch that ended with a result
+// means the top has left, whatever the sensor says: if the reading, once
+// settled, is clearly below the loaded plateau seen before the pull, that is
+// this launcher's empty level. Kept in RAM only (load_relearned()).
+//
+// The loaded plateau: an EMA of the readings while loaded, outside launches
+#define PLATEAU_DIV              8
+// Settled: readings within RELEARN_SETTLE_TOL_MV of each other for RELEARN_SETTLE_US;
+// not settled within RELEARN_TIMEOUT_US of the end of the launch: nothing learned
+#define RELEARN_SETTLE_TOL_MV    10
+#define RELEARN_SETTLE_US        300000
+#define RELEARN_TIMEOUT_US       3000000
+// Clearly below: by at least this share of the saved calibration's span (and
+// LOAD_MIN_CONTRAST_MV)
+#define RELEARN_MIN_DROP_PCT     30
+// Thresholds on the re-learned scale (settled empty level 0 %, plateau 100 %).
+// Lower than LOADED_PCT: the plateau is one top's reading, not a calibration,
+// and the next top may sit a little lower.
+#define RELEARN_LOADED_PCT       50
+#define RELEARN_RELEASED_PCT     25
+// Back to the saved calibration: this many readings in a row below its
+// released threshold (an empty reading the saved calibration explains, so
+// another launcher, or one reading as calibrated)
+#define RELEARN_REVERT_COUNT     DEBOUNCE_COUNT
+// Event log: EV_LOAD_RELEARN d
+#define RELEARN_EV_LEARNED       1
+#define RELEARN_EV_REVERTED      0
 
 
 static SemaphoreHandle_t s_lock;
@@ -93,6 +127,26 @@ static int64_t s_white_since_us;  // ...without a break since then
 static int s_empty_mv[LAUNCHER_COUNT];
 static launcher_cal_t s_empty_from[LAUNCHER_COUNT];
 static bool s_empty_init[LAUNCHER_COUNT];
+
+// Re-learned from launches (load_relearned()), per launcher
+typedef struct {
+    bool active;
+    int empty_mv;      // settled after a launch
+    int loaded_mv;     // the plateau before it
+    int revert_streak; // readings in a row the saved calibration calls released
+} relearn_t;
+static relearn_t s_relearn[LAUNCHER_COUNT];
+
+// The loaded plateau of the current top, and the settling after a launch
+static int s_plateau_mv;
+static bool s_plateau_valid;
+static bool s_settle_pending;    // a launch ended with a result: wait for the reading to settle
+static int64_t s_settle_end_us;  // give up then
+static int64_t s_window_us;      // readings since then are within the tolerance
+static int s_window_min;
+static int s_window_max;
+static int64_t s_window_sum;
+static int s_window_n;
 
 static inline void IRAM_ATTR led_set(bool on)
 {
@@ -400,6 +454,7 @@ static int *empty_level(launcher_t launcher)
         s_empty_from[l] = *cal;
         s_empty_mv[l] = cal->load_empty;
         s_empty_init[l] = true;
+        s_relearn[l].active = false;
     }
     return &s_empty_mv[l];
 }
@@ -410,8 +465,8 @@ int load_empty_mv(launcher_t launcher)
 }
 
 // Position of a reading between a launcher's empty (0, as re-learned) and
-// loaded (100) levels, or false without a usable calibration for it
-static bool cal_percent(launcher_t launcher, int diff_mv, int *pct)
+// loaded (100) levels on its saved calibration, or false without a usable one
+static bool saved_percent(launcher_t launcher, int diff_mv, int *pct)
 {
     const launcher_cal_t *cal = settings_cal(launcher);
     int empty = load_empty_mv(launcher);
@@ -421,6 +476,123 @@ static bool cal_percent(launcher_t launcher, int diff_mv, int *pct)
     }
     *pct = (diff_mv - empty) * 100 / span;
     return true;
+}
+
+static relearn_t *relearn_of(launcher_t launcher)
+{
+    empty_level(launcher);   // a changed calibration drops it
+    return &s_relearn[launcher == LAUNCHER_WHITE ? LAUNCHER_WHITE : LAUNCHER_BLACK];
+}
+
+// The same on the scale in use: the one re-learned from launches, if there is one
+static bool cal_percent(launcher_t launcher, int diff_mv, int *pct)
+{
+    const relearn_t *r = relearn_of(launcher);
+    if (!r->active) {
+        return saved_percent(launcher, diff_mv, pct);
+    }
+    *pct = (diff_mv - r->empty_mv) * 100 / (r->loaded_mv - r->empty_mv);
+    return true;
+}
+
+// The thresholds on that scale
+static int loaded_pct(launcher_t launcher)
+{
+    return relearn_of(launcher)->active ? RELEARN_LOADED_PCT : LOADED_PCT;
+}
+
+static int released_pct(launcher_t launcher)
+{
+    return relearn_of(launcher)->active ? RELEARN_RELEASED_PCT : RELEASED_PCT;
+}
+
+bool load_relearned(launcher_t launcher, int *empty_mv, int *loaded_mv)
+{
+    const relearn_t *r = relearn_of(launcher);
+    if (r->active) {
+        *empty_mv = r->empty_mv;
+        *loaded_mv = r->loaded_mv;
+    }
+    return r->active;
+}
+
+void load_launch_ended(void)
+{
+    s_settle_pending = true;
+    s_settle_end_us = esp_timer_get_time() + RELEARN_TIMEOUT_US;
+    s_window_n = 0;
+}
+
+// While the top still counts as loaded after a launch that ended with a result:
+// once the reading has settled clearly below the plateau, that is the empty
+// level, and the top has left
+static void settle_after_launch(launcher_t launcher, int diff_mv)
+{
+    int64_t now = esp_timer_get_time();
+    if (!s_loaded || !s_plateau_valid || now > s_settle_end_us) {
+        s_settle_pending = false;   // released as usual, nothing to learn from, or never settled
+        return;
+    }
+    if (s_window_n > 0) {
+        int lo = diff_mv < s_window_min ? diff_mv : s_window_min;
+        int hi = diff_mv > s_window_max ? diff_mv : s_window_max;
+        if (hi - lo > RELEARN_SETTLE_TOL_MV) {
+            s_window_n = 0;   // still moving: start the window again here
+        }
+    }
+    if (s_window_n == 0) {
+        s_window_us = now;
+        s_window_min = s_window_max = diff_mv;
+        s_window_sum = 0;
+    }
+    s_window_min = diff_mv < s_window_min ? diff_mv : s_window_min;
+    s_window_max = diff_mv > s_window_max ? diff_mv : s_window_max;
+    s_window_sum += diff_mv;
+    s_window_n++;
+    if (now - s_window_us < RELEARN_SETTLE_US) {
+        return;
+    }
+    s_settle_pending = false;
+    int settled = (int)(s_window_sum / s_window_n);
+
+    // Clearly below the plateau, in the direction the saved calibration goes
+    const launcher_cal_t *cal = settings_cal(launcher);
+    int span = cal->load_loaded - load_empty_mv(launcher);
+    int dir = span >= 0 ? 1 : -1;
+    int drop = (s_plateau_mv - settled) * dir;
+    int min_drop = abs(span) * RELEARN_MIN_DROP_PCT / 100;
+    if (min_drop < LOAD_MIN_CONTRAST_MV) {
+        min_drop = LOAD_MIN_CONTRAST_MV;
+    }
+    if (!cal->load_cal_valid || drop < min_drop) {
+        return;   // no contrast to go by: it stays as it is
+    }
+    relearn_t *r = relearn_of(launcher);
+    r->active = true;
+    r->empty_mv = settled;
+    r->loaded_mv = s_plateau_mv;
+    r->revert_streak = 0;
+    s_loaded = false;
+    s_streak = 0;
+    eventlog_add_ext(EV_LOAD_RELEARN, settled, s_plateau_mv, launcher, RELEARN_EV_LEARNED, 0);
+}
+
+// Back to the saved calibration once it explains the readings again
+static void check_revert(launcher_t launcher, int diff_mv)
+{
+    relearn_t *r = relearn_of(launcher);
+    int pct;
+    if (!r->active || s_loaded || !saved_percent(launcher, diff_mv, &pct)) {
+        return;
+    }
+    if (pct >= RELEASED_PCT) {
+        r->revert_streak = 0;
+    } else if (++r->revert_streak >= RELEARN_REVERT_COUNT) {
+        r->active = false;
+        s_streak = 0;
+        eventlog_add_ext(EV_LOAD_RELEARN, load_empty_mv(launcher), settings_cal(launcher)->load_loaded, launcher,
+                         RELEARN_EV_REVERTED, 0);
+    }
 }
 
 launcher_t load_track_launcher(int diff_mv, bool may_switch)
@@ -438,9 +610,9 @@ launcher_t load_track_launcher(int diff_mv, bool may_switch)
     launcher_t seen = s_launcher;
     if (black_only) {
         seen = LAUNCHER_BLACK;
-    } else if (cal_percent(LAUNCHER_WHITE, diff_mv, &pct) && pct > LOADED_PCT) {
+    } else if (cal_percent(LAUNCHER_WHITE, diff_mv, &pct) && pct > loaded_pct(LAUNCHER_WHITE)) {
         seen = LAUNCHER_WHITE;
-    } else if (cal_percent(LAUNCHER_BLACK, diff_mv, &pct) && pct < RELEASED_PCT) {
+    } else if (cal_percent(LAUNCHER_BLACK, diff_mv, &pct) && pct < released_pct(LAUNCHER_BLACK)) {
         seen = LAUNCHER_BLACK;
     }
     bool change = false;
@@ -467,8 +639,10 @@ launcher_t load_track_launcher(int diff_mv, bool may_switch)
         // Start from where this reading lies on the new launcher's scale, not from
         // the old state, so the switch itself isn't taken for a load or a release
         int pct;
-        s_loaded = cal_percent(seen, diff_mv, &pct) && pct > 50;
+        s_loaded = cal_percent(seen, diff_mv, &pct) && pct > SWITCH_LOADED_PCT;
         s_streak = 0;
+        s_plateau_valid = false;
+        s_settle_pending = false;
     }
     return s_launcher;
 }
@@ -481,11 +655,22 @@ bool load_classify(int diff_mv, bool may_switch)
     if (diff_mv == INT_MIN || !cal_percent(launcher, diff_mv, &pct)) {
         s_loaded = false;
         s_streak = 0;
+        s_plateau_valid = false;
+        s_settle_pending = false;
         return false;
     }
+
+    if (!may_switch) {
+        s_settle_pending = false;   // a new launch: the last one has nothing more to say
+    } else if (s_settle_pending) {
+        settle_after_launch(launcher, diff_mv);
+    }
+    check_revert(launcher, diff_mv);
+    cal_percent(launcher, diff_mv, &pct);   // on the scale in use now (it may have changed just above)
     s_last_pct = pct;
 
-    bool crossing = s_loaded ? (pct < RELEASED_PCT) : (pct > LOADED_PCT);
+    bool was_loaded = s_loaded;
+    bool crossing = s_loaded ? (pct < released_pct(launcher)) : (pct > loaded_pct(launcher));
     if (crossing) {
         if (++s_streak >= DEBOUNCE_COUNT) {
             s_loaded = !s_loaded;
@@ -495,13 +680,27 @@ bool load_classify(int diff_mv, bool may_switch)
         s_streak = 0;
     }
 
+    // The loaded plateau of this top: while it sits loaded, not during a launch
+    // nor while settling after one (the top has left then)
+    if (!s_loaded) {
+        s_plateau_valid = false;
+    } else if (may_switch && !s_settle_pending) {
+        if (!was_loaded || !s_plateau_valid) {
+            s_plateau_mv = diff_mv;
+            s_plateau_valid = true;
+        } else {
+            s_plateau_mv += (diff_mv - s_plateau_mv) / PLATEAU_DIV;
+        }
+    }
+
     // Re-learn the empty baseline while idle (load_empty_mv(): RAM only, the
     // saved calibration isn't changed), only near the empty level: readings off
     // the launcher (about 0 mV) would otherwise drag it down, and it couldn't
     // come back up
     if (!s_loaded && pct > -BASELINE_TRACK_PCT && pct < BASELINE_TRACK_PCT && s_launcher_streak == 0 &&
         !s_white_pending) {
-        int *empty = empty_level(launcher);
+        relearn_t *r = relearn_of(launcher);
+        int *empty = r->active ? &r->empty_mv : empty_level(launcher);
         *empty += (diff_mv - *empty) / BASELINE_DIV;
     }
     return s_loaded;

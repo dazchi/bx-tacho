@@ -492,6 +492,7 @@ static void sensor_task(void *arg)
                 eventlog_add(EV_STATE, snap.state, prev_state);
                 prev_state = snap.state;
                 if (snap.state == LAUNCH_RESULT) {
+                    load_launch_ended();   // the top has left: re-learn if it still reads loaded
                     uint32_t curve[LAUNCH_CURVE_MAX];
                     int n = launch_get_curve(curve, LAUNCH_CURVE_MAX);
                     bbp_record_shot(snap.result.peak_rpm, curve, n);

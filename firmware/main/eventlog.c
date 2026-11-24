@@ -174,6 +174,15 @@ static void print_entry(const ev_entry_t *e)
     case EV_LAUNCHER:
         cli_printf("LAUNCHER     %s, LOAD_SENSE %d mV\n", launcher_name(e->a), e->b);
         break;
+    case EV_LOAD_RELEARN:
+        if (e->d) {
+            cli_printf("LOAD RELEARN %s: empty %d mV after a launch, loaded %d mV before it\n", launcher_name(e->c),
+                       e->a, e->b);
+        } else {
+            cli_printf("LOAD RELEARN %s: back to the saved calibration (empty %d, loaded %d mV)\n",
+                       launcher_name(e->c), e->a, e->b);
+        }
+        break;
     default:
         cli_printf("?            %d %d\n", e->a, e->b);
         break;

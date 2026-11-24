@@ -21,6 +21,8 @@ typedef enum {
     EV_BLE_GESTURE,   // a = 1 BLE switched on, 0 off (by the load-sensor gesture)
     EV_LAUNCHER,      // a = launcher_t now in use, b = LOAD_SENSE mV that decided it
     EV_BATTCAL,       // a = 1 curve saved / 0 not (run too short), b = minutes of discharge
+    EV_LOAD_RELEARN,  // a = empty mV, b = loaded mV, c = launcher_t, d = 1 learned from a launch /
+                      //   0 back to the saved calibration (load_relearned())
 } ev_type_t;
 
 // Load sample came from a short LED flash (while the RPM channel is armed)

@@ -43,10 +43,10 @@ idf.py -B build/release -D SDKCONFIG=build/release/sdkconfig -D "SDKCONFIG_DEFAU
 Every build also writes the files to publish, named after `PROJECT_VER` in
 `CMakeLists.txt` (with `-bbp` for a build with the extension):
 
-- `build/release/bx-tacho-v2.4.3.bin`: for updates from the web app (USB or
+- `build/release/bx-tacho-v2.5.0.bin`: for updates from the web app (USB or
   Bluetooth) or `write-flash 0x10000` (with `otadata`, see above). A copy of
   `bx-tacho.bin`, which `idf.py flash` keeps using.
-- `build/release/bx-tacho-v2.4.3-merged.bin`: everything from 0x0 (what
+- `build/release/bx-tacho-v2.5.0-merged.bin`: everything from 0x0 (what
   `idf.py flash` writes), for a blank board (`write-flash 0x0`). It overwrites
   NVS (settings and shot history) but ends below `fctry`, so the battery
   calibration stays.
@@ -173,6 +173,31 @@ first top loaded, or the pin pushed up), BX Tacho is still on the black
 settings and the empty white launcher reads as loaded. The calibration commands
 always name the launcher (`cal load white empty`, `rpm scan white 5 apply`,
 `rpm thr white 80`) for that reason.
+
+#### Launchers that read higher than calibrated
+
+On some launchers the pin reads higher when empty than the calibration
+allows. After a launch the reading then never gets below the released
+threshold: the top stays "loaded" and the next one is never armed, so only
+the first launch is measured. BX Tacho re-learns such a launcher from its
+launches, without a new `cal load`:
+
+1. While a top sits loaded, it keeps the reading's level (the plateau).
+2. A launch that ended with a result means the top has left. If the reading
+   still counts as loaded, BX Tacho waits for it to settle (within 10 mV for
+   0.3 s, up to 3 s after the launch).
+3. If it settled clearly below the plateau (by 30 % of the calibrated span,
+   and at least 30 mV), that level is the launcher's empty level. The top
+   counts as released, and from then on the launcher uses this scale:
+   settled level 0 %, plateau 100 %, loaded above 50 %, released below 25 %.
+
+This is kept in RAM only, separately for black and white. It goes back to the
+saved calibration once an empty reading falls below that calibration's
+released threshold again (4 readings in a row, e.g. another launcher), on
+`cal load` and on a restart. `events` logs each change (LOAD RELEARN), and
+`status` shows the levels in use under the launcher's calibration. A launcher
+whose reading doesn't drop after a launch at all still needs `cal load`. All
+of these numbers are the `RELEARN_*` defines in `load.c`.
 
 Updating from 1.x resets the load and RPM calibration and `cfg edges` to
 these defaults (one calibration for every launcher can't be carried over);

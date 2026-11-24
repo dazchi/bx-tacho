@@ -169,6 +169,11 @@ static int cmd_status(int argc, char **argv)
             // The saved levels; the empty level in use is re-learned while empty (load_empty_mv())
             cli_printf("cal %-7s : load empty %d mV (tracking %d mV), loaded %d mV; rpm threshold %u mV\n",
                        launcher_name(l), c->load_empty, load_empty_mv(l), c->load_loaded, c->rpm_thr_mv);
+            int rl_empty, rl_loaded;
+            if (load_relearned(l, &rl_empty, &rl_loaded)) {
+                cli_printf("            : in use, learned from a launch: empty %d mV, loaded %d mV\n", rl_empty,
+                           rl_loaded);
+            }
         } else {
             cli_printf("cal %-7s : load not calibrated; rpm threshold %u mV\n", launcher_name(l), c->rpm_thr_mv);
         }

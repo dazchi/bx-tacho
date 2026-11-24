@@ -86,3 +86,14 @@ int load_last_percent(void);
 // saving them never stores it; back to the saved level when that calibration
 // changes.
 int load_empty_mv(launcher_t launcher);
+
+// A launch ended with a result (the sensor task calls it): the top has left.
+// If the reading still counts as loaded, the next readings decide: settled
+// clearly below the loaded plateau seen before the pull, that is the
+// launcher's empty level, and the top is released (load.c, RELEARN_*).
+void load_launch_ended(void);
+// The empty level and loaded plateau learned that way for a launcher, in use
+// instead of its saved calibration: false if none (never, or reverted once the
+// saved calibration explained an empty reading again). RAM only; dropped when
+// the calibration changes.
+bool load_relearned(launcher_t launcher, int *empty_mv, int *loaded_mv);
