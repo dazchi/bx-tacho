@@ -31,6 +31,7 @@ const state = {
   updating: false,       // ...being sent
   fw: null,              // { bytes, info, name }
   latest: null,          // the latest release on this site (firmware/latest/latest.json)
+  releases: [],          // every release since 2.0.0 on this site (firmware/releases/releases.json)
 };
 
 // ---------------------------------------------------------------- brand
@@ -402,41 +403,91 @@ async function findLatest() {
   }
 }
 
-// Downloads the latest release's firmware and checks it against the
+// Downloads a release's firmware from this site and checks it against the
 // release's checksum, then loads it like a chosen file. `prefix` is 'fw' or
-// 'bota', the block whose button was used.
+// 'bota', the block it was asked from; `url` where the file is.
+async function fetchRelease(prefix, release, url, load) {
+  const { version, file, sha256: want } = release;
+  let bytes;
+  try {
+    const res = await fetch(`${url}?sha256=${want}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    bytes = new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return releaseFailed(prefix, file, 'fw.releaseFailed', version);
+  }
+  if ((await sha256(bytes)) !== want) return releaseFailed(prefix, file, 'fw.releaseBad', version);
+  await load(new File([bytes], file), release);
+}
+
 async function useLatest(prefix, load) {
   const btn = $(`${prefix}-latest`);
-  const { version, file, sha256: want } = state.latest;
+  const { version, file } = state.latest;
   btn.disabled = true;
   setText(btn, 'fw.latestLoading', { v: version });
   try {
-    let bytes;
-    try {
-      const res = await fetch(`firmware/latest/${file}?sha256=${want}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      bytes = new Uint8Array(await res.arrayBuffer());
-    } catch {
-      return latestFailed(prefix, 'fw.latestFailed');
-    }
-    if ((await sha256(bytes)) !== want) return latestFailed(prefix, 'fw.latestBad');
-    await load(new File([bytes], file), state.latest);
+    await fetchRelease(prefix, state.latest, `firmware/latest/${file}`, load);
   } finally {
     btn.disabled = false;
     setText(btn, 'fw.latest', { v: version });
   }
 }
 
-// The latest release couldn't be used: says why in the file box, and drops
-// any file chosen before so it isn't sent by mistake
-function latestFailed(prefix, key) {
+// The releases since 2.0.0, which the Pages workflow copies to this site too:
+// a version picker under each "Use the latest release" (hidden without them)
+async function findReleases() {
+  try {
+    const res = await fetch('firmware/releases/releases.json', { cache: 'no-cache' });
+    if (!res.ok) return;
+    const list = await res.json();
+    state.releases = (Array.isArray(list) ? list : []).filter((r) => r && /^v[\d.]+$/.test(r.tag)
+      && /^[0-9a-f]{64}$/.test(r.sha256) && /^bx-tacho[\w.-]*\.bin$/.test(r.file));
+  } catch {
+    return;
+  }
+  if (!state.releases.length) return;
+  for (const prefix of ['fw', 'bota']) {
+    fillReleases(prefix);
+    $(`${prefix}-older`).hidden = false;
+  }
+}
+
+// The picker's options: a prompt, then each release, newest first
+function fillReleases(prefix, loading) {
+  const sel = $(`${prefix}-release`);
+  sel.innerHTML = '';
+  sel.append(new Option(loading ? t('fw.latestLoading', { v: loading }) : t('fw.olderPick'), ''));
+  for (const r of state.releases) {
+    const latest = r.tag === state.latest?.tag ? t('fw.olderLatest') : '';   // its own spacing: ' (latest)', '（最新）'
+    sel.append(new Option(`v${r.version}${latest} · ${(r.published || '').slice(0, 10)}`, r.tag));
+  }
+  sel.value = '';
+}
+
+async function useRelease(prefix, load) {
+  const sel = $(`${prefix}-release`);
+  const release = state.releases.find((r) => r.tag === sel.value);
+  if (!release) return;
+  sel.disabled = true;
+  fillReleases(prefix, release.version);
+  try {
+    await fetchRelease(prefix, release, `firmware/releases/${release.tag}/${release.file}`, load);
+  } finally {
+    sel.disabled = false;
+    fillReleases(prefix);
+  }
+}
+
+// A release couldn't be used: says why in the file box, and drops any file
+// chosen before so it isn't sent by mistake
+function releaseFailed(prefix, file, key, version) {
   if (prefix === 'fw') state.fw = null;
   else state.bfw = null;
   const box = $(`${prefix}-info`);
   box.hidden = false;
   box.dataset.kind = 'invalid';
-  setPlain($(`${prefix}-name`), state.latest.file);
-  setText($(`${prefix}-detail`), key);
+  setPlain($(`${prefix}-name`), file);
+  setText($(`${prefix}-detail`), key, { v: version });
   $(`${prefix}-sum`).hidden = true;
   $(`${prefix}-sum`).pending = null;
   $(`${prefix}-progress`).hidden = true;
@@ -450,7 +501,16 @@ function latestFailed(prefix, key) {
 
 $('fw-latest').addEventListener('click', () => useLatest('fw', loadFirmware));
 $('bota-latest').addEventListener('click', () => useLatest('bota', loadBleFirmware));
-findLatest();
+$('fw-release').addEventListener('change', () => useRelease('fw', loadFirmware));
+$('bota-release').addEventListener('change', () => useRelease('bota', loadBleFirmware));
+findLatest().then(findReleases);
+// The picker's texts are written by hand (options can't carry data-i18n)
+document.addEventListener('langchange', () => {
+  if (!state.releases.length) return;
+  for (const prefix of ['fw', 'bota']) {
+    if (!$(`${prefix}-release`).disabled) fillReleases(prefix);
+  }
+});
 
 async function loadFirmware(file, release) {
   const bytes = new Uint8Array(await file.arrayBuffer());

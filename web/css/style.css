@@ -1129,6 +1129,37 @@ button {
   gap: 8px;
 }
 
+/* Another release than the latest: a version picker under its button */
+.older {
+  display: grid;
+  gap: 6px;
+}
+
+.older[hidden] {
+  display: none;
+}
+
+.older__label {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.older__select {
+  font: inherit;
+  min-height: 42px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.older__select:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .lang__select {
   font: inherit;
   color: var(--ink);
