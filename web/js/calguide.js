@@ -12,11 +12,20 @@
 
 export const LOADED_PCT = 90;
 export const RELEASED_PCT = 40;
-export const MIN_CONTRAST_MV = 30;   // the firmware's LOAD_MIN_CONTRAST_MV
+export const MIN_CONTRAST_MV = 25;   // the firmware's LOAD_MIN_CONTRAST_MV (load.h)
 const SPIN_FACTOR = 0.91;            // a spinning top is read with short flashes: about 91 % of the level
-const MIN_WINDOW_MV = 25;            // below this the margins would be under 5 mV
-const THIRDS_MIN_WINDOW_MV = 45;     // below this the thirds would be under the minimum contrast
+const MIN_MARGIN_MV = 5;             // the least margin a setting may leave on each side
 const TIGHT_MARGIN_MV = 10;
+
+// With the smallest range the firmware takes (MIN_CONTRAST_MV), centred in the
+// room W, the thresholds sit THRESHOLDS_PCT_SUM % of it apart from both ends
+// together: each margin is (W - MIN_CONTRAST_MV * that / 100) / 2 around them,
+// and released - emax = (W - MIN_CONTRAST_MV * (LOADED_PCT - RELEASED_PCT) / 100) / 2.
+const THRESHOLDS_PCT_SUM = RELEASED_PCT + LOADED_PCT;
+// Below this room, the margins would be under MIN_MARGIN_MV
+export const MIN_WINDOW_MV = Math.ceil(2 * MIN_MARGIN_MV + MIN_CONTRAST_MV * (LOADED_PCT - RELEASED_PCT) / 100);
+// Below this room, a range of two thirds of it would be under MIN_CONTRAST_MV
+const THIRDS_MIN_WINDOW_MV = Math.ceil(MIN_CONTRAST_MV * 3 / 2);
 
 const thresholds = (empty, loaded) => ({
   released: Math.round(empty + (loaded - empty) * RELEASED_PCT / 100),
@@ -48,8 +57,8 @@ export function suggest(rows) {
     empty = Math.round(base.emax + base.w / 15);
     loaded = Math.round(empty + base.w * 2 / 3);
   } else if (base.w >= MIN_WINDOW_MV) {
-    // The smallest range the firmware takes, centred in the room there is
-    empty = Math.round(base.emax + (base.w - 15) / 2 - 12);
+    // The smallest range the firmware takes, its thresholds centred in the room there is
+    empty = Math.round(base.emax + (base.w - MIN_CONTRAST_MV * THRESHOLDS_PCT_SUM / 100) / 2);
     loaded = empty + MIN_CONTRAST_MV;
   } else {
     return { verdict: 'impossible', ...base };

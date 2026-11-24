@@ -9,7 +9,7 @@ import { BleConsole, readInfo } from './bleconsole.js';
 import { BleUpdater, OtaError } from './bleota.js';
 import { drawCurve, drawHistory } from './chart.js';
 import { analyzeImage, flashFirmware, loadBootFiles } from './flasher.js';
-import { MIN_CONTRAST_MV, crossCheck, parseLoadReadings, suggest } from './calguide.js';
+import { MIN_CONTRAST_MV, MIN_WINDOW_MV, crossCheck, parseLoadReadings, suggest } from './calguide.js';
 import { drawPixelText, pixelWidth, revealPixelText } from './pixelfont.js';
 import { ESPRESSIF_VID, SerialLink, requestBxPort, serialApi, serialSupported } from './serial.js';
 
@@ -1212,7 +1212,7 @@ function renderGuideResult() {
   } else if (s?.verdict === 'impossible') {
     res.dataset.tone = 'bad';
     res.append(guideP('guide.res.window', { emax: s.emax, ea: s.emaxAt + 1, lmin: s.lmin, la: s.lminAt + 1, w: s.w }),
-      guideP('guide.res.impossible', { ea: s.emaxAt + 1, la: s.lminAt + 1 }));
+      guideP('guide.res.impossible', { ea: s.emaxAt + 1, la: s.lminAt + 1, min: MIN_WINDOW_MV }));
   } else if (s) {
     canApply = true;
     res.dataset.tone = s.verdict === 'ok' && s.spinOk ? 'ok' : 'warn';

@@ -11,7 +11,7 @@
 #include "settings.h"
 
 // Smallest |loaded - empty| difference accepted as a calibration (mV)
-#define LOAD_MIN_CONTRAST_MV 30
+#define LOAD_MIN_CONTRAST_MV 25
 
 esp_err_t load_init(void);
 

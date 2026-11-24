@@ -189,7 +189,7 @@ export default {
   'guide.res.tight': "Works, but with little margin: another bey or a slightly different reading may not be detected. Measure with the bey that reads lowest, and check each launcher after saving.",
   'guide.res.spin': "While a bey spins it reads about 9 % lower: on launcher {la} that is close to the released level, so a spinning bey may count as released.",
   'guide.res.contrast': "Launcher {n}: loaded reads only {d} mV above empty (at least {min} mV needed). Is the bey attached? Measure it again.",
-  'guide.res.impossible': "No single setting works: launcher {ea}'s empty reading is too close to launcher {la}'s loaded reading (at least 25 mV of room needed). Remove one of them, or calibrate BX Tacho for it alone.",
+  'guide.res.impossible': "No single setting works: launcher {ea}'s empty reading is too close to launcher {la}'s loaded reading (at least {min} mV of room needed). Remove one of them, or calibrate BX Tacho for it alone.",
   'guide.res.blackLooksWhite': "A black launcher reads up to {max} mV, at or above the white launchers' loaded level ({thr} mV): BX Tacho would switch to white on it. Set cfg autowhite off and measure all launchers as black.",
   'guide.res.whiteLooksBlack': "An empty white launcher reads {min} mV, at or below the black launchers' released level ({thr} mV): BX Tacho would switch to black on it.",
   'guide.apply': "Save to BX Tacho",

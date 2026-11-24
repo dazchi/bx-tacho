@@ -188,7 +188,7 @@ export default {
   'guide.res.tight': "能使用，但余量很小：换一个陀螺或读数稍有不同就可能检测不到。请用读数最低的陀螺测量，保存后在每个发射器上确认。",
   'guide.res.spin': "陀螺旋转时读数约低 9 %：在发射器 {la} 上会接近松开的门限，旋转中的陀螺可能被判定为已松开。",
   'guide.res.contrast': "发射器 {n}：已装上只比未装上高 {d} mV（至少需要 {min} mV）。陀螺装上了吗？请重新测量。",
-  'guide.res.impossible': "没有一组设置能通用：发射器 {ea} 的未装上读数太接近发射器 {la} 的已装上读数（至少需要 25 mV 的空间）。请移除其中一个，或只为它单独校准 BX Tacho。",
+  'guide.res.impossible': "没有一组设置能通用：发射器 {ea} 的未装上读数太接近发射器 {la} 的已装上读数（至少需要 {min} mV 的空间）。请移除其中一个，或只为它单独校准 BX Tacho。",
   'guide.res.blackLooksWhite': "黑色发射器的读数最高到 {max} mV，达到或超过白色发射器的已装上门限（{thr} mV）：BX Tacho 会在它上面切换为白色。请设置 cfg autowhite off，并把所有发射器都当作黑色测量。",
   'guide.res.whiteLooksBlack': "白色发射器未装上时读数为 {min} mV，达到或低于黑色发射器的松开门限（{thr} mV）：BX Tacho 会在它上面切换为黑色。",
   'guide.apply': "保存到 BX Tacho",

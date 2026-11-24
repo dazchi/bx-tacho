@@ -7,6 +7,7 @@ idf_component_register(
         "battery.c"
         "rpm.c"
         "load.c"
+        "load_classify.c"
         "launch.c"
         "display.c"
         "font5x7.c"

@@ -237,6 +237,19 @@ exports the table. The tab only shows data: the mode stays as it was, so with
 automatic flashing (or update) on, a board plugged in meanwhile is still
 written.
 
+**Black span check.** A board whose black launcher calibration is narrow
+(loaded − empty under 50 mV, `BLACK_SPAN_MIN_MV` in `index.html`) shows its
+**Black load** in red, with the reason on hover and in its details; the count
+is under the table, and searching `low-span` lists them. Every board is
+calibrated on the same set of launchers with the web app's "Several
+launchers" guide, which saves two thirds of the room between their highest
+empty and lowest loaded readings, so a span narrower than the other boards'
+is the board: a less sensitive ITR8307, or one tilted or sitting too high. It
+leaves less margin for a customer's launcher that reads differently. Reseat
+or reflow the ITR8307 and calibrate again. (A board calibrated on one
+launcher has a wider span, about 90 mV: the check only compares boards
+calibrated the same way.)
+
 **Delete…** in a board's details removes its row, after a second step that
 names the board (and what goes with it: customer, calibration, notes) and
 wants the last 4 characters of its serial typed. It can't be undone; the row

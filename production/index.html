@@ -142,6 +142,7 @@
   .plug li { display: flex; gap: 10px 16px; align-items: center; flex-wrap: wrap; }
   .plug li span { flex: 1 1 320px; overflow-wrap: anywhere; }
   .plug li.bad span { color: var(--bad); }
+  .ids dd.bad { color: var(--bad); font-weight: 700; }
   .plug code { font-family: var(--mono); }
   .plug button { font: inherit; font-size: 0.9rem; font-weight: 600; padding: 6px 16px; border-radius: 8px;
     border: 1px solid var(--wait); background: var(--surface); color: var(--wait); cursor: pointer; }
@@ -621,6 +622,29 @@ const DETAIL_LABELS = {
 };
 // Read from the board on the Database tab ('status'); empty: not read since it was flashed
 function battCal(v) { return v === null || v === undefined ? '' : (v ? 'calibrated' : 'default'); }
+
+// Production check: the black launcher's span (loaded - empty). Every board is
+// calibrated on the same set of launchers with the web app's "Several
+// launchers" guide, which saves two thirds of the room between their highest
+// empty and lowest loaded readings. So a span narrower than the other boards'
+// is the board, not the launchers: a less sensitive ITR8307, or one tilted or
+// sitting too high. It leaves less margin for a customer's launcher that reads
+// differently (re-learning needs 25 mV of it). Spans from 16 Nov 2026, with
+// the guide: 48-67 mV (before, from one launcher, about 90 mV).
+const BLACK_SPAN_MIN_MV = 50;
+const LOW_SPAN_WORD = 'low-span';   // what the search finds them by
+function blackSpan(r) {
+  const e = r.black_load_empty_mv, l = r.black_load_loaded_mv;
+  return e === null || e === undefined || l === null || l === undefined ? null : l - e;
+}
+function blackSpanLow(r) {
+  const span = blackSpan(r);
+  return span !== null && span < BLACK_SPAN_MIN_MV;
+}
+function blackSpanNote(r) {
+  return `black span ${blackSpan(r)} mV, under ${BLACK_SPAN_MIN_MV} mV: narrow for the launcher set, `
+    + "check the ITR8307's seating (tilt, height), then calibrate black again";
+}
 function load(r, l) {
   if (r[l + '_rpm_thr_mv'] === null || r[l + '_rpm_thr_mv'] === undefined) return '';
   return r[l + '_load_empty_mv'] === null ? 'not calibrated'
@@ -667,7 +691,8 @@ function renderDb() {
 
   const words = $('db-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   let rows = db.rows.filter((r) => {
-    const text = db.columns.filter((c) => c !== 'cal_detail').map((c) => r[c] ?? '').join(' ').toLowerCase();
+    const text = db.columns.filter((c) => c !== 'cal_detail').map((c) => r[c] ?? '').join(' ').toLowerCase()
+      + (blackSpanLow(r) ? ` ${LOW_SPAN_WORD}` : '');
     return words.every((w) => text.includes(w));
   });
   if (dbSort) {
@@ -693,6 +718,10 @@ function renderDb() {
         td.classList.add(cls);
         td.title = r[key] || '';
       }
+      if (key === 'black_load_empty_mv' && blackSpanLow(r)) {
+        td.classList.add('fail');
+        td.title = blackSpanNote(r);
+      }
       tr.append(td);
     }
     tr.addEventListener('click', () => {
@@ -709,8 +738,11 @@ function renderDb() {
   }
   const calibrated = db.rows.filter((r) => r.cal_at).length;
   const failed = db.rows.filter((r) => r.cal_result === 'FAIL').length;
+  const lowSpan = db.rows.filter(blackSpanLow).length;
   $('db-info').textContent = `${words.length ? `${rows.length} of ` : ''}${db.rows.length} boards · `
-    + `${calibrated} calibrated${failed ? ` (${failed} FAIL)` : ''} · ${db.db}`;
+    + `${calibrated} calibrated${failed ? ` (${failed} FAIL)` : ''}`
+    + (lowSpan ? ` · ${lowSpan} with a black span under ${BLACK_SPAN_MIN_MV} mV (search "${LOW_SPAN_WORD}")` : '')
+    + ` · ${db.db}`;
   renderDetail(db.rows.find((r) => r.unique_id === dbSelected));
 }
 
@@ -727,6 +759,12 @@ function renderDetail(r) {
     const v = DETAIL_FORMAT[c] ? DETAIL_FORMAT[c](r[c]) : String(r[c]);
     ids.append(Object.assign(document.createElement('dt'), { textContent: DETAIL_LABELS[c] || c }),
                Object.assign(document.createElement('dd'), { textContent: v }));
+  }
+  if (blackSpan(r) !== null) {
+    const dd = Object.assign(document.createElement('dd'),
+                             { textContent: blackSpanLow(r) ? blackSpanNote(r) : `${blackSpan(r)} mV` });
+    if (blackSpanLow(r)) dd.className = 'bad';
+    ids.append(Object.assign(document.createElement('dt'), { textContent: 'Black: span' }), dd);
   }
   let detail = null;
   try { detail = r.cal_detail ? JSON.parse(r.cal_detail) : null; } catch { /* left out */ }

@@ -188,7 +188,7 @@ export default {
   'guide.res.tight': "能使用，但餘裕很小：換一顆陀螺或讀值稍有不同就可能偵測不到。請用讀值最低的陀螺量測，儲存後在每個發射器上確認。",
   'guide.res.spin': "陀螺旋轉時讀值約低 9 %：在發射器 {la} 上會接近放開的門檻，旋轉中的陀螺可能被判定為已放開。",
   'guide.res.contrast': "發射器 {n}：已裝上只比未裝上高 {d} mV（至少需要 {min} mV）。陀螺有裝上嗎？請重新量測。",
-  'guide.res.impossible': "沒有一組設定能通用：發射器 {ea} 的未裝上讀值太接近發射器 {la} 的已裝上讀值（至少需要 25 mV 的空間）。請移除其中一個，或只為它單獨校正 BX Tacho。",
+  'guide.res.impossible': "沒有一組設定能通用：發射器 {ea} 的未裝上讀值太接近發射器 {la} 的已裝上讀值（至少需要 {min} mV 的空間）。請移除其中一個，或只為它單獨校正 BX Tacho。",
   'guide.res.blackLooksWhite': "黑色發射器的讀值最高到 {max} mV，達到或超過白色發射器的已裝上門檻（{thr} mV）：BX Tacho 會在它上面切換成白色。請設定 cfg autowhite off，並把所有發射器都當作黑色量測。",
   'guide.res.whiteLooksBlack': "白色發射器未裝上時讀值為 {min} mV，達到或低於黑色發射器的放開門檻（{thr} mV）：BX Tacho 會在它上面切換成黑色。",
   'guide.apply': "儲存到 BX Tacho",

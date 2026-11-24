@@ -90,7 +90,7 @@ Tunables are under **BX Tacho** in `idf.py menuconfig` (`main/Kconfig.projbuild`
 | `rpm thr [black\|white <mV>]` | Show the comparator thresholds, or set one launcher's (capped at 2000 mV) |
 | `load [n]` / `load flash [n]` | Print ambient-cancelled LOAD_SENSE readings; `flash` puts a full poll next to the short flash sample used while a top is loaded |
 | `load led on\|off\|auto` | Hold the load LED on (diag or meter mode), to test its crosstalk into the RPM sensor, or off (no measurement flashes, only ambient light); `load` and the diag screen then show the raw LOAD_SENSE voltage. `auto` goes back to normal measurements, as does leaving diag or meter mode. `rpm scan` keeps it off while it samples. In normal use it is only flashed while the RPM channel is armed, as its light reflected off a loaded top reaches the RPM sensor: at each rising RPM edge while the disc turns, off again within 90 % of the disc's white part (so it can't make or move a rising edge), and every 10 ms while the disc is still |
-| `cal load black\|white empty\|loaded [<mV>]\|clear` | Calibrate the load sensor for one launcher: measure the empty or loaded level, or set it to the level given (e.g. one recorded before; `status` shows the saved levels). Checked and saved the same way: valid once both levels are in and at least 30 mV apart |
+| `cal load black\|white empty\|loaded [<mV>]\|clear` | Calibrate the load sensor for one launcher: measure the empty or loaded level, or set it to the level given (e.g. one recorded before; `status` shows the saved levels). Checked and saved the same way: valid once both levels are in and at least 25 mV apart |
 | `cal vbat start` … `stop` | Production VBAT calibration, see below |
 | `cal batt start\|stop\|show\|clear` | Battery percentage calibration from a full discharge, see below |
 | `cfg edges <n>` | Rising edges per launcher revolution |
@@ -187,9 +187,9 @@ launches, without a new `cal load`:
    still counts as loaded, BX Tacho waits for it to settle (within 10 mV for
    0.3 s, up to 3 s after the launch).
 3. If it settled clearly below the plateau (by 30 % of the calibrated span,
-   and at least 30 mV), that level is the launcher's empty level. The top
+   and at least 25 mV), that level is the launcher's empty level. The top
    counts as released, and from then on the launcher uses this scale:
-   settled level 0 %, plateau 100 %, loaded above 50 %, released below 25 %.
+   settled level 0 %, plateau 100 %, loaded above 67 %, released below 33 %.
 
 This is kept in RAM only, separately for black and white. It goes back to the
 saved calibration once an empty reading falls below that calibration's
